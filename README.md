@@ -2,7 +2,8 @@
 
 AI Companion is a full-stack wellness application that combines journaling, mood tracking, and AI-powered conversations to support users' mental health and personal growth.
 
-![AI Companion Logo](frontend/public/logo.svg)
+<img src="frontend/public/logo.svg" alt="AI Companion Logo" width="180">
+
 
 ## Features
 
