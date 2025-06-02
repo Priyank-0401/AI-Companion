@@ -313,7 +313,8 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background-light to-background-dark text-text-light p-4 sm:p-6 md:p-8">
+    <div className="w-full h-full bg-gradient-to-br from-background-light to-background-dark text-text-light pt-16">
+      {/* Page content directly on the page */}
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -50 }}

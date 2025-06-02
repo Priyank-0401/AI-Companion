@@ -88,13 +88,13 @@ const JournalingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background-light to-background-dark text-text-light p-4 sm:p-6 md:p-8 flex flex-col items-center">
-      {/* Header */}
+    <div className="w-full min-h-screen bg-gradient-to-br from-background-light to-background-dark text-text-light pt-16">
+      {/* Enhanced Header */}
       <motion.header
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
-        className="w-full max-w-4xl mb-8 text-center"
+        className="w-full max-w-6xl mx-auto mb-8 text-center px-4"
       >
         <h1 className="text-4xl sm:text-5xl font-bold text-primary-accent mb-3">
           Your Private Journal: A Space to Reflect
@@ -117,7 +117,7 @@ const JournalingPage = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-mediumDark rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+              className="bg-mediumDark rounded-xl p-6 w-full max-w-3xl max-h-[80vh] overflow-y-auto shadow-2xl"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-semibold">New Journal Entry</h2>
@@ -198,7 +198,7 @@ const JournalingPage = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="card mb-6"
+        className="card mb-6 max-w-6xl mx-auto px-4"
       >
         <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
           <div className="flex-1 relative">
@@ -229,7 +229,7 @@ const JournalingPage = () => {
       </motion.div>
 
       {/* Journal Entries */}
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-6xl mx-auto px-4">
         <AnimatePresence>
           {filteredEntries.map((entry, index) => (
             <motion.div
@@ -238,7 +238,7 @@ const JournalingPage = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ delay: index * 0.1 }}
-              className="card hover:bg-mediumDark/80 transition-colors group"
+              className="card hover:bg-mediumDark/80 transition-colors group shadow-lg"
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-3">

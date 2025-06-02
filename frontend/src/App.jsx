@@ -38,14 +38,12 @@ function AppContent() {
     };
   }, [isHomePage]);
 
-  return (
-    <div className="flex flex-col min-h-screen bg-dark text-lightText">
-      <Navbar />
-      <motion.main
+  return (    <div className="flex flex-col min-h-screen bg-[#222831] text-[#EEEEEE]">
+      <Navbar />      <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className={isAuthPage ? "" : "container mx-auto px-4 py-8 flex-grow"}
+        className={isAuthPage ? "" : "w-full py-4 flex-grow"}
       >
         <Routes>
           <Route path="/" element={<HomePage />} />
