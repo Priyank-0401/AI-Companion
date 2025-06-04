@@ -21,6 +21,7 @@ const Navbar = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser, logout, loading } = useAuth()
+  const isWellnessPage = location.pathname === '/wellness'
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home, public: true },

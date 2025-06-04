@@ -20,6 +20,7 @@ function AppContent() {
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isHomePage = location.pathname === '/';
+  const isWellnessPage = location.pathname === '/wellness';
 
   // Prevent body scrolling on all pages except HomePage
   useEffect(() => {
@@ -43,7 +44,7 @@ function AppContent() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className={isAuthPage ? "" : "w-full py-4 flex-grow"}
+        className={isAuthPage ? "" : isWellnessPage ? "w-full flex-grow" : "w-full py-4 flex-grow"}
       >
         <Routes>
           <Route path="/" element={<HomePage />} />

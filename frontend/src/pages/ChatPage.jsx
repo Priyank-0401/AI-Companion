@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, User, Loader2 } from 'lucide-react'
+import { useChat } from '../contexts/ChatContext';
 
 const ChatPage = () => {
+  const { resetChat } = useChat();
+
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -23,7 +26,7 @@ const ChatPage = () => {
     setMessages(prev => [...prev, message]);
   };
 
-  const resetChat = () => {
+  const resetChatHandler = () => {
     setMessages([{
       id: 1,
       type: 'bot',
@@ -58,6 +61,38 @@ const ChatPage = () => {
     if (chatScrollContainerRef.current) {
       chatScrollContainerRef.current.style.paddingTop = '4rem';
     }
+  }, [messages]);
+
+  useEffect(() => {
+    // Load messages from local storage on component mount
+    const savedMessages = localStorage.getItem('chatMessages');
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
+          setMessages(parsedMessages.map(msg => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          })));
+          return; // Exit early if valid messages are found
+        }
+      } catch (e) {
+        console.error('Parsing error:', e);
+      }
+    }
+
+    // Only set welcome message if no valid saved messages
+    setMessages([{
+      id: 1,
+      type: 'bot',
+      content: "Welcome! It's wonderful to see you. I'm Seriva, a friendly presence here to listen without judgment, offer support, and explore any thoughts or feelings you'd like to share. How can I help you feel more supported today?",
+      timestamp: new Date()
+    }]);
+  }, []);
+
+  useEffect(() => {
+    console.log("Saving messages to localStorage", messages);
+    localStorage.setItem('chatMessages', JSON.stringify(messages));
   }, [messages]);
 
   const handleSendMessage = async () => {
@@ -161,159 +196,169 @@ const ChatPage = () => {
           {/* Full Width Chat Container */}
           <div className="flex-1 flex flex-col w-full">
             {/* Messages Area with controlled scroll */}
-            <div 
-              ref={chatScrollContainerRef} 
-              className="h-[580px] overflow-y-auto px-8 py-6 space-y-6"
-              style={{
-                scrollbarWidth: 'thin',
-                scrollbarColor: '#475569 transparent'
-              }}
-            >
-              <div className="max-w-5xl mx-auto space-y-6">
-                <AnimatePresence mode="popLayout">
-                  {messages.map((message, index) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -30, scale: 0.95 }}
-                      transition={{ 
-                        duration: 0.4, 
-                        delay: index * 0.05,
-                        type: "spring",
-                        stiffness: 200,
-                        damping: 20
-                      }}
-                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`flex items-start gap-4 max-w-[75%] ${
-                        message.type === 'user' ? 'flex-row-reverse' : ''
-                      }`}>
-                        {/* Enhanced avatar */}
-                        <motion.div 
-                          className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 ${
-                          message.type === 'user' 
-                            ? 'bg-gradient-to-br from-purple-500 to-purple-600' 
-                            : ''
-                        }`}
-                        whileHover={{ scale: 1.05 }}
-                      >
-                        {message.type === 'user' ? (
-                          <User className="w-6 h-6 text-white" />
-                        ) : (
-                          <img 
-                            src="/logo.png" 
-                            alt="Application Logo" 
-                            className="w-20 h-20 rounded-full object-cover" 
-                            style={{ background: 'transparent' }}
-                          />
-                        )}
-                      </motion.div>
+            <div className="relative">
+              {/* Reset Chat Button */}
+              <button
+                onClick={resetChat}
+                className="absolute top-4 right-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200 shadow-md"
+              >
+                Reset Chat
+              </button>
 
-                        
-                        {/* Enhanced message bubble */}
-                        <motion.div 
-                          className={`relative group ${
-                            message.type === 'user'
-                              ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-3xl rounded-br-lg' 
-                              : 'bg-gradient-to-br from-slate-700/80 to-slate-800/80 backdrop-blur-sm border border-slate-600/50 rounded-3xl rounded-bl-lg'
-                          } p-6 shadow-xl transition-all duration-200`}
-                          whileHover={{ scale: 1.01 }}
-                        >
-                          {/* Message content */}
-                          <p className={`leading-relaxed whitespace-pre-wrap text-base ${
-                            message.type === 'user' ? 'text-white' : 'text-slate-100'
-                          }`}>
-                            {message.content}
-                          </p>
-                          
-                          {/* Timestamp */}
-                          <p className={`text-xs mt-3 ${
-                            message.type === 'user' ? 'text-white/60' : 'text-slate-400'
-                          }`}>
-                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          
-                          {/* Message tail */}
-                          <div className={`absolute bottom-0 ${
-                            message.type === 'user' 
-                              ? '-right-2 border-l-[16px] border-l-purple-500 border-t-[16px] border-t-transparent' 
-                              : '-left-2 border-r-[16px] border-r-slate-700/80 border-t-[16px] border-t-transparent'
-                          }`} />
-                        </motion.div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                
-                {/* Enhanced loading indicator */}
-                {isLoading && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-start"
-                  >
-                    <div className="flex items-start gap-4 max-w-[75%]">
-                      <motion.div 
-                        className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 via-purple-600 to-blue-500 flex items-center justify-center shadow-lg"
-                        animate={{ scale: [1, 1.05, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
+              <div 
+                ref={chatScrollContainerRef} 
+                className="h-[580px] overflow-y-auto px-8 py-6 space-y-6"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#475569 transparent'
+                }}
+              >
+                <div className="max-w-5xl mx-auto space-y-6">
+                  <AnimatePresence mode="popLayout">
+                    {messages.map((message, index) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -30, scale: 0.95 }}
+                        transition={{ 
+                          duration: 0.4, 
+                          delay: index * 0.05,
+                          type: "spring",
+                          stiffness: 200,
+                          damping: 20
+                        }}
+                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <User className="w-6 h-6 text-white" />
-                      </motion.div>
-                      <div className="bg-gradient-to-br from-slate-700/80 to-slate-800/80 backdrop-blur-sm border border-slate-600/50 rounded-3xl rounded-bl-lg p-6 shadow-xl">
-                        <div className="flex items-center gap-3">
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        <div className={`flex items-start gap-4 max-w-[75%] ${
+                          message.type === 'user' ? 'flex-row-reverse' : ''
+                        }`}>
+                          {/* Enhanced avatar */}
+                          <motion.div 
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 ${
+                            message.type === 'user' 
+                              ? 'bg-gradient-to-br from-purple-500 to-purple-600' 
+                              : ''
+                          }`}
+                          whileHover={{ scale: 1.05 }}
+                        >
+                          {message.type === 'user' ? (
+                            <User className="w-6 h-6 text-white" />
+                          ) : (
+                            <img 
+                              src="/logo.png" 
+                              alt="Application Logo" 
+                              className="w-20 h-20 rounded-full object-cover" 
+                              style={{ background: 'transparent' }}
+                            />
+                          )}
+                        </motion.div>
+
+                          
+                          {/* Enhanced message bubble */}
+                          <motion.div 
+                            className={`relative group ${
+                              message.type === 'user'
+                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-3xl rounded-br-lg' 
+                                : 'bg-gradient-to-br from-slate-700/80 to-slate-800/80 backdrop-blur-sm border border-slate-600/50 rounded-3xl rounded-bl-lg'
+                            } p-6 shadow-xl transition-all duration-200`}
+                            whileHover={{ scale: 1.01 }}
                           >
-                            <Loader2 className="w-5 h-5 text-purple-400" />
+                            {/* Message content */}
+                            <p className={`leading-relaxed whitespace-pre-wrap text-base ${
+                              message.type === 'user' ? 'text-white' : 'text-slate-100'
+                            }`}>
+                              {message.content}
+                            </p>
+                            
+                            {/* Timestamp */}
+                            <p className={`text-xs mt-3 ${
+                              message.type === 'user' ? 'text-white/60' : 'text-slate-400'
+                            }`}>
+                              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            
+                            {/* Message tail */}
+                            <div className={`absolute bottom-0 ${
+                              message.type === 'user' 
+                                ? '-right-2 border-l-[16px] border-l-purple-500 border-t-[16px] border-t-transparent' 
+                                : '-left-2 border-r-[16px] border-r-slate-700/80 border-t-[16px] border-t-transparent'
+                            }`} />
                           </motion.div>
-                          <span className="text-slate-300">Seriva is typing...</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  
+                  {/* Enhanced loading indicator */}
+                  {isLoading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-start"
+                    >
+                      <div className="flex items-start gap-4 max-w-[75%]">
+                        <motion.div 
+                          className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 via-purple-600 to-blue-500 flex items-center justify-center shadow-lg"
+                          animate={{ scale: [1, 1.05, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <User className="w-6 h-6 text-white" />
+                        </motion.div>
+                        <div className="bg-gradient-to-br from-slate-700/80 to-slate-800/80 backdrop-blur-sm border border-slate-600/50 rounded-3xl rounded-bl-lg p-6 shadow-xl">
+                          <div className="flex items-center gap-3">
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            >
+                              <Loader2 className="w-5 h-5 text-purple-400" />
+                            </motion.div>
+                            <span className="text-slate-300">Seriva is typing...</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                )}
-                
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-
-            {/* Full Width Chat Input - Fixed at bottom */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="fixed bottom-0 left-0 right-0 flex justify-center border-t border-slate-600/30 bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm z-10"
-            >
-              <div className="w-full max-w-6xl mx-auto px-8 py-6">
-                <div className="flex gap-4 items-end">
-                  <div className="flex-1 relative">
-                    <textarea
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Share your thoughts... I'm here to listen with empathy and understanding."
-                      className="w-full bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 rounded-2xl px-6 py-4 pr-16 text-white placeholder-slate-400 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-base"
-                      rows="3"
-                      disabled={isLoading}
-                    />
-                    
-                    {/* Enhanced send button */}
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleSendMessage}
-                      disabled={!input.trim() || isLoading}
-                      className="absolute bottom-4 right-4 w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-purple-500/25 transition-all duration-200"
-                    >
-                      <Send className="w-5 h-5 text-white" />
-                    </motion.button>
-                  </div>
+                    </motion.div>
+                  )}
+                  
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
-            </motion.div>
+
+              {/* Full Width Chat Input - Fixed at bottom */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="fixed bottom-0 left-0 right-0 flex justify-center border-t border-slate-600/30 bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm z-10"
+              >
+                <div className="w-full max-w-6xl mx-auto px-8 py-6">
+                  <div className="flex gap-4 items-end">
+                    <div className="flex-1 relative">
+                      <textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Share your thoughts... I'm here to listen with empathy and understanding."
+                        className="w-full bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 rounded-2xl px-6 py-4 pr-16 text-white placeholder-slate-400 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-base"
+                        rows="3"
+                        disabled={isLoading}
+                      />
+                      
+                      {/* Enhanced send button */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSendMessage}
+                        disabled={!input.trim() || isLoading}
+                        className="absolute bottom-4 right-4 w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-purple-500/25 transition-all duration-200"
+                      >
+                        <Send className="w-5 h-5 text-white" />
+                      </motion.button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </div>
         </motion.div>
       </div>
