@@ -311,9 +311,8 @@ const SettingsPage = () => {
         return null
     }
   }
-
   return (
-    <div className="w-full h-full bg-gradient-to-br from-background-light to-background-dark text-text-light pt-16">
+    <div className="w-full h-full bg-gradient-to-br from-background-light to-background-dark text-text-light">
       {/* Page content directly on the page */}
       {/* Header */}
       <motion.header

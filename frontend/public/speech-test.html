@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Speech Recognition Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #222831;
+      color: #EEEEEE;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #00ADB5;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+    button:hover {
+      background-color: #008B94;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #393E46;
+      min-height: 100px;
+      border-radius: 5px;
+      background-color: #393E46;
+    }
+    #log {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #393E46;
+      min-height: 100px;
+      border-radius: 5px;
+      font-family: monospace;
+      background-color: #393E46;
+      overflow-y: auto;
+      max-height: 300px;
+    }
+    .status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .listening {
+      color: #00ADB5;
+    }
+    .stopped {
+      color: #FF6B6B;
+    }
+  </style>
+</head>
+<body>
+  <h1>Speech Recognition Test</h1>
+  <p>This page will help diagnose speech recognition issues in your browser.</p>
+  
+  <button id="startButton">Start Speech Recognition</button>
+  <button id="stopButton" disabled>Stop</button>
+  
+  <div class="status">Status: <span id="status" class="stopped">Not listening</span></div>
+  
+  <h3>Recognized Text:</h3>
+  <div id="result"></div>
+  
+  <h3>Debug Log:</h3>
+  <div id="log"></div>
+  
+  <script>
+    const startButton = document.getElementById('startButton');
+    const stopButton = document.getElementById('stopButton');
+    const status = document.getElementById('status');
+    const resultDiv = document.getElementById('result');
+    const logDiv = document.getElementById('log');
+    
+    let recognition = null;
+    
+    function logMessage(message) {
+      const now = new Date().toLocaleTimeString();
+      logDiv.innerHTML += `<div>[${now}] ${message}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    
+    function initSpeechRecognition() {
+      try {
+        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!window.SpeechRecognition) {
+          logMessage('ERROR: Speech recognition not supported in this browser');
+          return false;
+        }
+        
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
+        
+        recognition.onstart = function() {
+          logMessage('Speech recognition started');
+          status.textContent = 'Listening...';
+          status.className = 'listening';
+          startButton.disabled = true;
+          stopButton.disabled = false;
+        };
+        
+        recognition.onresult = function(event) {
+          let interimTranscript = '';
+          let finalTranscript = '';
+          
+          logMessage(`Received ${event.results.length} results`);
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            const confidence = event.results[i][0].confidence;
+            
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+              logMessage(`FINAL: "${transcript}" (confidence: ${confidence.toFixed(2)})`);
+            } else {
+              interimTranscript += transcript;
+              logMessage(`INTERIM: "${transcript}" (confidence: ${confidence.toFixed(2)})`);
+            }
+          }
+          
+          resultDiv.innerHTML = `
+            <div><strong>Final:</strong> ${finalTranscript}</div>
+            <div><strong>Interim:</strong> <span style="color:#aaa">${interimTranscript}</span></div>
+          `;
+        };
+        
+        recognition.onerror = function(event) {
+          logMessage(`ERROR: ${event.error}`);
+          if (event.error === 'not-allowed') {
+            logMessage('Microphone access denied - Please check your browser permissions');
+          }
+        };
+        
+        recognition.onend = function() {
+          logMessage('Speech recognition ended');
+          status.textContent = 'Not listening';
+          status.className = 'stopped';
+          startButton.disabled = false;
+          stopButton.disabled = true;
+        };
+        
+        return true;
+      } catch (error) {
+        logMessage(`ERROR: ${error.message}`);
+        return false;
+      }
+    }
+    
+    startButton.addEventListener('click', function() {
+      logMessage('Starting speech recognition...');
+      
+      if (!recognition) {
+        if (!initSpeechRecognition()) {
+          return;
+        }
+      }
+      
+      try {
+        recognition.start();
+      } catch (error) {
+        logMessage(`ERROR starting: ${error.message}`);
+      }
+    });
+    
+    stopButton.addEventListener('click', function() {
+      if (recognition) {
+        logMessage('Stopping speech recognition...');
+        recognition.stop();
+      }
+    });
+    
+    // Initialize on load
+    initSpeechRecognition();
+  </script>
+</body>
+</html>

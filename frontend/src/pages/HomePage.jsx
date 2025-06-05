@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { 
   MessageCircle, 
-  Heart, 
+  BarChart3, 
   BookOpen, 
   Sparkles, 
   ArrowRight,
@@ -29,12 +29,11 @@ const features = [
     description: 'Engage in meaningful conversations with our intelligent Seriva powered by advanced language models.',
     link: '/chat',
     color: 'from-blue-500 to-cyan-500'
-  },
-  {
-    icon: Heart,
-    title: 'Wellness Tools',
-    description: 'Access breathing exercises, meditation guides, and mood tracking to support your mental wellbeing.',
-    link: '/wellness',
+  },  {
+    icon: BarChart3,
+    title: 'Dashboard & Analytics',
+    description: 'Track your emotional wellness journey with detailed insights, mood trends, and personal growth metrics.',
+    link: '/dashboard',
     color: 'from-green-500 to-emerald-500'
   },
   {
@@ -175,13 +174,12 @@ const HomePage = () => {
               >
                 <span>Continue Chatting</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/wellness"
+              </Link>              <Link
+                to="/dashboard"
                 className="btn-secondary text-lg px-8 py-4 inline-flex items-center space-x-2"
               >
                 <Sparkles className="w-5 h-5" />
-                <span>Explore Wellness</span>
+                <span>View Dashboard</span>
               </Link>
             </>
           ) : (

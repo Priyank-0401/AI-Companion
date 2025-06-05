@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import Navbar from './components/layout/Navbar'
 import HomePage from './pages/HomePage'
 import ChatPage from './pages/ChatPage'
-import WellnessPage from './pages/WellnessPage'
+import DashboardPage from './pages/DashboardPage'
 import JournalingPage from './pages/JournalingPage'
 import SettingsPage from './pages/SettingsPage'
 import AvatarCallPage from './pages/AvatarCallPage'
@@ -20,11 +20,11 @@ function AppContent() {
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isHomePage = location.pathname === '/';
-  const isWellnessPage = location.pathname === '/wellness';
-
-  // Prevent body scrolling on all pages except HomePage
+  const isDashboardPage = location.pathname === '/dashboard';
+  const isSettingsPage = location.pathname === '/settings';
+  // Prevent body scrolling on all pages except HomePage and Dashboard
   useEffect(() => {
-    if (!isHomePage) {
+    if (!isHomePage && !isDashboardPage && !isSettingsPage) {
       document.body.style.overflow = 'hidden';
       document.body.style.height = '100vh';
     } else {
@@ -37,14 +37,20 @@ function AppContent() {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     };
-  }, [isHomePage]);
-
-  return (    <div className="flex flex-col min-h-screen bg-[#222831] text-[#EEEEEE]">
-      <Navbar />      <motion.main
+  }, [isHomePage, isDashboardPage, isSettingsPage]);
+  return (
+    <div className="flex flex-col min-h-screen bg-[#222831] text-[#EEEEEE]">
+      <Navbar />
+      <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className={isAuthPage ? "" : isWellnessPage ? "w-full flex-grow" : "w-full py-4 flex-grow"}
+        className={isAuthPage 
+          ? "pt-16 flex-grow" 
+          : isDashboardPage 
+            ? "pt-16 w-full flex-grow" 
+            : "pt-16 w-full py-4 flex-grow"
+        }
       >
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -65,12 +71,11 @@ function AppContent() {
                 <AvatarCallPage />
               </ProtectedRoute>
             } 
-          />
-          <Route 
-            path="/wellness" 
+          />          <Route 
+            path="/dashboard" 
             element={
               <ProtectedRoute>
-                <WellnessPage />
+                <DashboardPage />
               </ProtectedRoute>
             } 
           />
