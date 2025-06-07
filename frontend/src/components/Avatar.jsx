@@ -88,8 +88,8 @@ function AnimatedModel({ isTalking, ...props }) {
   if (!scene || !boundingBox) {
     return null;
   }  // Auto-scale model to fit nicely in view - optimized for video call size with zoom
-  const scale = Math.min(4.5 / boundingBox.size.x, 5 / boundingBox.size.y, 5 / boundingBox.size.z);
-  const yOffset = -boundingBox.center.y * 0.5 - 0.5; // Move model down from center
+  const scale = Math.min(5 / boundingBox.size.x, 5 / boundingBox.size.y, 5 / boundingBox.size.z);
+  const yOffset = -boundingBox.center.y * 0.8 - 0.5; // Move model down from center
 
   return (
     <group ref={group} {...props} key={modelPath}>
@@ -129,10 +129,11 @@ const Avatar = ({ isTalking = false, height = '100vh' }) => {
       </div>
     );
   }  return (
-    <div className="w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">      <Canvas
+    <div className="w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <Canvas
         onError={handleError}
         gl={{ antialias: true, alpha: true }}
-        camera={{ position: [0, 0, 3], fov: 45 }}
+        camera={{ position: [0, 0, 4], fov: 50 }}
         style={{ background: 'transparent' }}
       >
         {/* Enhanced lighting for video call realism */}
