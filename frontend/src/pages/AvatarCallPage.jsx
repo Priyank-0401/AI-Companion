@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import Avatar from '../components/Avatar'; // Import the Avatar component
 import { Loader2, PhoneOff, Mic, MicOff, Video, VideoOff, Settings, AlertTriangle } from 'lucide-react'; // Assuming lucide-react for icons
 
 const AvatarCallPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isTalking, setIsTalking] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOn, setIsVideoOn] = useState(true);
 
   useEffect(() => {
     // Simulate loading
@@ -15,8 +19,22 @@ const AvatarCallPage = () => {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+  // Simulate talking animation every few seconds (disabled for testing)
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     setIsTalking(true);
+  //     setTimeout(() => setIsTalking(false), 3000); // Talk for 3 seconds
+  //   }, 8000); // Every 8 seconds
 
-  // ... existing functions ...
+  //   return () => clearInterval(interval);
+  // }, []);
+
+  const toggleMute = () => setIsMuted(!isMuted);
+  const toggleVideo = () => setIsVideoOn(!isVideoOn);
+  const endCall = () => {
+    // Handle ending the call
+    console.log('Ending call...');
+  };
 
   if (isLoading) {
     return (
@@ -42,89 +60,124 @@ const AvatarCallPage = () => {
         </button>
       </div>
     );
-  }
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-dark to-mediumDark p-4 text-white">
+  }  return (
+    <div className="no-root-padding flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-dark to-mediumDark p-4 text-white">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-4xl"
+        className="w-full max-w-6xl"
       >
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-3 gradient-text">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl md:text-4xl font-bold mb-3 gradient-text">
             Experience a More Personal Connection
           </h1>
-          <p className="text-xl text-lightText/80 max-w-2xl mx-auto">
+          <p className="text-lg text-lightText/80 max-w-2xl mx-auto">
             Step into a more immersive conversation. Our avatar feature brings a friendly face to your Seriva companion, making your interactions feel more natural and engaging.
           </p>
         </div>
 
-        {/* Avatar Display Area */}
+        {/* Avatar Display Area - Video Call Style */}
         <motion.div 
-          className="relative w-full aspect-video bg-black/30 rounded-xl shadow-2xl mb-6 overflow-hidden border-2 border-accent/30"
+          className="relative w-full h-[70vh] bg-black/30 rounded-2xl shadow-2xl mb-6 overflow-hidden border-2 border-accent/30"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          {/* Placeholder for actual avatar/video stream */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* Replace with actual video element or avatar component */}
-            <img src="/placeholder-avatar.png" alt="Seriva Avatar" className="w-1/2 h-1/2 object-contain opacity-70" />
-             <p className="absolute bottom-4 left-4 text-sm bg-black/50 px-2 py-1 rounded">Companion's View (Placeholder)</p>
+        >          {/* Avatar Component - Dynamic switching between Idle and Talking */}
+          <div className="absolute inset-0">
+            <Avatar isTalking={isTalking} />
           </div>
-           <div className="absolute top-4 right-4 p-2 bg-black/40 rounded-lg">
-            <span className="text-xs text-green-400">● Live</span>
+          
+          {/* Video Call UI Overlays */}
+          <div className="absolute top-6 right-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
+            <span className="text-sm text-green-400 font-medium">● Live</span>
           </div>
-        </motion.div>
-
-        {/* Controls */}
+          
+          <div className="absolute top-6 left-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
+            <span className={`text-sm font-medium ${isTalking ? 'text-blue-400' : 'text-gray-400'}`}>
+              {isTalking ? '🗣️ Speaking' : '😌 Listening'}
+            </span>
+          </div>
+          
+          <div className="absolute bottom-6 left-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
+            <span className="text-sm text-yellow-400 font-mono">
+              {isTalking ? 'Talking.glb' : 'Idle.glb'}
+            </span>
+          </div>
+          
+          {/* Video Call Style Name Bar */}
+          <div className="absolute bottom-6 right-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
+            <span className="text-sm text-white font-medium">Seriva AI Companion</span>
+          </div>
+        </motion.div>        {/* Video Call Controls */}
         <motion.div 
-          className="flex items-center justify-center space-x-4 mb-6"
+          className="flex items-center justify-center space-x-6 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <button className="control-btn bg-blue-500 hover:bg-blue-600">
-            <Mic className="w-6 h-6" />
-            <span className="sr-only">Mute/Unmute Mic</span>
+          <button 
+            onClick={toggleMute}
+            className={`control-btn-large ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+            title={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
           </button>
-          <button className="control-btn bg-red-500 hover:bg-red-600">
-            <PhoneOff className="w-6 h-6" />
-            <span className="sr-only">End Call</span>
+          
+          <button 
+            onClick={endCall}
+            className="control-btn-large bg-red-500 hover:bg-red-600"
+            title="End Call"
+          >
+            <PhoneOff className="w-7 h-7" />
           </button>
-          <button className="control-btn bg-blue-500 hover:bg-blue-600">
-            <Video className="w-6 h-6" />
-            <span className="sr-only">Turn Video On/Off</span>
+          
+          <button 
+            onClick={toggleVideo}
+            className={`control-btn-large ${!isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+            title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
+          >
+            {isVideoOn ? <Video className="w-7 h-7" /> : <VideoOff className="w-7 h-7" />}
           </button>
-          <button className="control-btn bg-gray-600 hover:bg-gray-700">
-            <Settings className="w-6 h-6" />
-            <span className="sr-only">Settings</span>
+          
+          <button 
+            className="control-btn-large bg-gray-600 hover:bg-gray-700"
+            title="Settings"
+          >
+            <Settings className="w-7 h-7" />
+          </button>
+          
+          <button 
+            onClick={() => setIsTalking(!isTalking)}
+            className={`control-btn-large ${isTalking ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-600 hover:bg-gray-700'}`}
+            title={isTalking ? 'Stop Talking' : 'Start Talking'}
+          >
+            <span className="text-base font-bold">
+              {isTalking ? 'Stop' : 'Talk'}
+            </span>
           </button>
         </motion.div>
-        
-        {/* Chat Input (Optional for avatar call) */}
+          {/* Chat Input (Optional for avatar call) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
-          className="mt-4"
+          className="mt-6 max-w-3xl mx-auto"
         >
           <input 
             type="text"
-            placeholder="Share your thoughts with your companion..."
-            className="w-full p-3 bg-mediumDark/50 border border-dark rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none placeholder-lightText/60"
+            placeholder="Type a message to your AI companion..."
+            className="w-full p-4 bg-mediumDark/50 border border-accent/30 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none placeholder-lightText/60 text-lg"
           />
         </motion.div>
 
         <motion.p 
-          className="text-center text-sm text-lightText/70 mt-8"
+          className="text-center text-sm text-lightText/60 mt-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.8 }}
         >
-          This is a preview of the avatar call feature. Full functionality coming soon.
+          Experience immersive conversations with your AI companion through our advanced avatar technology.
         </motion.p>
       </motion.div>
     </div>

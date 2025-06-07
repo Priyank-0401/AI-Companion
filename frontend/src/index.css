@@ -33,6 +33,13 @@
   .btn-secondary {
     @apply bg-mediumDark hover:bg-mediumDark/80 text-lightText font-medium py-2 px-4 rounded-lg transition-all duration-200 ease-in-out;
   }
+  .control-btn {
+    @apply p-3 rounded-full text-white flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-105 shadow-lg;
+  }
+
+  .control-btn-large {
+    @apply p-4 rounded-full text-white flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-110 shadow-xl min-w-[60px] min-h-[60px];
+  }
 
   .card {
     @apply bg-mediumDark rounded-xl p-6 shadow-lg;
@@ -41,7 +48,6 @@
   .input-field {
     @apply bg-mediumDark border border-mediumDark/50 text-lightText rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200;
   }
-
   .gradient-text {
     @apply bg-gradient-to-r from-accent to-blue-400 bg-clip-text text-transparent;
   }
@@ -49,5 +55,12 @@
   /* Hide scrollbar for chat messages */
   .chat-scroll-container::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Override root padding for full-screen pages */
+  .no-root-padding {
+    margin: -2rem;
+    padding: 0;
+    width: calc(100% + 4rem);
   }
 }
