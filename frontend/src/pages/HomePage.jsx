@@ -124,9 +124,8 @@ const HomePage = () => {
       }
     };
   }, []);
-
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen homepage-padding">
       {/* Hero Section */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}

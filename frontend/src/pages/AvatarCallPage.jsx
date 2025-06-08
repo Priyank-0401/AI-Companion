@@ -1,7 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '../components/Avatar'; // Import the Avatar component
-import { Loader2, PhoneOff, Mic, MicOff, Video, VideoOff, Settings, AlertTriangle } from 'lucide-react'; // Assuming lucide-react for icons
+import { 
+  Loader2, 
+  PhoneOff, 
+  Mic, 
+  MicOff, 
+  Video, 
+  VideoOff, 
+  Settings, 
+  AlertTriangle,
+  MessageSquare,
+  Volume2,
+  VolumeX,
+  Users,
+  MoreVertical,
+  Maximize,
+  Minimize,
+  Phone,
+  Clock,
+  Wifi,
+  WifiOff
+} from 'lucide-react';
 
 const AvatarCallPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -9,7 +29,52 @@ const AvatarCallPage = () => {
   const [isTalking, setIsTalking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);  const [showControls, setShowControls] = useState(false);
+  const [showHeader, setShowHeader] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [connectionQuality, setConnectionQuality] = useState('excellent');
+  const [showChat, setShowChat] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
 
+  // Simulate call duration timer
+  useEffect(() => {
+    if (!isLoading && !error) {
+      const timer = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isLoading, error]);
+
+  // Format call duration
+  const formatDuration = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  // Auto-hide controls - removed automatic hiding, now only shows on hover
+  useEffect(() => {
+    let timer;
+    if (showControls) {
+      timer = setTimeout(() => setShowControls(false), 2000);
+    }
+    return () => clearTimeout(timer);
+  }, [showControls]);
+
+  // Auto-hide header - removed automatic hiding, now only shows on hover
+  useEffect(() => {
+    let timer;
+    if (showHeader) {
+      timer = setTimeout(() => setShowHeader(false), 2000);
+    }
+    return () => clearTimeout(timer);
+  }, [showHeader]);
   useEffect(() => {
     // Simulate loading
     const timer = setTimeout(() => {
@@ -19,175 +84,359 @@ const AvatarCallPage = () => {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
-  // Simulate talking animation every few seconds (disabled for testing)
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     setIsTalking(true);
-  //     setTimeout(() => setIsTalking(false), 3000); // Talk for 3 seconds
-  //   }, 8000); // Every 8 seconds
 
-  //   return () => clearInterval(interval);
-  // }, []);
-
+  // Simulate random talking
+  useEffect(() => {
+    if (!isLoading && !error) {
+      const interval = setInterval(() => {
+        if (Math.random() > 0.7) {
+          setIsTalking(true);
+          setTimeout(() => setIsTalking(false), 2000 + Math.random() * 3000);
+        }
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoading, error]);
   const toggleMute = () => setIsMuted(!isMuted);
   const toggleVideo = () => setIsVideoOn(!isVideoOn);
+  const toggleSpeaker = () => setIsSpeakerOn(!isSpeakerOn);
+  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
+  const toggleChat = () => setShowChat(!showChat);
+  
   const endCall = () => {
     // Handle ending the call
     console.log('Ending call...');
   };
 
+  const sendMessage = () => {
+    if (newMessage.trim()) {
+      setMessages(prev => [...prev, { id: Date.now(), text: newMessage, sender: 'user', timestamp: new Date() }]);
+      setNewMessage('');
+      // Simulate AI response
+      setTimeout(() => {
+        setMessages(prev => [...prev, { id: Date.now() + 1, text: "I understand what you're saying!", sender: 'ai', timestamp: new Date() }]);
+      }, 1000);
+    }
+  };
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-dark to-mediumDark p-6 text-white">
-        <Loader2 className="w-16 h-16 animate-spin text-accent mb-6" />
-        <h1 className="text-3xl font-semibold mb-2">Bringing your companion to life...</h1>
-        <p className="text-lightText/80">Please wait a moment.</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <div className="relative mb-8">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+              <Loader2 className="w-12 h-12 animate-spin text-white" />
+            </div>
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+              </div>
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            Connecting to Seriva...
+          </h1>
+          <p className="text-gray-400 mb-6">Initializing avatar and voice systems</p>
+          <div className="flex justify-center space-x-2 text-sm text-gray-500">
+            <span>●</span>
+            <span>Preparing 3D Environment</span>
+          </div>
+        </motion.div>
       </div>
     );
   }
-
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-dark to-mediumDark p-6 text-white">
-        <AlertTriangle className="w-16 h-16 text-red-500 mb-6" />
-        <h1 className="text-3xl font-semibold mb-2 text-red-400">Connection Issue</h1>
-        <p className="text-lightText/80 mb-6 text-center max-w-md">{error}</p>
-        <button
-          onClick={() => window.location.reload()} // Simple reload, or implement a retry mechanism
-          className="btn-primary"
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center max-w-md"
         >
-          Try Again
-        </button>
+          <AlertTriangle className="w-16 h-16 text-red-500 mb-6 mx-auto" />
+          <h1 className="text-3xl font-bold mb-3 text-red-400">Connection Failed</h1>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105"
+          >
+            Reconnect
+          </button>
+        </motion.div>
       </div>
     );
   }  return (
-    <div className="no-root-padding flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-dark to-mediumDark p-4 text-white">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-6xl"
+    <div 
+      className={`${isFullscreen ? 'fixed inset-0 z-50' : ''} flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden`}
+    >      {/* Header Bar - Only shows on hover */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-20 z-40 group"
+        onMouseEnter={() => setShowHeader(true)}
+        onMouseLeave={() => setShowHeader(false)}
       >
-        <div className="text-center mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold mb-3 gradient-text">
-            Experience a More Personal Connection
-          </h1>
-          <p className="text-lg text-lightText/80 max-w-2xl mx-auto">
-            Step into a more immersive conversation. Our avatar feature brings a friendly face to your Seriva companion, making your interactions feel more natural and engaging.
-          </p>
+        {/* Subtle hover indicator */}
+        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-white/10 rounded-b-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
+        <AnimatePresence>
+          {showHeader && (
+            <motion.div
+              initial={{ y: -100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -100, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-black/50 backdrop-blur-sm border-b border-gray-700/50 h-full"
+            >
+              <div className="flex items-center justify-between px-6 py-4 h-full">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">Seriva AI Companion</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-400">
+                    <Clock className="w-4 h-4" />
+                    <span>{formatDuration(callDuration)}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    {connectionQuality === 'excellent' ? (
+                      <Wifi className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <WifiOff className="w-4 h-4 text-red-500" />
+                    )}
+                    <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
+                  </div>
+                  <button
+                    onClick={toggleFullscreen}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Main Video Area with Chat Sidebar */}
+      <div className="flex-1 flex relative">
+        {/* Video Area */}
+        <div className={`${showChat ? 'flex-1' : 'w-full'} relative bg-black/20`}>
+          <motion.div 
+            className="absolute inset-0 rounded-none overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >            {/* Avatar Component */}
+            <div className="absolute inset-0">
+              <Avatar isTalking={isTalking} heightScale={0.8} />
+            </div>
+            
+            {/* Video Overlays */}
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Top Status Indicators */}
+              <div className="absolute top-6 left-6 flex flex-col space-y-2">
+                <div className="px-3 py-2 bg-black/60 rounded-lg backdrop-blur-sm">
+                  <span className={`text-sm font-medium flex items-center space-x-2 ${isTalking ? 'text-blue-400' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${isTalking ? 'bg-blue-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                    <span>{isTalking ? 'Speaking' : 'Listening'}</span>
+                  </span>
+                </div>
+                {isTalking && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="px-3 py-2 bg-blue-500/20 rounded-lg backdrop-blur-sm border border-blue-500/30"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-1 h-4 bg-blue-400 rounded-full animate-pulse"></div>
+                        <div className="w-1 h-6 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1 h-3 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                        <div className="w-1 h-5 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                      </div>
+                      <span className="text-xs text-blue-300">Audio Waveform</span>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Bottom Name Tag */}
+              <div className="absolute bottom-20 left-6">
+                <div className="px-4 py-2 bg-black/60 rounded-lg backdrop-blur-sm border border-gray-600/30">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold">
+                      S
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Seriva AI</p>
+                      <p className="text-xs text-gray-400">AI Companion</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
 
-        {/* Avatar Display Area - Video Call Style */}
-        <motion.div 
-          className="relative w-full h-[70vh] bg-black/30 rounded-2xl shadow-2xl mb-6 overflow-hidden border-2 border-accent/30"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >          {/* Avatar Component - Dynamic switching between Idle and Talking */}
-          <div className="absolute inset-0">
-            <Avatar isTalking={isTalking} />
-          </div>
-          
-          {/* Video Call UI Overlays */}
-          <div className="absolute top-6 right-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
-            <span className="text-sm text-green-400 font-medium">● Live</span>
-          </div>
-          
-          <div className="absolute top-6 left-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
-            <span className={`text-sm font-medium ${isTalking ? 'text-blue-400' : 'text-gray-400'}`}>
-              {isTalking ? '🗣️ Speaking' : '😌 Listening'}
-            </span>
-          </div>
-          
-          <div className="absolute bottom-6 left-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
-            <span className="text-sm text-yellow-400 font-mono">
-              {isTalking ? 'Talking.glb' : 'Idle.glb'}
-            </span>
-          </div>
-          
-          {/* Video Call Style Name Bar */}
-          <div className="absolute bottom-6 right-6 p-3 bg-black/60 rounded-lg backdrop-blur-sm">
-            <span className="text-sm text-white font-medium">Seriva AI Companion</span>
-          </div>
-        </motion.div>        {/* Video Call Controls */}
-        <motion.div 
-          className="flex items-center justify-center space-x-6 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <button 
-            onClick={toggleMute}
-            className={`control-btn-large ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
-          </button>
-          
-          <button 
-            onClick={endCall}
-            className="control-btn-large bg-red-500 hover:bg-red-600"
-            title="End Call"
-          >
-            <PhoneOff className="w-7 h-7" />
-          </button>
-          
-          <button 
-            onClick={toggleVideo}
-            className={`control-btn-large ${!isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
-            title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
-          >
-            {isVideoOn ? <Video className="w-7 h-7" /> : <VideoOff className="w-7 h-7" />}
-          </button>
-          
-          <button 
-            className="control-btn-large bg-gray-600 hover:bg-gray-700"
-            title="Settings"
-          >
-            <Settings className="w-7 h-7" />
-          </button>
-          
-          <button 
-            onClick={() => setIsTalking(!isTalking)}
-            className={`control-btn-large ${isTalking ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-600 hover:bg-gray-700'}`}
-            title={isTalking ? 'Stop Talking' : 'Start Talking'}
-          >
-            <span className="text-base font-bold">
-              {isTalking ? 'Stop' : 'Talk'}
-            </span>
-          </button>
-        </motion.div>
-          {/* Chat Input (Optional for avatar call) */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-          className="mt-6 max-w-3xl mx-auto"
-        >
-          <input 
-            type="text"
-            placeholder="Type a message to your AI companion..."
-            className="w-full p-4 bg-mediumDark/50 border border-accent/30 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none placeholder-lightText/60 text-lg"
-          />
-        </motion.div>
+        {/* Chat Sidebar */}
+        <AnimatePresence>
+          {showChat && (
+            <motion.div
+              initial={{ x: 400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 400, opacity: 0 }}
+              className="w-80 bg-gray-800/95 backdrop-blur-sm border-l border-gray-700/50 flex flex-col"
+            >
+              <div className="p-4 border-b border-gray-700/50">
+                <h3 className="font-semibold text-white">Chat</h3>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {messages.map((message) => (
+                  <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-xs px-3 py-2 rounded-lg ${
+                      message.sender === 'user' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-700 text-gray-100'
+                    }`}>
+                      <p className="text-sm">{message.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t border-gray-700/50">
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="Type a message..."
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  <button
+                    onClick={sendMessage}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  >
+                    Send
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>      {/* Bottom Controls - Only shows on hover */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-24 z-40 group"
+        onMouseEnter={() => setShowControls(true)}
+        onMouseLeave={() => setShowControls(false)}
+      >
+        {/* Subtle hover indicator */}
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-white/10 rounded-t-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
+        <AnimatePresence>
+          {showControls && (
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
+            >
+              <div className="flex items-center justify-center h-full">
+                <div className="flex items-center space-x-4">
+                  {/* Mute Button */}
+                  <button 
+                    onClick={toggleMute}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      isMuted 
+                        ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    title={isMuted ? 'Unmute' : 'Mute'}
+                  >
+                    {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                  </button>
+                  
+                  {/* Video Button */}
+                  <button 
+                    onClick={toggleVideo}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      !isVideoOn 
+                        ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
+                  >
+                    {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                  </button>
 
-        <motion.p 
-          className="text-center text-sm text-lightText/60 mt-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-        >
-          Experience immersive conversations with your AI companion through our advanced avatar technology.
-        </motion.p>
-      </motion.div>
+                  {/* Speaker Button */}
+                  <button 
+                    onClick={toggleSpeaker}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      !isSpeakerOn 
+                        ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
+                  >
+                    {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+                  </button>
+                  
+                  {/* End Call Button */}
+                  <button 
+                    onClick={endCall}
+                    className="w-16 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-all duration-200 transform hover:scale-110 shadow-lg shadow-red-500/30"
+                    title="End Call"
+                  >
+                    <PhoneOff className="w-7 h-7" />
+                  </button>
+                  
+                  {/* Chat Button */}
+                  <button 
+                    onClick={toggleChat}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      showChat 
+                        ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30' 
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    title="Toggle Chat"
+                  >
+                    <MessageSquare className="w-6 h-6" />
+                  </button>
+                  
+                  {/* Settings Button */}
+                  <button 
+                    className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                    title="Settings"
+                  >
+                    <Settings className="w-6 h-6" />
+                  </button>
+
+                  {/* More Options */}
+                  <button 
+                    className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                    title="More Options"
+                  >
+                    <MoreVertical className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
 
 export default AvatarCallPage;
 
-// Helper styles (can be in a global CSS or here for simplicity if not already defined)
-// Ensure these class names are available or adapt them:
-// .control-btn { padding: 0.75rem; border-radius: 9999px; color: white; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
-// .gradient-text { background-clip: text; -webkit-background-clip: text; color: transparent; background-image: linear-gradient(to right, var(--color-accent), var(--color-blue-500)); }
-// Ensure --color-accent and --color-blue-500 are defined in your Tailwind config or CSS variables.

@@ -27,7 +27,7 @@ const Navbar = () => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home, public: true },
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3, public: false },
-    {path: '/AvatarCall', label: 'Avatar', icon: User, public: false },
+    {path: '/avatar-call', label: 'Avatar', icon: User, public: false },
     { path: '/chat', label: 'AI Chat', icon: MessageCircle, public: false },
     { path: '/journal', label: 'Journal', icon: BookOpen, public: false },
     { path: '/settings', label: 'Settings', icon: Settings, public: false },

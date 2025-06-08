@@ -2,8 +2,16 @@
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  padding: 2rem;
   text-align: left;
+}
+
+/* Page-specific padding */
+.homepage-padding {
+  padding: 2rem;
+}
+
+.settings-padding {
+  padding: 2rem;
 }
 
 .logo {

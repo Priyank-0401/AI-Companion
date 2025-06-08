@@ -306,13 +306,13 @@ const SettingsPage = () => {
             <div className="text-right text-sm text-lightText/70">{setting.value}%</div>
           </div>
         )
-      
-      default:
+        default:
         return null
     }
   }
+  
   return (
-    <div className="w-full h-full bg-gradient-to-br from-background-light to-background-dark text-text-light">
+    <div className="w-full h-full bg-gradient-to-br from-background-light to-background-dark text-text-light settings-padding">
       {/* Page content directly on the page */}
       {/* Header */}
       <motion.header

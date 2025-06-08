@@ -25,7 +25,7 @@ function ErrorFallback({ error }) {
 }
 
 // Model component that loads and displays the GLB file with animations
-function AnimatedModel({ isTalking, ...props }) {
+function AnimatedModel({ isTalking, heightScale = 1.0, ...props }) {
   const group = useRef();
   const [boundingBox, setBoundingBox] = useState(null);
   
@@ -37,16 +37,16 @@ function AnimatedModel({ isTalking, ...props }) {
   console.log(`Loading model: ${modelPath}`);
   console.log(`Animations available: ${animations?.length || 0}`);
   console.log(`Actions available: ${Object.keys(actions || {}).length}`);
-  
-  // Calculate bounding box for proper scaling and positioning
+    // Calculate bounding box for proper scaling and positioning
   useEffect(() => {
     if (scene) {
       const box = new THREE.Box3().setFromObject(scene);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
+      console.log(`Model ${modelPath} - Size:`, size, 'Center:', center);
       setBoundingBox({ size, center });
     }
-  }, [scene]);
+  }, [scene, modelPath]);
   
   useEffect(() => {
     console.log(`Effect triggered for model: ${modelPath}`);
@@ -87,15 +87,23 @@ function AnimatedModel({ isTalking, ...props }) {
 
   if (!scene || !boundingBox) {
     return null;
-  }  // Auto-scale model to fit nicely in view - optimized for video call size with zoom
-  const scale = Math.min(5 / boundingBox.size.x, 5 / boundingBox.size.y, 5 / boundingBox.size.z);
-  const yOffset = -boundingBox.center.y * 0.8 - 0.5; // Move model down from center
+  }  // Optimized scaling for video call interface - ensure model fits height-wise
+  // Calculate scale based on desired height (fit within video call viewport)
+  const targetHeight = 6 * heightScale; // Adjust this value to make model larger/smaller
+  const scaleY = targetHeight / boundingBox.size.y;
+  const scaleX = Math.min(scaleY, 4 / boundingBox.size.x); // Prevent too wide models
+  const scaleZ = Math.min(scaleY, 4 / boundingBox.size.z);
+  const finalScale = Math.min(scaleX, scaleY, scaleZ);
+  
+  // Center the model vertically in the viewport, with slight bottom bias for better framing
+  const yOffset = -boundingBox.center.y * finalScale - 1.0; // Move model down for better video call framing
+  
+  console.log(`Model ${modelPath} - Final scale:`, finalScale, 'Y offset:', yOffset);
 
-  return (
-    <group ref={group} {...props} key={modelPath}>
+  return (    <group ref={group} {...props} key={modelPath}>
       <primitive 
         object={scene} 
-        scale={[scale, scale, scale]}
+        scale={[finalScale, finalScale, finalScale]}
         position={[0, yOffset, 0]}
         rotation={[0, 0, 0]}
       />
@@ -104,7 +112,7 @@ function AnimatedModel({ isTalking, ...props }) {
 }
 
 // Main Avatar component
-const Avatar = ({ isTalking = false }) => {
+const Avatar = ({ isTalking = false, heightScale = 1.0 }) => {
   const [error, setError] = useState(null);
 
   // Error boundary for the Canvas
@@ -129,23 +137,20 @@ const Avatar = ({ isTalking = false }) => {
       </div>
     );
   }  return (
-    <div className="w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <Canvas
+    <div className="w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">      <Canvas
         onError={handleError}
         gl={{ antialias: true, alpha: true }}
-        camera={{ position: [0, 0, 4], fov: 50 }}
+        camera={{ position: [0, 1, 5], fov: 45 }}
         style={{ background: 'transparent' }}
-      >
-        {/* Enhanced lighting for video call realism */}
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[5, 5, 5]} intensity={1.2} castShadow />
-        <directionalLight position={[-5, -5, -5]} intensity={0.6} />
-        <pointLight position={[0, 3, 2]} intensity={0.8} color="#ffffff" />
-        <spotLight position={[0, 5, 0]} intensity={0.5} angle={0.3} penumbra={1} />
-
-        {/* Model with Suspense fallback */}
+      >        {/* Optimized lighting for video call interface */}
+        <ambientLight intensity={1.0} />
+        <directionalLight position={[3, 4, 5]} intensity={1.5} castShadow />
+        <directionalLight position={[-3, -2, -5]} intensity={0.7} />
+        <pointLight position={[0, 4, 3]} intensity={1.0} color="#ffffff" />
+        <spotLight position={[0, 6, 2]} intensity={0.8} angle={0.4} penumbra={1} />
+        <hemisphereLight skyColor="#ffffff" groundColor="#444444" intensity={0.5} />        {/* Model with Suspense fallback */}
         <Suspense fallback={<LoadingFallback />}>
-          <AnimatedModel isTalking={isTalking} key={isTalking ? 'talking' : 'idle'} />
+          <AnimatedModel isTalking={isTalking} heightScale={heightScale} key={isTalking ? 'talking' : 'idle'} />
         </Suspense>
 
         {/* Controls for development (remove in production) */}
