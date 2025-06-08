@@ -63,15 +63,14 @@ function AppContent() {
                 <ChatPage />
               </ProtectedRoute>
             } 
-          />
-          <Route 
+          />          <Route 
             path="/avatar-call" 
             element={
               <ProtectedRoute>
                 <AvatarCallPage />
               </ProtectedRoute>
-            } 
-          />          <Route 
+            }          />
+          <Route 
             path="/dashboard" 
             element={
               <ProtectedRoute>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '../components/Avatar'; // Import the Avatar component
+import { useAvatarExpressions } from '../hooks/useAvatarExpressions'; // Import the expression hook
 import { 
   Loader2, 
   PhoneOff, 
@@ -23,20 +24,33 @@ import {
   WifiOff
 } from 'lucide-react';
 
-const AvatarCallPage = () => {
-  const [isLoading, setIsLoading] = useState(true);
+const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isTalking, setIsTalking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true); // Always visible by default (will be controlled by fullscreen state)
-  const [showHeader, setShowHeader] = useState(true); // Always visible by default (will be controlled by fullscreen state)
+  const [isVideoOn, setIsVideoOn] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [showHeader, setShowHeader] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState('excellent');
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [lastBotMessage, setLastBotMessage] = useState('');
+  const [audioElement, setAudioElement] = useState(null);
+  
+  // Expression management
+  const { currentExpression, setExpression } = useAvatarExpressions(
+    isTalking, 
+    lastBotMessage,
+    {
+      enableAutoExpression: true,
+      enableBlinking: true,
+      lipSyncEnabled: true
+    }
+  );
 
   // Simulate call duration timer
   useEffect(() => {
@@ -95,11 +109,48 @@ const AvatarCallPage = () => {
       // setError("Could not connect to the avatar service. Please try again later.");
     }, 2500);
     return () => clearTimeout(timer);  }, []);
+  // Demo functions for testing expressions and chatbot responses
+  const demoResponses = [
+    { text: "Hello! I'm so excited to meet you! 😊", expression: "smile" },
+    { text: "I'm sorry to hear you're having trouble with that.", expression: "frown" },
+    { text: "Wow, that's absolutely amazing! I can't believe it!", expression: "surprise" },
+    { text: "Let me think about that for a moment...", expression: "neutral" },
+    { text: "Congratulations! That's fantastic news! 🎉", expression: "smile" },
+    { text: "Oh no, that's quite concerning. I'm worried about that.", expression: "frown" }
+  ];
+
+  const simulateChatbotResponse = () => {
+    const randomResponse = demoResponses[Math.floor(Math.random() * demoResponses.length)];
+    setLastBotMessage(randomResponse.text);
+    setIsTalking(true);
+    
+    // Add to chat if open
+    if (showChat) {
+      setMessages(prev => [...prev, { 
+        id: Date.now(), 
+        text: randomResponse.text, 
+        sender: 'ai', 
+        timestamp: new Date() 
+      }]);
+    }
+    
+    // Stop talking after 3 seconds
+    setTimeout(() => {
+      setIsTalking(false);
+    }, 3000);
+  };
+  const testExpression = (expression) => {
+    setExpression(expression);
+  };
 
   // Note: Removed automatic talking simulation
   // The isTalking state should be controlled by actual voice detection or manual triggers
   const toggleMute = () => setIsMuted(!isMuted);
-  const toggleVideo = () => setIsVideoOn(!isVideoOn);
+  const toggleVideo = () => {
+    setIsVideoOn(!isVideoOn);
+    // Switch to talking model when camera is turned on, idle when off
+    setIsTalking(!isVideoOn);
+  };
   const toggleSpeaker = () => setIsSpeakerOn(!isSpeakerOn);
   const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
   const toggleChat = () => setShowChat(!showChat);
@@ -108,14 +159,29 @@ const AvatarCallPage = () => {
     // Handle ending the call
     console.log('Ending call...');
   };
-
+  
   const sendMessage = () => {
     if (newMessage.trim()) {
       setMessages(prev => [...prev, { id: Date.now(), text: newMessage, sender: 'user', timestamp: new Date() }]);
       setNewMessage('');
-      // Simulate AI response
+      
+      // Simulate AI response with expression detection
       setTimeout(() => {
-        setMessages(prev => [...prev, { id: Date.now() + 1, text: "I understand what you're saying!", sender: 'ai', timestamp: new Date() }]);
+        const randomResponse = demoResponses[Math.floor(Math.random() * demoResponses.length)];
+        setLastBotMessage(randomResponse.text);
+        setIsTalking(true);
+        
+        setMessages(prev => [...prev, { 
+          id: Date.now() + 1, 
+          text: randomResponse.text, 
+          sender: 'ai', 
+          timestamp: new Date() 
+        }]);
+        
+        // Stop talking after 3 seconds
+        setTimeout(() => {
+          setIsTalking(false);
+        }, 3000);
       }, 1000);
     }
   };
@@ -275,7 +341,12 @@ const AvatarCallPage = () => {
             style={{ pointerEvents: 'none' }}
           >            {/* Avatar Component */}
             <div className="absolute inset-0">
-              <Avatar isTalking={isTalking} />
+              <Avatar 
+                isTalking={isTalking} 
+                expression={currentExpression}
+                audioElement={audioElement}
+                lipSyncEnabled={true}
+              />
             </div>
             
             {/* Video Overlays */}
@@ -304,23 +375,60 @@ const AvatarCallPage = () => {
                       <span className="text-xs text-blue-300">Audio Waveform</span>
                     </div>
                   </motion.div>
-                )}
-              </div>
+                )}              </div>
 
-              {/* Bottom Name Tag */}
-              <div className="absolute bottom-20 left-6">
-                <div className="px-4 py-2 bg-black/60 rounded-lg backdrop-blur-sm border border-gray-600/30">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold">
-                      S
+              {/* Demo Controls - Top Right (only in windowed mode) */}
+              {!isFullscreen && (
+                <div className="absolute top-6 right-6 flex flex-col space-y-2">
+                  <div className="px-3 py-2 bg-black/60 rounded-lg backdrop-blur-sm">
+                    <span className="text-xs text-gray-300 mb-2 block">Expression Demo</span>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        onClick={() => testExpression('smile')}
+                        className="px-2 py-1 bg-green-600/70 hover:bg-green-600 rounded text-xs transition-colors"
+                      >
+                        😊 Smile
+                      </button>
+                      <button
+                        onClick={() => testExpression('frown')}
+                        className="px-2 py-1 bg-red-600/70 hover:bg-red-600 rounded text-xs transition-colors"
+                      >
+                        😔 Frown
+                      </button>
+                      <button
+                        onClick={() => testExpression('surprise')}
+                        className="px-2 py-1 bg-yellow-600/70 hover:bg-yellow-600 rounded text-xs transition-colors"
+                      >
+                        😲 Surprise
+                      </button>
+                      <button
+                        onClick={() => testExpression('neutral')}
+                        className="px-2 py-1 bg-gray-600/70 hover:bg-gray-600 rounded text-xs transition-colors"
+                      >
+                        😐 Neutral
+                      </button>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">Seriva AI</p>
-                      <p className="text-xs text-gray-400">AI Companion</p>
+                  </div>
+                  <div className="px-3 py-2 bg-black/60 rounded-lg backdrop-blur-sm">
+                    <span className="text-xs text-gray-300 mb-2 block">Chat Demo</span>
+                    <button
+                      onClick={simulateChatbotResponse}
+                      className="px-3 py-1 bg-blue-600/70 hover:bg-blue-600 rounded text-xs transition-colors w-full"
+                    >
+                      🤖 Random Response
+                    </button>
+                  </div>
+                  <div className="px-3 py-2 bg-black/60 rounded-lg backdrop-blur-sm">
+                    <span className="text-xs text-gray-300 mb-2 block">Current</span>
+                    <div className="text-xs text-blue-300">
+                      Expression: {currentExpression}
+                    </div>
+                    <div className="text-xs text-purple-300">
+                      Status: {isTalking ? 'Talking' : 'Idle'}
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </motion.div>
         </div>
@@ -388,13 +496,12 @@ const AvatarCallPage = () => {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
                 transition={{ duration: 0.3 }}                className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
-              >
-                <div className="flex items-center justify-center h-full pb-4">
+              >                <div className="flex items-center justify-center h-full pb-4">
                   <div className="flex items-center space-x-4">
                     {/* Mute Button */}
                     <button 
                       onClick={toggleMute}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                         isMuted 
                           ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
                           : 'bg-gray-700 hover:bg-gray-600'
@@ -407,12 +514,12 @@ const AvatarCallPage = () => {
                     {/* Video Button */}
                     <button 
                       onClick={toggleVideo}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                         !isVideoOn 
                           ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
                           : 'bg-gray-700 hover:bg-gray-600'
                       }`}
-                      title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
+                      title={isVideoOn ? 'Switch to Idle Model' : 'Switch to Talking Model'}
                     >
                       {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
                     </button>
@@ -420,7 +527,7 @@ const AvatarCallPage = () => {
                     {/* Speaker Button */}
                     <button 
                       onClick={toggleSpeaker}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                         !isSpeakerOn 
                           ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
                           : 'bg-gray-700 hover:bg-gray-600'
@@ -433,7 +540,7 @@ const AvatarCallPage = () => {
                     {/* End Call Button */}
                     <button 
                       onClick={endCall}
-                      className="w-16 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-all duration-200 transform hover:scale-110 shadow-lg shadow-red-500/30"
+                      className="w-16 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-all duration-200 shadow-lg shadow-red-500/30"
                       title="End Call"
                     >
                       <PhoneOff className="w-7 h-7" />
@@ -442,7 +549,7 @@ const AvatarCallPage = () => {
                     {/* Chat Button */}
                     <button 
                       onClick={toggleChat}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                         showChat 
                           ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30' 
                           : 'bg-gray-700 hover:bg-gray-600'
@@ -454,7 +561,7 @@ const AvatarCallPage = () => {
                     
                     {/* Settings Button */}
                     <button 
-                      className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                      className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200"
                       title="Settings"
                     >
                       <Settings className="w-6 h-6" />
@@ -462,7 +569,7 @@ const AvatarCallPage = () => {
 
                     {/* More Options */}
                     <button 
-                      className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                      className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200"
                       title="More Options"
                     >
                       <MoreVertical className="w-6 h-6" />
@@ -498,7 +605,7 @@ const AvatarCallPage = () => {
                     ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
                     : 'bg-gray-700 hover:bg-gray-600'
                 }`}
-                title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
+                title={isVideoOn ? 'Switch to Idle Model' : 'Switch to Talking Model'}
               >
                 {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
               </button>
