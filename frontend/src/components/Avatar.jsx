@@ -104,7 +104,7 @@ function AnimatedModel({ isTalking, ...props }) {
 }
 
 // Main Avatar component
-const Avatar = ({ isTalking = false, height = '100vh' }) => {
+const Avatar = ({ isTalking = false }) => {
   const [error, setError] = useState(null);
 
   // Error boundary for the Canvas
