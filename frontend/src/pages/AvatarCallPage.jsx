@@ -29,9 +29,9 @@ const AvatarCallPage = () => {
   const [isTalking, setIsTalking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);  const [showControls, setShowControls] = useState(false);
-  const [showHeader, setShowHeader] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true); // Always visible by default (will be controlled by fullscreen state)
+  const [showHeader, setShowHeader] = useState(true); // Always visible by default (will be controlled by fullscreen state)
   const [callDuration, setCallDuration] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState('excellent');
   const [showChat, setShowChat] = useState(false);
@@ -57,24 +57,36 @@ const AvatarCallPage = () => {
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-  // Auto-hide controls - removed automatic hiding, now only shows on hover
+  };  // Auto-hide controls in fullscreen mode only
   useEffect(() => {
     let timer;
-    if (showControls) {
-      timer = setTimeout(() => setShowControls(false), 2000);
+    if (isFullscreen && showControls) {
+      timer = setTimeout(() => setShowControls(false), 3000);
     }
     return () => clearTimeout(timer);
-  }, [showControls]);
+  }, [showControls, isFullscreen]);
 
-  // Auto-hide header - removed automatic hiding, now only shows on hover
+  // Auto-hide header in fullscreen mode only
   useEffect(() => {
     let timer;
-    if (showHeader) {
-      timer = setTimeout(() => setShowHeader(false), 2000);
+    if (isFullscreen && showHeader) {
+      timer = setTimeout(() => setShowHeader(false), 3000);
     }
-    return () => clearTimeout(timer);
-  }, [showHeader]);
+    return () => clearTimeout(timer);  }, [showHeader, isFullscreen]);
+  
+  // Handle fullscreen mode transitions
+  useEffect(() => {
+    if (isFullscreen) {
+      // Hide controls and header when entering fullscreen
+      setShowControls(false);
+      setShowHeader(false);
+    } else {
+      // Show controls and header when exiting fullscreen (windowed mode)
+      setShowControls(true);
+      setShowHeader(true);
+    }
+  }, [isFullscreen]);
+
   useEffect(() => {
     // Simulate loading
     const timer = setTimeout(() => {
@@ -82,21 +94,10 @@ const AvatarCallPage = () => {
       // Simulate an error for demonstration if needed
       // setError("Could not connect to the avatar service. Please try again later.");
     }, 2500);
-    return () => clearTimeout(timer);
-  }, []);
+    return () => clearTimeout(timer);  }, []);
 
-  // Simulate random talking
-  useEffect(() => {
-    if (!isLoading && !error) {
-      const interval = setInterval(() => {
-        if (Math.random() > 0.7) {
-          setIsTalking(true);
-          setTimeout(() => setIsTalking(false), 2000 + Math.random() * 3000);
-        }
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isLoading, error]);
+  // Note: Removed automatic talking simulation
+  // The isTalking state should be controlled by actual voice detection or manual triggers
   const toggleMute = () => setIsMuted(!isMuted);
   const toggleVideo = () => setIsVideoOn(!isVideoOn);
   const toggleSpeaker = () => setIsSpeakerOn(!isSpeakerOn);
@@ -173,70 +174,108 @@ const AvatarCallPage = () => {
   }  return (
     <div 
       className={`${isFullscreen ? 'fixed inset-0 z-50' : ''} flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden`}
-    >      {/* Header Bar - Only shows on hover */}
-      <div 
-        className="absolute top-0 left-0 right-0 h-20 z-40 group"
-        onMouseEnter={() => setShowHeader(true)}
-        onMouseLeave={() => setShowHeader(false)}
-      >
-        {/* Subtle hover indicator */}
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-white/10 rounded-b-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        
-        <AnimatePresence>
-          {showHeader && (
-            <motion.div
-              initial={{ y: -100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -100, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="bg-black/50 backdrop-blur-sm border-b border-gray-700/50 h-full"
-            >
-              <div className="flex items-center justify-between px-6 py-4 h-full">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium">Seriva AI Companion</span>
+    >
+      {/* Header Bar - Always visible in windowed mode, hover in fullscreen */}
+      {isFullscreen ? (
+        <div 
+          className="absolute top-0 left-0 right-0 h-24 z-50 group"
+          onMouseEnter={() => setShowHeader(true)}
+          onMouseLeave={() => setShowHeader(false)}
+          style={{ pointerEvents: 'auto' }}
+        >
+          {/* Subtle hover indicator */}
+          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-2 bg-white/20 rounded-b-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          
+          <AnimatePresence>
+            {showHeader && (
+              <motion.div
+                initial={{ y: -100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -100, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="bg-black/50 backdrop-blur-sm border-b border-gray-700/50 h-full"
+              >
+                <div className="flex items-center justify-between px-6 py-4 h-full">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium">Seriva AI Companion</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-gray-400">
+                      <Clock className="w-4 h-4" />
+                      <span>{formatDuration(callDuration)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-400">
-                    <Clock className="w-4 h-4" />
-                    <span>{formatDuration(callDuration)}</span>
+                  
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      {connectionQuality === 'excellent' ? (
+                        <Wifi className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <WifiOff className="w-4 h-4 text-red-500" />
+                      )}
+                      <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
+                    </div>
+                    <button
+                      onClick={toggleFullscreen}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      <Minimize className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    {connectionQuality === 'excellent' ? (
-                      <Wifi className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <WifiOff className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
-                  </div>
-                  <button
-                    onClick={toggleFullscreen}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                  </button>
-                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ) : (
+        // Always visible header in windowed mode
+        <div className="bg-black/30 backdrop-blur-sm border-b border-gray-700/50 z-40">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium">Seriva AI Companion</span>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-400">
+                <Clock className="w-4 h-4" />
+                <span>{formatDuration(callDuration)}</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                {connectionQuality === 'excellent' ? (
+                  <Wifi className="w-4 h-4 text-green-500" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-500" />
+                )}
+                <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
+              </div>
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Enter Fullscreen"
+              >
+                <Maximize className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Video Area with Chat Sidebar */}
-      <div className="flex-1 flex relative">
-        {/* Video Area */}
+      <div className="flex-1 flex relative">        {/* Video Area */}
         <div className={`${showChat ? 'flex-1' : 'w-full'} relative bg-black/20`}>
           <motion.div 
             className="absolute inset-0 rounded-none overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
+            style={{ pointerEvents: 'none' }}
           >            {/* Avatar Component */}
             <div className="absolute inset-0">
-              <Avatar isTalking={isTalking} heightScale={0.8} />
+              <Avatar isTalking={isTalking} />
             </div>
             
             {/* Video Overlays */}
@@ -332,108 +371,192 @@ const AvatarCallPage = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>      {/* Bottom Controls - Only shows on hover */}
-      <div 
-        className="absolute bottom-0 left-0 right-0 h-24 z-40 group"
-        onMouseEnter={() => setShowControls(true)}
-        onMouseLeave={() => setShowControls(false)}
-      >
-        {/* Subtle hover indicator */}
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-white/10 rounded-t-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        
-        <AnimatePresence>
-          {showControls && (
-            <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
-            >
-              <div className="flex items-center justify-center h-full">
-                <div className="flex items-center space-x-4">
-                  {/* Mute Button */}
-                  <button 
-                    onClick={toggleMute}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
-                      isMuted 
-                        ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    title={isMuted ? 'Unmute' : 'Mute'}
-                  >
-                    {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                  </button>
-                  
-                  {/* Video Button */}
-                  <button 
-                    onClick={toggleVideo}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
-                      !isVideoOn 
-                        ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
-                  >
-                    {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-                  </button>
+      </div>      {/* Bottom Controls - Always visible in windowed mode, hover in fullscreen */}
+      {isFullscreen ? (
+        <div 
+          className="absolute bottom-8 left-0 right-0 h-32 z-50 group"
+          onMouseEnter={() => setShowControls(true)}
+          onMouseLeave={() => setShowControls(false)}
+          style={{ pointerEvents: 'auto' }}
+        >
+          {/* Subtle hover indicator */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-24 h-2 bg-white/20 rounded-t-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <AnimatePresence>
+            {showControls && (
+              <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                transition={{ duration: 0.3 }}                className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
+              >
+                <div className="flex items-center justify-center h-full pb-4">
+                  <div className="flex items-center space-x-4">
+                    {/* Mute Button */}
+                    <button 
+                      onClick={toggleMute}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                        isMuted 
+                          ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                      title={isMuted ? 'Unmute' : 'Mute'}
+                    >
+                      {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                    </button>
+                    
+                    {/* Video Button */}
+                    <button 
+                      onClick={toggleVideo}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                        !isVideoOn 
+                          ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                      title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
+                    >
+                      {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                    </button>
 
-                  {/* Speaker Button */}
-                  <button 
-                    onClick={toggleSpeaker}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
-                      !isSpeakerOn 
-                        ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
-                  >
-                    {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-                  </button>
-                  
-                  {/* End Call Button */}
-                  <button 
-                    onClick={endCall}
-                    className="w-16 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-all duration-200 transform hover:scale-110 shadow-lg shadow-red-500/30"
-                    title="End Call"
-                  >
-                    <PhoneOff className="w-7 h-7" />
-                  </button>
-                  
-                  {/* Chat Button */}
-                  <button 
-                    onClick={toggleChat}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
-                      showChat 
-                        ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30' 
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    title="Toggle Chat"
-                  >
-                    <MessageSquare className="w-6 h-6" />
-                  </button>
-                  
-                  {/* Settings Button */}
-                  <button 
-                    className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
-                    title="Settings"
-                  >
-                    <Settings className="w-6 h-6" />
-                  </button>
+                    {/* Speaker Button */}
+                    <button 
+                      onClick={toggleSpeaker}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                        !isSpeakerOn 
+                          ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                      title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
+                    >
+                      {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+                    </button>
+                    
+                    {/* End Call Button */}
+                    <button 
+                      onClick={endCall}
+                      className="w-16 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-all duration-200 transform hover:scale-110 shadow-lg shadow-red-500/30"
+                      title="End Call"
+                    >
+                      <PhoneOff className="w-7 h-7" />
+                    </button>
+                    
+                    {/* Chat Button */}
+                    <button 
+                      onClick={toggleChat}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                        showChat 
+                          ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30' 
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                      title="Toggle Chat"
+                    >
+                      <MessageSquare className="w-6 h-6" />
+                    </button>
+                    
+                    {/* Settings Button */}
+                    <button 
+                      className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                      title="Settings"
+                    >
+                      <Settings className="w-6 h-6" />
+                    </button>
 
-                  {/* More Options */}
-                  <button 
-                    className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
-                    title="More Options"
-                  >
-                    <MoreVertical className="w-6 h-6" />
-                  </button>
+                    {/* More Options */}
+                    <button 
+                      className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                      title="More Options"
+                    >
+                      <MoreVertical className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ) : (        // Always visible controls in windowed mode
+        <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
+          <div className="flex items-center justify-center py-4 pb-20">
+            <div className="flex items-center space-x-4">
+              {/* Mute Button */}
+              <button 
+                onClick={toggleMute}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                  isMuted 
+                    ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+              </button>
+              
+              {/* Video Button */}
+              <button 
+                onClick={toggleVideo}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                  !isVideoOn 
+                    ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title={isVideoOn ? 'Turn Camera Off' : 'Turn Camera On'}
+              >
+                {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+              </button>
+
+              {/* Speaker Button */}
+              <button 
+                onClick={toggleSpeaker}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                  !isSpeakerOn 
+                    ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' 
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
+              >
+                {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+              </button>
+              
+              {/* End Call Button */}
+              <button 
+                onClick={endCall}
+                className="w-16 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-all duration-200 transform hover:scale-110 shadow-lg shadow-red-500/30"
+                title="End Call"
+              >
+                <PhoneOff className="w-7 h-7" />
+              </button>
+              
+              {/* Chat Button */}
+              <button 
+                onClick={toggleChat}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 ${
+                  showChat 
+                    ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30' 
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title="Toggle Chat"
+              >
+                <MessageSquare className="w-6 h-6" />
+              </button>
+              
+              {/* Settings Button */}
+              <button 
+                className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                title="Settings"
+              >
+                <Settings className="w-6 h-6" />
+              </button>
+
+              {/* More Options */}
+              <button 
+                className="w-14 h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                title="More Options"
+              >
+                <MoreVertical className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
