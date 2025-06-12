@@ -47,8 +47,10 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-dark relative overflow-hidden">
       
-      {/* Main content - Split Layout */}      <div className="flex h-screen">
-        {/* Left Section - Form (70%) */}        <div className="w-full lg:w-[70%] p-10 flex items-center justify-start relative">          {/* AI Neural Network Decoration */}
+      {/* Main content - Split Layout */}      
+      <div className="flex h-screen pb-16">
+        {/* Left Section - Form (70%) */}        
+        <div className="w-full lg:w-[70%] p-10 flex items-center justify-start relative">          {/* AI Neural Network Decoration */}
           <div className="absolute right-0 h-full opacity-20 pointer-events-none overflow-hidden">
             <svg width="600" height="800" viewBox="0 0 600 800" fill="none" xmlns="http://www.w3.org/2000/svg">
               {/* Neural Network Nodes */}
@@ -245,23 +247,7 @@ const LoginPage = () => {
               <span className="group-hover:text-white transition-colors duration-200">Continue with Google</span>
             </motion.button>
 
-            {/* Sign Up Link */}
-            <motion.div
-              className="text-center mt-8"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-            >
-              <p className="text-lightText/60">
-                Don't have an account?{' '}
-                <Link 
-                  to="/signup" 
-                  className="font-semibold text-accent hover:text-accent/80 transition-colors duration-200 hover:underline"
-                >
-                  Create one here
-                </Link>
-              </p>
-            </motion.div>
+            
           </motion.div>
         </div>        {/* Right Section - Image (30%) */}
         <div className="hidden lg:block lg:w-[30%] relative overflow-hidden">          {/* Gradient overlay with horizontal fade effect - darker on left, more visible on right */}

@@ -28,7 +28,7 @@ const Navbar = () => {
     { path: '/', label: 'Home', icon: Home, public: true },
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3, public: false },
     {path: '/avatar-call', label: 'Avatar', icon: User, public: false },
-    { path: '/chat', label: 'AI Chat', icon: MessageCircle, public: false },
+    { path: '/chat', lael: 'AI Chat', icon: MessageCircle, public: false },
     { path: '/journal', label: 'Journal', icon: BookOpen, public: false },
     { path: '/settings', label: 'Settings', icon: Settings, public: false },
   ]
@@ -102,7 +102,7 @@ const Navbar = () => {
                     </Link>
                     <Link
                       to="/signup"
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-[#00ADB5] text-white hover:bg-[#00ADB5]/80 transition-all duration-200"
+                      className="flex items-center space-x-2 px-4 py-2 rounded-lg text-[#EEEEEE] hover:bg-[#00ADB5]/20 hover:text-[#00ADB5] transition-all duration-200"
                     >
                       <UserPlus className="w-4 h-4" />
                       <span>Sign Up</span>
