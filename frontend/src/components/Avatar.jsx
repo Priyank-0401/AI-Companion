@@ -112,6 +112,7 @@ function AnimatedModel({
   const expressionTimer = useRef(null);
   const lastExpression = useRef('neutral');
   const frameCount = useRef(0);
+  const lastModelType = useRef(null);
   
   // Preload both models to eliminate loading delays
   const idleModel = useGLTF('/models/Idle.glb');
@@ -121,30 +122,23 @@ function AnimatedModel({
   const idleAnimations = useAnimations(idleModel.animations, group);
   const talkingAnimations = useAnimations(talkingModel.animations, group);
   
-  // Current model and animations based on isTalking state
+  // Current model and animations based on isTalking state - stable reference
   const currentModel = React.useMemo(() => {
-    return isTalking ? talkingModel : idleModel;
+    const model = isTalking ? talkingModel : idleModel;
+    const modelType = isTalking ? 'talking' : 'idle';
+    
+    // Only log when actually switching models
+    if (lastModelType.current !== modelType) {
+      console.log(`🔄 Model switching from ${lastModelType.current} to ${modelType}`);
+      lastModelType.current = modelType;
+    }
+    
+    return model;
   }, [isTalking, idleModel, talkingModel]);
   
   const { scene, animations } = currentModel;
   const { actions, mixer } = isTalking ? talkingAnimations : idleAnimations;
-  
-  // Track when models are ready
-  useEffect(() => {
-    if (idleModel.scene) {
-      setIsIdleReady(true);
-      console.log('Idle model loaded and ready');
-    }
-  }, [idleModel.scene]);
-  
-  useEffect(() => {
-    if (talkingModel.scene) {
-      setIsTalkingReady(true);
-      console.log('Talking model loaded and ready');
-    }
-  }, [talkingModel.scene]);
-  
-  // Only log when model actually changes (reduce console spam)
+    // Only log when model actually changes (reduce console spam)
   React.useEffect(() => {
     const modelName = isTalking ? 'Talking' : 'Idle';
     console.log(`Switching to ${modelName} model`);
@@ -216,47 +210,49 @@ function AnimatedModel({
         clearTimeout(blinkTimer.current);
       }
     };
-  }, []); // Only run once  // Initialize animations only once per model
+  }, []); // Only run once  // Initialize animations only once per model - OPTIMIZED to prevent re-rendering
   useEffect(() => {
     if (!scene || !actions || Object.keys(actions).length === 0) {
       return;
     }
 
+    // Use a stable reference to prevent constant reinitialization
     const modelName = isTalking ? 'Talking' : 'Idle';
-    const isAnimationsInitialized = isTalking ? talkingAnimationsInitialized : idleAnimationsInitialized;
+    const currentAnimationsInitialized = isTalking ? talkingAnimationsInitialized : idleAnimationsInitialized;
     
-    if (isAnimationsInitialized) {
-      return; // Animations already initialized for this model
+    if (currentAnimationsInitialized) {
+      return; // Skip if already initialized
     }
 
-    console.log(`Initializing animations for ${modelName} model`);
+    console.log(`🎬 ONCE: Initializing animations for ${modelName} model`);
     
     const actionNames = Object.keys(actions);
-    console.log(`Available animations:`, actionNames);
     
-    // Stop all previous actions before initializing new ones
+    // Don't stop all actions every time - only when switching models
     if (mixer) {
       mixer.stopAllAction();
     }
     
+    // Initialize animations with stable settings
     actionNames.forEach(actionName => {
       const action = actions[actionName];
       if (action) {
         action.reset();
         action.setEffectiveWeight(1.0);
-        action.play();
         action.setLoop(THREE.LoopRepeat);
+        action.clampWhenFinished = false;
+        action.play();
       }
     });
 
-    // Mark animations as initialized for this model
+    // Mark as initialized to prevent re-runs
     if (isTalking) {
       setTalkingAnimationsInitialized(true);
     } else {
       setIdleAnimationsInitialized(true);
     }
 
-    console.log(`${modelName} model animations initialized`);
+    console.log(`✅ ${modelName} animations initialized - will not re-run`);
   }, [scene, actions, mixer, isTalking, idleAnimationsInitialized, talkingAnimationsInitialized]);
 
   // Memoize the facial expression application to prevent unnecessary updates
@@ -299,13 +295,12 @@ function AnimatedModel({
       }
     });
   }, [isTalking]);
-
   // Apply expression changes only when necessary
   useEffect(() => {
-    if (scene && (isIdleReady || isTalkingReady)) {
+    if (scene && (idleModel.scene || talkingModel.scene)) {
       applyFacialExpression(scene, currentExpression);
     }
-  }, [scene, currentExpression, isIdleReady, isTalkingReady, applyFacialExpression]);
+  }, [scene, currentExpression, applyFacialExpression, idleModel.scene, talkingModel.scene]);
   // Memoize animation weight calculation
   const getAnimationWeight = useCallback((animationName, expression, talking) => {
     const baseWeight = talking ? 1.0 : 0.8;
@@ -336,10 +331,17 @@ function AnimatedModel({
       }
     });
   }, [actions, currentExpression, isTalking, getAnimationWeight]);
-
   // Optimized frame-based updates with reduced frequency
-  useFrame(() => {
+  useFrame((state, delta) => {
     frameCount.current++;
+    
+    // Only update every 3rd frame to reduce computational load
+    if (frameCount.current % 3 !== 0) return;
+    
+    // Update mixer for animations
+    if (mixer) {
+      mixer.update(delta);
+    }
     
     if (lipSyncEnabled && audioAnalyzer.current.analyser) {
       const data = audioAnalyzer.current.getVolumeData();
@@ -354,7 +356,7 @@ function AnimatedModel({
         applyLipSyncMorphs(scene, data);
       }
     }
-  });  // Memoized lip-sync morph application
+  });// Memoized lip-sync morph application
   const applyLipSyncMorphs = useCallback((scene, audioData) => {
     scene.traverse((child) => {
       if (child.isMesh && child.morphTargetDictionary) {
@@ -395,9 +397,8 @@ function AnimatedModel({
 
   const scale = [2, 2, 2];
   const position = [0, -1.8, 0];
-  
-  return (
-    <group ref={group} {...props} key={`avatar-${isTalking ? 'talking' : 'idle'}`}>
+    return (
+    <group ref={group} {...props}>
       <primitive 
         object={scene} 
         scale={scale}

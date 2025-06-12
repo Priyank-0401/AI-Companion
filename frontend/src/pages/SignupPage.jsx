@@ -110,52 +110,23 @@ const SignupPage = () => {
     }
     setIsLoading(false);
   };  return (
-    <div className="min-h-screen bg-gradient-to-br from-dark via-mediumDark to-dark relative overflow-hidden pt-12">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-accent/20 rounded-full mix-blend-multiply filter blur-xl animate-pulse-slow"></div>
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-blue-500/20 rounded-full mix-blend-multiply filter blur-xl animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-purple-500/20 rounded-full mix-blend-multiply filter blur-xl animate-pulse-slow" style={{ animationDelay: '4s' }}></div>
-      </div>
-
-      {/* Floating Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-accent/40 rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -150, 0],
-              opacity: [0, 1, 0],
-              scale: [0, 1, 0],
-            }}
-            transition={{
-              duration: Math.random() * 4 + 3,
-              repeat: Infinity,
-              delay: Math.random() * 3,
-            }}
-          />
-        ))}
-      </div>
+    <div className="min-h-screen bg-dark relative overflow-hidden">
       
-      {/* Main content */}
-      <div className="relative z-10 min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-4">
-        <motion.div
-          initial={{ opacity: 0, y: 50, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="w-full max-w-lg"
-        >
-          {/* Main Card */}
-          <div className="relative">
-            {/* Glowing border effect */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-accent via-blue-500 to-purple-500 rounded-3xl blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
-            
-            <div className="relative bg-mediumDark/90 backdrop-blur-xl border border-accent/20 rounded-3xl p-8 shadow-2xl">              {/* Header */}
+      {/* Main content - Split Layout */}
+      <div className="flex h-screen">
+        {/* Left Section - Form (70%) */}
+        <div className="w-full lg:w-[70%] p-10 flex items-center justify-center relative">
+          {/* Dotted Curved Line */}
+          <svg className="absolute right-0 h-full opacity-20" width="400" viewBox="0 0 200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M180 0C100 100 250 300 100 400C-50 500 50 700 180 800" stroke="#00ADB5" strokeWidth="2" strokeDasharray="6 6" />
+          </svg>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md relative z-10"
+          >{/* Header */}
               <motion.div 
                 className="text-center mb-6"
                 initial={{ opacity: 0, y: 20 }}
@@ -168,7 +139,7 @@ const SignupPage = () => {
                     transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                     className="absolute inset-0 bg-gradient-to-r from-accent to-blue-500 rounded-full opacity-20 blur-md"
                   />
-                  <img src="/logo.svg" alt="Seriva" className="relative w-16 h-16 mx-auto rounded-full" />
+                  <img src="https://cdn-icons-png.flaticon.com/512/6828/6828737.png" alt="Seriva" className="relative w-16 h-16 mx-auto rounded-full" />
                   <motion.div
                     className="absolute -top-2 -right-2"
                     animate={{ scale: [1, 1.2, 1] }}
@@ -446,11 +417,25 @@ const SignupPage = () => {
                   >
                     Sign in here
                   </Link>
-                </p>
-              </motion.div>
+                </p>              </motion.div>
+          </motion.div>
+        </div>
+        
+        {/* Right Section - Image (30%) */}
+        <div className="hidden lg:block lg:w-[30%] relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-accent/20 via-mediumDark to-dark z-10"></div>
+          <img 
+            src="https://images.unsplash.com/photo-1587723958656-ee042cc565a1?q=80&w=1000&auto=format&fit=crop" 
+            alt="AI Wellness" 
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 p-8 z-20">
+            <div className="bg-dark/40 backdrop-blur-md rounded-xl p-6 border border-accent/20">
+              <h3 className="text-xl font-semibold text-white mb-2">Join Our Wellness Community</h3>
+              <p className="text-lightText/70">Create your account to start your personal well-being journey.</p>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
