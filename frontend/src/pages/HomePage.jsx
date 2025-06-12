@@ -123,9 +123,15 @@ const HomePage = () => {
         history.scrollRestoration = 'auto';
       }
     };
-  }, []);
-  return (
-    <div className="min-h-screen homepage-padding">
+  }, []);  return (
+    <div 
+      className="min-h-screen homepage-padding overflow-x-hidden scrollbar-hide"
+      style={{
+        msOverflowStyle: 'none',
+        scrollbarWidth: 'none',
+        overflow: 'auto'
+      }}
+    >
       {/* Hero Section */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}

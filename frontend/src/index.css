@@ -20,6 +20,17 @@
     color: #EEEEEE;
   }
 
+  /* Global scrollbar hiding for better control */
+  html, body {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  html::-webkit-scrollbar, 
+  body::-webkit-scrollbar {
+    display: none;  /* Safari, Chrome, Brave */
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -51,10 +62,32 @@
   .gradient-text {
     @apply bg-gradient-to-r from-accent to-blue-400 bg-clip-text text-transparent;
   }
-
   /* Hide scrollbar for chat messages */
   .chat-scroll-container::-webkit-scrollbar {
     display: none;
+  }  /* Hide scrollbar utility class - with higher specificity */
+  .scrollbar-hide,
+  .scrollbar-hide * {
+    -ms-overflow-style: none !important;  /* Internet Explorer 10+ */
+    scrollbar-width: none !important;  /* Firefox */
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar,
+  .scrollbar-hide *::-webkit-scrollbar {
+    display: none !important;  /* Safari, Chrome, Brave */
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Specific override for homepage */
+  .homepage-padding {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  
+  .homepage-padding::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
   }
 
   /* Override root padding for full-screen pages */
