@@ -31,7 +31,8 @@ import {
   Plus,
   ChevronRight,
   Menu,
-  X
+  X,
+  Save
 } from 'lucide-react'
 import { useChat } from '../contexts/ChatContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -73,9 +74,9 @@ const ChatPage = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState(null);
-  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState(null);  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
   const [listeningTimeout, setListeningTimeout] = useState(null);
+  const [activeChatDropdown, setActiveChatDropdown] = useState(null);
   const messagesEndRef = useRef(null);
   const initialLoadDoneRef = useRef(false);
   const chatScrollContainerRef = useRef(null);
@@ -89,7 +90,7 @@ const ChatPage = () => {
   // Generate a chat title from the first user message
   const generateChatTitle = (firstMessage) => {
     if (!firstMessage) return "New Chat";
-    const words = firstMessage.split(' ');
+    const words = firstMessage.split(' ');  
     if (words.length <= 4) return firstMessage;
     return words.slice(0, 4).join(' ') + '...';
   };
@@ -155,9 +156,50 @@ const ChatPage = () => {
       setChatHistory(savedChats.map(c => ({
         ...c,
         date: new Date(c.date),
-        lastActivity: new Date(c.lastActivity)
-      })));
+        lastActivity: new Date(c.lastActivity)      })));
     }
+  };
+
+  // Save chat as TXT file
+  const saveChatAsTxt = (chat) => {
+    const formattedDate = new Date(chat.date).toISOString().split('T')[0];
+    const filename = `${chat.title.replace(/[^a-zA-Z0-9]/g, '_')}_${formattedDate}.txt`;
+    
+    const content = chat.messages
+      .filter(m => m.type !== 'system') // Filter out system messages if any
+      .map(m => `[${m.type.toUpperCase()}] ${new Date(m.timestamp).toLocaleString()}\n${m.content}\n`)
+      .join('\n---\n\n');
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+    setActiveChatDropdown(null); // Close dropdown
+  };
+
+  // Delete chat from history
+  const deleteChatFromHistory = (chatId) => {
+    const savedChats = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    const updatedChats = savedChats.filter(chat => chat.id !== chatId);
+    
+    localStorage.setItem('chatHistory', JSON.stringify(updatedChats));
+    setChatHistory(updatedChats.map(chat => ({
+      ...chat,
+      date: new Date(chat.date),
+      lastActivity: new Date(chat.lastActivity)
+    })));
+    
+    // If the deleted chat is the current one, reset to welcome message
+    if (currentConversationId === chatId) {
+      resetChatHandler();
+    }
+    
+    setActiveChatDropdown(null); // Close dropdown
   };
   const resetChatHandler = () => {
     setMessages([{
@@ -360,43 +402,81 @@ const ChatPage = () => {
     // Check for speech synthesis support
     if ('speechSynthesis' in window) {
       synthRef.current = window.speechSynthesis;
-      
-      // Load available voices
+        // Load available voices
       const loadVoices = () => {
         const voices = synthRef.current.getVoices();
         if (voices.length > 0) {
-          // Filter for better quality voices, preferring Google voices
-          const filteredVoices = voices.filter(voice => 
-            !voice.name.includes('Microsoft') || voice.name.includes('Google')
-          );
+          // Filter for better quality voices, include more voice providers
+          const filteredVoices = voices.filter(voice => {
+            // Include Google, Apple, native browser voices, and exclude only poor quality ones
+            const name = voice.name.toLowerCase();
+            const isGoodQuality = 
+              name.includes('google') ||
+              name.includes('apple') ||
+              name.includes('natural') ||
+              name.includes('neural') ||
+              name.includes('premium') ||
+              (!name.includes('microsoft') || name.includes('neural')) || // Include only Neural Microsoft voices
+              voice.localService === true; // Include high-quality local voices
+            
+            return isGoodQuality;
+          });
           
-          // Sort voices: Google first, then by language (English first)
+          // Sort voices: Google first, then Apple, then others, prioritizing English
           const sortedVoices = filteredVoices.sort((a, b) => {
-            // Google voices first
-            if (a.name.includes('Google') && !b.name.includes('Google')) return -1;
-            if (!a.name.includes('Google') && b.name.includes('Google')) return 1;
+            // Priority scoring
+            const getVoicePriority = (voice) => {
+              let score = 0;
+              const name = voice.name.toLowerCase();
+              
+              // Provider priority
+              if (name.includes('google')) score += 100;
+              else if (name.includes('apple')) score += 80;
+              else if (name.includes('neural')) score += 60;
+              else if (name.includes('natural')) score += 40;
+              else if (voice.localService) score += 20;
+              
+              // Language priority
+              if (voice.lang === 'en-US') score += 50;
+              else if (voice.lang.startsWith('en-')) score += 30;
+              
+              // Gender variety (prefer having both male and female options)
+              if (name.includes('female') || name.includes('woman')) score += 10;
+              if (name.includes('male') || name.includes('man')) score += 10;
+              
+              return score;
+            };
             
-            // English voices first
-            if (a.lang.startsWith('en-') && !b.lang.startsWith('en-')) return -1;
-            if (!a.lang.startsWith('en-') && b.lang.startsWith('en-')) return 1;
+            const scoreA = getVoicePriority(a);
+            const scoreB = getVoicePriority(b);
             
-            // Alphabetical order by name
+            if (scoreA !== scoreB) return scoreB - scoreA; // Higher score first
+            
+            // If same score, alphabetical order
             return a.name.localeCompare(b.name);
           });
           
           setAvailableVoices(sortedVoices);
           
-          // Set a default voice - prefer a female Google US English voice
+          // Set a default voice - prefer a high-quality English voice
           const defaultVoice = sortedVoices.find(voice => 
-            voice.name.includes('Google') && 
-            voice.name.includes('Female') && 
+            voice.name.toLowerCase().includes('google') && 
+            (voice.name.toLowerCase().includes('female') || voice.name.toLowerCase().includes('woman')) && 
             voice.lang === 'en-US'
           ) || 
-          sortedVoices.find(voice => voice.name.includes('Google') && voice.lang === 'en-US') ||
+          sortedVoices.find(voice => voice.name.toLowerCase().includes('google') && voice.lang === 'en-US') ||
+          sortedVoices.find(voice => voice.name.toLowerCase().includes('apple') && voice.lang === 'en-US') ||
           sortedVoices.find(voice => voice.lang === 'en-US') ||
           sortedVoices[0];
           
           setSelectedVoice(defaultVoice);
+          
+          // Debug log to see available voices
+          console.log('Available voices loaded:', sortedVoices.map(v => ({
+            name: v.name,
+            lang: v.lang,
+            localService: v.localService
+          })));
         }
       };
       
@@ -431,8 +511,22 @@ const ChatPage = () => {
       if (listeningTimeout) {
         clearTimeout(listeningTimeout);
       }
+    };  }, [listeningTimeout]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeChatDropdown) {
+        setActiveChatDropdown(null);
+      }
     };
-  }, [listeningTimeout]);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeChatDropdown]);
+
   // Auto-speak bot messages when voice is enabled
   useEffect(() => {
     if (voiceEnabled && messages.length > 0) {
@@ -526,11 +620,20 @@ const ChatPage = () => {
     if (voiceEnabled && isSpeaking) {
       stopSpeaking()
     }
-  }
-  // Handle form submission and send message
+  }  // Handle form submission and send message
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (input.trim() === '') return;
+    
+    // Generate conversation ID on first user message
+    if (!currentConversationId) {
+      const newConversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentConversationId(newConversationId);
+      
+      // Generate title from first message
+      const title = generateChatTitle(input.trim());
+      setCurrentChatTitle(title);
+    }
     
     // Create and add user message
     const userMessage = {
@@ -551,7 +654,7 @@ const ChatPage = () => {
       // Call the real Ollama API
       const response = await chatApi.sendMessage(
         userInput, 
-        null, // conversationId - can be null for new conversations
+        currentConversationId, // Use the current conversation ID
         conversationStyle // Use the selected conversation style
       );
       
@@ -683,7 +786,7 @@ const ChatPage = () => {
         />
       )}
         {/* Sidebar - Permanently visible on desktop */}
-      <aside className={`fixed md:static h-[calc(100vh-4rem)] bg-[#393E46] w-72 z-50 flex flex-col shadow-xl ${mobileSidebarOpen ? 'block' : 'hidden md:flex'}`}>
+      <aside className={`fixed md:static h-[calc(100vh-4rem)] pt-2 bg-[#393E46] w-72 z-50 flex flex-col shadow-xl ${mobileSidebarOpen ? 'block' : 'hidden md:flex'}`}>
             {/* New Chat Button */}
             <div className="p-4">
               <motion.button
@@ -934,9 +1037,7 @@ const ChatPage = () => {
                   )}
                 </div>
               )}
-            </div>
-
-            {/* Chat History */}
+            </div>            {/* Chat History */}
             <div className="flex-1 overflow-y-auto px-2">
               <div className="px-2 mb-2">
                 <h2 className="text-xs uppercase font-semibold text-[#EEEEEE]/50 tracking-wider">Chat History</h2>
@@ -947,21 +1048,73 @@ const ChatPage = () => {
                   <div className="px-2 mb-2">
                     <h3 className="text-xs font-medium text-[#EEEEEE]/60">{date}</h3>
                   </div>
-                  
-                  {chats.map(chat => (
-                    <motion.button
-                      key={chat.id}
-                      whileHover={{ x: 4 }}
-                      className="flex items-start w-full p-2 rounded-lg hover:bg-[#00ADB5]/10 transition-colors text-left"
-                    >
-                      <MessageSquare className="w-4 h-4 mt-0.5 mr-3 text-[#EEEEEE]/70" />
-                      <div className="flex-1 overflow-hidden">
-                        <h4 className="text-sm font-medium text-[#EEEEEE] truncate">{chat.title}</h4>
-                        <p className="text-xs text-[#EEEEEE]/60 truncate">
-                          {chat.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                    {chats.map(chat => (
+                    <div key={chat.id} className="relative group">
+                      <motion.button
+                        whileHover={{ x: 4 }}
+                        onClick={() => loadChat(chat.id)}
+                        className={`flex items-start w-full p-2 rounded-lg hover:bg-[#00ADB5]/10 transition-colors text-left ${
+                          currentConversationId === chat.id ? 'bg-[#00ADB5]/20 border-l-2 border-[#00ADB5]' : ''
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4 mt-0.5 mr-3 text-[#EEEEEE]/70" />
+                        <div className="flex-1 overflow-hidden">
+                          <h4 className="text-sm font-medium text-[#EEEEEE] truncate">{chat.title}</h4>
+                          <p className="text-xs text-[#EEEEEE]/60 truncate">
+                            {chat.lastActivity ? chat.lastActivity.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+                             chat.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </motion.button>
+                      
+                      {/* Dropdown Menu Button */}
+                      <div className="absolute right-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveChatDropdown(activeChatDropdown === chat.id ? null : chat.id);
+                          }}
+                          className="p-1 rounded hover:bg-[#393E46] transition-colors"
+                        >
+                          <MoreVertical className="w-3 h-3 text-[#EEEEEE]/70" />
+                        </motion.button>
+                        
+                        {/* Dropdown Menu */}
+                        <AnimatePresence>
+                          {activeChatDropdown === chat.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                              className="absolute right-0 top-full mt-1 w-32 bg-[#393E46] border border-[#00ADB5]/20 rounded-lg shadow-lg z-50 overflow-hidden"
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  saveChatAsTxt(chat);
+                                }}
+                                className="flex items-center w-full px-3 py-2 text-sm text-[#EEEEEE] hover:bg-[#00ADB5]/10 transition-colors"
+                              >
+                                <Save className="w-3 h-3 mr-2 text-[#00ADB5]" />
+                                Save as TXT
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteChatFromHistory(chat.id);
+                                }}
+                                className="flex items-center w-full px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Delete
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </motion.button>
+                    </div>
                   ))}
                 </div>
               ))}
@@ -970,30 +1123,11 @@ const ChatPage = () => {
               {Object.keys(groupedChatHistory).length === 0 && (
                 <div className="flex flex-col items-center justify-center h-32 px-4 text-center">
                   <MessageSquare className="w-8 h-8 text-[#EEEEEE]/30 mb-2" />
-                  <p className="text-sm text-[#EEEEEE]/50">No chat history yet</p>
-                  <p className="text-xs text-[#EEEEEE]/30">Start a new conversation</p>
+                  <p className="text-sm text-[#EEEEEE]/50">No chat history yet</p>                  <p className="text-xs text-[#EEEEEE]/30">Start a new conversation</p>
                 </div>
               )}
             </div>
-
-            {/* User Profile */}
-            <div className="p-3 border-t border-[#00ADB5]/20">
-              <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-[#222831]/50 transition-colors">
-                <div className="w-8 h-8 rounded-full bg-[#00ADB5] flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-[#EEEEEE] truncate">
-                    {currentUser?.displayName || "User"}
-                  </p>
-                  <p className="text-xs text-[#EEEEEE]/50 truncate">
-                    {currentUser?.email || "user@example.com"}
-                  </p>
-                </div>
-                
-              </div>
-            </div>
-          </aside>      {/* Main Chat Area */}
+          </aside>{/* Main Chat Area */}
       <div className="flex-1 flex flex-col h-full">
         {/* Chat Messages */}
         <div 
