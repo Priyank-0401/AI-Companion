@@ -27,12 +27,30 @@ import {
   Mic,
   MicOff,
   Play,
-  Pause
+  Pause,
+  Plus,
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react'
 import { useChat } from '../contexts/ChatContext';
+import { useAuth } from '../contexts/AuthContext';
+import { chatApi } from '../services/api';
 
 const ChatPage = () => {
   const { resetChat } = useChat();
+  const { currentUser } = useAuth();
+
+  // Model options
+  const modelOptions = [
+    { id: 'default', name: 'Seriva (Default)', description: 'Balanced wellness companion' },
+    { id: 'supportive', name: 'Supportive Seriva', description: 'Extra empathetic responses' },
+    { id: 'analytical', name: 'Analytical Seriva', description: 'Logical and analytical approach' }
+  ];
+    // State for chat history and current conversation
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [currentChatTitle, setCurrentChatTitle] = useState(null);
 
   const [messages, setMessages] = useState([
     {
@@ -40,27 +58,107 @@ const ChatPage = () => {
       type: 'bot',
       content: "Welcome! It's wonderful to see you. I'm Seriva, a friendly presence here to listen without judgment, offer support, and explore any thoughts or feelings you'd like to share. How can I help you feel more supported today?",
       timestamp: new Date()
-    }  ]);
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [conversationStyle, setConversationStyle] = useState('supportive')
-  const [showOptions, setShowOptions] = useState(false)
-  const [copiedMessageId, setCopiedMessageId] = useState(null)
-  const [isListening, setIsListening] = useState(false)
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [speechSupported, setSpeechSupported] = useState(false)
-  const [voiceEnabled, setVoiceEnabled] = useState(true)
-  const [listeningTimeout, setListeningTimeout] = useState(null)
+    }
+  ]);
+  
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationStyle, setConversationStyle] = useState('supportive');
+  const [showOptions, setShowOptions] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);  const [selectedModel, setSelectedModel] = useState('default');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
+  const [listeningTimeout, setListeningTimeout] = useState(null);
   const messagesEndRef = useRef(null);
   const initialLoadDoneRef = useRef(false);
   const chatScrollContainerRef = useRef(null);
   const recognitionRef = useRef(null);
   const synthRef = useRef(null);
-
-  const addMessage = (message) => {
+  const inputRef = useRef(null);
+    const addMessage = (message) => {
     setMessages(prev => [...prev, message]);
   };
 
+  // Generate a chat title from the first user message
+  const generateChatTitle = (firstMessage) => {
+    if (!firstMessage) return "New Chat";
+    const words = firstMessage.split(' ');
+    if (words.length <= 4) return firstMessage;
+    return words.slice(0, 4).join(' ') + '...';
+  };
+
+  // Save current chat to history
+  const saveCurrentChatToHistory = () => {
+    if (!currentConversationId || messages.length <= 1) return;
+
+    const chatToSave = {
+      id: currentConversationId,
+      title: currentChatTitle || generateChatTitle(messages.find(m => m.type === 'user')?.content),
+      messages: messages,
+      date: new Date(),
+      lastActivity: new Date()
+    };
+
+    const savedChats = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    const existingIndex = savedChats.findIndex(chat => chat.id === currentConversationId);
+    
+    if (existingIndex >= 0) {
+      savedChats[existingIndex] = chatToSave;
+    } else {
+      savedChats.unshift(chatToSave);
+    }
+
+    // Keep only the last 50 chats
+    if (savedChats.length > 50) {
+      savedChats.splice(50);
+    }
+
+    localStorage.setItem('chatHistory', JSON.stringify(savedChats));
+    setChatHistory(savedChats);
+  };
+
+  // Load chat history from localStorage
+  const loadChatHistory = () => {
+    const savedChats = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    setChatHistory(savedChats.map(chat => ({
+      ...chat,
+      date: new Date(chat.date),
+      lastActivity: new Date(chat.lastActivity)
+    })));
+    return savedChats;
+  };
+
+  // Load a specific chat
+  const loadChat = (chatId) => {
+    const savedChats = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    const chat = savedChats.find(c => c.id === chatId);
+    
+    if (chat) {
+      setMessages(chat.messages.map(msg => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      })));
+      setCurrentConversationId(chat.id);
+      setCurrentChatTitle(chat.title);
+      setMobileSidebarOpen(false);
+      
+      // Update last activity
+      chat.lastActivity = new Date();
+      localStorage.setItem('chatHistory', JSON.stringify(savedChats));
+      setChatHistory(savedChats.map(c => ({
+        ...c,
+        date: new Date(c.date),
+        lastActivity: new Date(c.lastActivity)
+      })));
+    }
+  };
   const resetChatHandler = () => {
     setMessages([{
       id: 1,
@@ -68,6 +166,8 @@ const ChatPage = () => {
       content: "Welcome! It's wonderful to see you. I'm Seriva, a friendly presence here to listen without judgment, offer support, and explore any thoughts or feelings you'd like to share. How can I help you feel more supported today?",
       timestamp: new Date()
     }]);
+    setCurrentConversationId(null);
+    setCurrentChatTitle(null);
     initialLoadDoneRef.current = false;
   };
 
@@ -91,17 +191,17 @@ const ChatPage = () => {
       }, 100);
       return () => clearTimeout(timer);
     }
-
-    // Ensure padding remains consistent
-    if (chatScrollContainerRef.current) {
-      chatScrollContainerRef.current.style.paddingTop = '4rem';
-    }
   }, [messages]);
-
+  // Load and save messages to localStorage
   useEffect(() => {
-    // Load messages from local storage on component mount
+    // Load chat history first
+    const savedChats = loadChatHistory();
+    
+    // Load current conversation from localStorage
+    const savedCurrentConversationId = localStorage.getItem('currentConversationId');
     const savedMessages = localStorage.getItem('chatMessages');
-    if (savedMessages) {
+    
+    if (savedCurrentConversationId && savedMessages) {
       try {
         const parsedMessages = JSON.parse(savedMessages);
         if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
@@ -109,6 +209,13 @@ const ChatPage = () => {
             ...msg,
             timestamp: new Date(msg.timestamp)
           })));
+          setCurrentConversationId(savedCurrentConversationId);
+          
+          // Try to get title from chat history
+          const existingChat = savedChats.find(chat => chat.id === savedCurrentConversationId);
+          if (existingChat) {
+            setCurrentChatTitle(existingChat.title);
+          }
           return; // Exit early if valid messages are found
         }
       } catch (e) {
@@ -124,11 +231,25 @@ const ChatPage = () => {
       timestamp: new Date()
     }]);
   }, []);
+
   useEffect(() => {
-    console.log("Saving messages to localStorage", messages);
+    // Save current messages and conversation ID
     localStorage.setItem('chatMessages', JSON.stringify(messages));
-  }, [messages]);
-  // Initialize speech recognition and synthesis
+    if (currentConversationId) {
+      localStorage.setItem('currentConversationId', currentConversationId);
+    }
+    
+    // Auto-save to history if conversation has real messages
+    if (currentConversationId && messages.length > 1 && messages.some(m => m.type === 'user')) {
+      const timeoutId = setTimeout(() => {
+        saveCurrentChatToHistory();
+      }, 2000); // Auto-save after 2 seconds of inactivity
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [messages, currentConversationId]);
+
+  // Handle speech recognition and synthesis
   useEffect(() => {
     // Check for speech recognition support
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -238,7 +359,54 @@ const ChatPage = () => {
 
     // Check for speech synthesis support
     if ('speechSynthesis' in window) {
-      synthRef.current = window.speechSynthesis
+      synthRef.current = window.speechSynthesis;
+      
+      // Load available voices
+      const loadVoices = () => {
+        const voices = synthRef.current.getVoices();
+        if (voices.length > 0) {
+          // Filter for better quality voices, preferring Google voices
+          const filteredVoices = voices.filter(voice => 
+            !voice.name.includes('Microsoft') || voice.name.includes('Google')
+          );
+          
+          // Sort voices: Google first, then by language (English first)
+          const sortedVoices = filteredVoices.sort((a, b) => {
+            // Google voices first
+            if (a.name.includes('Google') && !b.name.includes('Google')) return -1;
+            if (!a.name.includes('Google') && b.name.includes('Google')) return 1;
+            
+            // English voices first
+            if (a.lang.startsWith('en-') && !b.lang.startsWith('en-')) return -1;
+            if (!a.lang.startsWith('en-') && b.lang.startsWith('en-')) return 1;
+            
+            // Alphabetical order by name
+            return a.name.localeCompare(b.name);
+          });
+          
+          setAvailableVoices(sortedVoices);
+          
+          // Set a default voice - prefer a female Google US English voice
+          const defaultVoice = sortedVoices.find(voice => 
+            voice.name.includes('Google') && 
+            voice.name.includes('Female') && 
+            voice.lang === 'en-US'
+          ) || 
+          sortedVoices.find(voice => voice.name.includes('Google') && voice.lang === 'en-US') ||
+          sortedVoices.find(voice => voice.lang === 'en-US') ||
+          sortedVoices[0];
+          
+          setSelectedVoice(defaultVoice);
+        }
+      };
+      
+      // Chrome needs to wait for the voiceschanged event
+      if (synthRef.current.onvoiceschanged !== undefined) {
+        synthRef.current.onvoiceschanged = loadVoices;
+      }
+      
+      // For browsers that don't fire onvoiceschanged
+      loadVoices();
     }
 
     // Cleanup for speech recognition and synthesis
@@ -327,16 +495,13 @@ const ChatPage = () => {
       setListeningTimeout(null)
     }
   }
-
   const speakMessage = (text) => {
-    if (synthRef.current && voiceEnabled) {
+    if (synthRef.current && voiceEnabled && selectedVoice) {
       // Cancel any ongoing speech
       synthRef.current.cancel()
       
       const utterance = new SpeechSynthesisUtterance(text)
-      utterance.voice = synthRef.current.getVoices().find(voice => 
-        voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Karen')
-      ) || synthRef.current.getVoices()[0]
+      utterance.voice = selectedVoice
       utterance.rate = 0.9
       utterance.pitch = 1.1
       utterance.volume = 0.8
@@ -362,143 +527,264 @@ const ChatPage = () => {
       stopSpeaking()
     }
   }
-
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-
+  // Handle form submission and send message
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (input.trim() === '') return;
+    
+    // Create and add user message
     const userMessage = {
-      id: Date.now(),
+      id: messages.length + 1,
       type: 'user',
       content: input.trim(),
       timestamp: new Date()
     };
-
     addMessage(userMessage);
-    setInput('')
-    setIsLoading(true)
-
-    try {
-      const response = await fetch('http://localhost:3001/api/chat/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: userMessage.content,
-          conversationId: null,
-          style: conversationStyle
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch AI response');
-      }
-
-      const data = await response.json();
-      const botMessage = {
-        id: Date.now() + 1,
+    
+    // Store the input for API call
+    const userInput = input.trim();
+    
+    // Clear input and start loading
+    setInput('');
+    setIsLoading(true);
+      try {
+      // Call the real Ollama API
+      const response = await chatApi.sendMessage(
+        userInput, 
+        null, // conversationId - can be null for new conversations
+        conversationStyle // Use the selected conversation style
+      );
+      
+      console.log('API Response:', response); // Debug log
+      
+      // Create and add bot response
+      const botResponse = {
+        id: messages.length + 2,
         type: 'bot',
-        content: data.response,
+        content: response.response || response.message || response.content || 'I apologize, but I encountered an issue processing your message. Could you please try again?',
         timestamp: new Date()
       };
-
-      addMessage(botMessage);
+      addMessage(botResponse);
       
-      // Auto-speak bot response if voice is enabled
+      // Speak the response if voice is enabled
       if (voiceEnabled) {
-        setTimeout(() => speakMessage(data.response), 500)
+        speakMessage(botResponse.content);
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage = {
-        id: Date.now() + 1,
+      
+      // Add error message
+      const errorResponse = {
+        id: messages.length + 2,
         type: 'bot',
-        content: 'Sorry, I encountered an error while processing your request.',
+        content: 'I apologize, but I\'m having trouble connecting to my AI brain right now. Please check your connection and try again. If the problem persists, the Ollama service might not be running.',
         timestamp: new Date()
       };
-      addMessage(errorMessage);
+      addMessage(errorResponse);
+      
+      // Speak error message if voice is enabled
+      if (voiceEnabled) {
+        speakMessage(errorResponse.content);
+      }
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
+  // Handle copy message
+  const copyMessage = (content) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageId(content);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
+
+  // Export chat
   const exportChat = () => {
-    const chatData = messages.map(msg => ({
-      type: msg.type,
-      content: msg.content,
-      timestamp: msg.timestamp.toISOString()
-    }))
-    const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ai-companion-chat-${new Date().toISOString().split('T')[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
+    const formattedDate = new Date().toISOString().split('T')[0];
+    const filename = `seriva-chat-${formattedDate}.txt`;
+    const content = messages
+      .map(m => `[${m.type.toUpperCase()}] ${m.timestamp.toLocaleString()}\n${m.content}\n`)
+      .join('\n---\n\n');
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+  };  const startNewChat = () => {
+    // Save current chat to history if it has real conversations (more than welcome message)
+    if (messages.length > 1 && messages.some(m => m.type === 'user')) {
+      saveCurrentChatToHistory();
+    }
+    
+    // Reset to new chat
+    resetChatHandler();
+    setMobileSidebarOpen(false);
+  };
 
-  const copyMessage = (messageId, content) => {
-    navigator.clipboard.writeText(content)
-    setCopiedMessageId(messageId)
-    setTimeout(() => setCopiedMessageId(null), 2000)
-  }
+  const toggleMobileSidebar = () => {
+    setMobileSidebarOpen(prev => !prev);
+  };
+
   const conversationStyles = [
-    { value: 'supportive', label: 'Supportive', icon: Heart, color: 'text-pink-400' },
-    { value: 'analytical', label: 'Analytical', icon: Brain, color: 'text-blue-400' },
-    { value: 'casual', label: 'Casual', icon: Smile, color: 'text-yellow-400' },
-    { value: 'professional', label: 'Professional', icon: FileText, color: 'text-green-400' }
-  ]
+    { value: 'supportive', label: 'Supportive', icon: Heart, color: 'text-red-400' },
+    { value: 'practical', label: 'Practical', icon: Coffee, color: 'text-yellow-400' },
+    { value: 'reflective', label: 'Reflective', icon: Brain, color: 'text-blue-400' },
+    { value: 'cheerful', label: 'Cheerful', icon: Smile, color: 'text-green-400' }
+  ];
 
+  // Format date for chat history
+  const formatDate = (date) => {
+    const now = new Date();
+    const diff = now - date;
+    const dayInMs = 86400000;
+    
+    if (diff < dayInMs) return 'Today';
+    if (diff < dayInMs * 2) return 'Yesterday';
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  // Group chat history by date
+  const groupedChatHistory = chatHistory.reduce((acc, chat) => {
+    const dateKey = formatDate(chat.date);
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(chat);
+    return acc;
+  }, {});
   return (
-    <div className="w-full min-h-screen bg-[#222831] text-[#EEEEEE]">
-      {/* Enhanced Header with Chat Controls */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="sticky top-16 z-40 bg-[#222831]/95 backdrop-blur-sm border-b border-[#393E46]/50"
-      >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <motion.div 
-                className="w-12 h-12 bg-gradient-to-br from-[#00ADB5] to-[#00ADB5]/80 rounded-xl flex items-center justify-center"
-                whileHover={{ scale: 1.05 }}
+    <div className="flex h-screen pt-20 bg-[#222831]">
+      {/* Mobile Sidebar Toggle Button */}
+      <div className="md:hidden fixed bottom-4 left-4 z-50">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleMobileSidebar}
+          className="p-3 bg-[#00ADB5] rounded-full shadow-lg"
+        >
+          {mobileSidebarOpen ? (
+            <X className="w-6 h-6 text-white" />
+          ) : (
+            <Menu className="w-6 h-6 text-white" />
+          )}
+        </motion.button>
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          onClick={() => setMobileSidebarOpen(false)} 
+        />
+      )}
+        {/* Sidebar - Permanently visible on desktop */}
+      <aside className={`fixed md:static h-[calc(100vh-4rem)] bg-[#393E46] w-72 z-50 flex flex-col shadow-xl ${mobileSidebarOpen ? 'block' : 'hidden md:flex'}`}>
+            {/* New Chat Button */}
+            <div className="p-4">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={startNewChat}
+                className="flex items-center justify-center w-full py-3 px-4 bg-[#00ADB5] hover:bg-[#00ADB5]/90 text-white rounded-lg shadow-md transition-colors gap-2"
               >
-                <Bot className="w-6 h-6 text-white" />
-              </motion.div>
-              <div>
-                <h1 className="text-2xl font-bold text-[#00ADB5]">Chat with Seriva</h1>
-                <p className="text-sm text-[#EEEEEE]/70">Your AI Wellness Companion</p>
+                <Plus className="w-5 h-5" />
+                <span className="font-medium">New Chat</span>
+              </motion.button>
+            </div>
+
+            {/* Model Selection */}
+            <div className="px-4 mb-4">
+              <div className="relative">
+                <button 
+                  onClick={() => setShowModelDropdown(!showModelDropdown)}
+                  className="flex items-center justify-between w-full p-3 bg-[#222831] hover:bg-[#222831]/80 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-[#00ADB5]" />
+                    <span className="text-sm font-medium text-[#EEEEEE]">
+                      {modelOptions.find(m => m.id === selectedModel)?.name || 'Select Model'}
+                    </span>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-[#EEEEEE]/70 transition-transform ${showModelDropdown ? 'rotate-90' : ''}`} />
+                </button>
+
+                {/* Model Dropdown */}
+                <AnimatePresence>
+                  {showModelDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute left-0 right-0 mt-2 bg-[#222831] border border-[#00ADB5]/20 rounded-lg shadow-lg z-10 overflow-hidden"
+                    >
+                      {modelOptions.map(model => (
+                        <button
+                          key={model.id}
+                          className={`flex flex-col w-full text-left p-3 hover:bg-[#00ADB5]/10 transition-colors ${model.id === selectedModel ? 'bg-[#00ADB5]/20' : ''}`}
+                          onClick={() => {
+                            setSelectedModel(model.id);
+                            setShowModelDropdown(false);
+                          }}
+                        >
+                          <span className="font-medium text-sm text-[#EEEEEE]">{model.name}</span>
+                          <span className="text-xs text-[#EEEEEE]/60">{model.description}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
-            {/* Chat Controls */}
-            <div className="flex items-center space-x-3">
-              {/* Conversation Style Selector */}
-              <div className="relative">                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => setShowOptions(!showOptions)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-[#393E46] hover:bg-[#393E46]/80 rounded-lg transition-colors"
+            {/* Quick Actions Section */}
+            <div className="px-4 mb-4">
+              <div className="mb-2">
+                <h3 className="text-xs uppercase font-semibold text-[#EEEEEE]/50 tracking-wider px-1">Quick Actions</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                {/* Export Chat Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={exportChat}
+                  className="flex items-center justify-center p-3 bg-[#222831] hover:bg-[#222831]/80 rounded-lg transition-colors group"
+                  title="Export Chat"
                 >
-                  {(() => {
-                    const currentStyle = conversationStyles.find(s => s.value === conversationStyle);
-                    const Icon = currentStyle?.icon;
-                    return Icon ? <Icon className={`w-4 h-4 ${currentStyle.color}`} /> : null;
-                  })()}
-                  <span className="text-sm text-[#EEEEEE]">
-                    {conversationStyles.find(s => s.value === conversationStyle)?.label}
-                  </span>
-                  <MoreVertical className="w-4 h-4 text-[#EEEEEE]/70" />
+                  <Download className="w-4 h-4 text-[#00ADB5] mr-2" />
+                  <span className="text-xs font-medium text-[#EEEEEE]">Export</span>
                 </motion.button>
+
+                {/* Reset Chat Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={resetChatHandler}
+                  className="flex items-center justify-center p-3 bg-[#222831] hover:bg-red-500/20 rounded-lg transition-colors group"
+                  title="Reset Chat"
+                >
+                  <Trash2 className="w-4 h-4 text-[#EEEEEE]/70 group-hover:text-red-400 mr-2" />
+                  <span className="text-xs font-medium text-[#EEEEEE] group-hover:text-red-400">Reset</span>
+                </motion.button>
+              </div>
+              
+              {/* Conversation Style */}
+              <div className="mt-2 relative">
+                <button
+                  onClick={() => setShowOptions(!showOptions)}
+                  className="flex items-center justify-between w-full p-3 bg-[#222831] hover:bg-[#222831]/80 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <MoreVertical className="w-4 h-4 text-[#00ADB5]" />
+                    <span className="text-sm font-medium text-[#EEEEEE]">Conversation Style</span>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-[#EEEEEE]/70 transition-transform ${showOptions ? 'rotate-90' : ''}`} />
+                </button>
 
                 {/* Style Options Dropdown */}
                 <AnimatePresence>
@@ -507,364 +793,476 @@ const ChatPage = () => {
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute top-full right-0 mt-2 w-48 bg-[#393E46] rounded-lg border border-[#00ADB5]/20 shadow-xl z-50"
+                      className="absolute left-0 right-0 mt-2 bg-[#222831] border border-[#00ADB5]/20 rounded-lg shadow-lg z-10 overflow-hidden"
                     >
-                      <div className="p-2">
-                        {conversationStyles.map((style) => {
-                          const Icon = style.icon
-                          return (
-                            <motion.button
-                              key={style.value}
-                              whileHover={{ backgroundColor: 'rgba(0, 173, 181, 0.1)' }}
-                              onClick={() => {
-                                setConversationStyle(style.value)
-                                setShowOptions(false)
-                              }}
-                              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md transition-colors ${
-                                conversationStyle === style.value ? 'bg-[#00ADB5]/20' : ''
-                              }`}
-                            >
-                              <Icon className={`w-4 h-4 ${style.color}`} />
-                              <span className="text-sm text-[#EEEEEE]">{style.label}</span>
-                            </motion.button>
-                          )
-                        })}
-                      </div>
+                      {conversationStyles.map((style) => {
+                        const Icon = style.icon;
+                        return (
+                          <motion.button
+                            key={style.value}
+                            whileHover={{ backgroundColor: 'rgba(0, 173, 181, 0.1)' }}
+                            onClick={() => {
+                              setConversationStyle(style.value);
+                              setShowOptions(false);
+                            }}
+                            className={`w-full flex items-center space-x-3 px-3 py-2 text-left transition-colors ${
+                              conversationStyle === style.value ? 'bg-[#00ADB5]/20' : ''
+                            }`}
+                          >
+                            <Icon className={`w-4 h-4 ${style.color}`} />
+                            <span className="text-sm text-[#EEEEEE]">{style.label}</span>
+                          </motion.button>
+                        );
+                      })}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
-
-              {/* Export Chat Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={exportChat}
-                className="p-2 bg-[#393E46] hover:bg-[#393E46]/80 rounded-lg transition-colors"
-                title="Export Chat"
-              >
-                <Download className="w-5 h-5 text-[#00ADB5]" />
-              </motion.button>
-
-              {/* Reset Chat Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={resetChatHandler}
-                className="p-2 bg-[#393E46] hover:bg-red-500/20 rounded-lg transition-colors group"
-                title="Reset Chat"
-              >
-                <Trash2 className="w-5 h-5 text-[#EEEEEE]/70 group-hover:text-red-400" />
-              </motion.button>
             </div>
-          </div>
-        </div>
-      </motion.header>      {/* Enhanced Chat Container */}
-      <div className="max-w-7xl mx-auto px-6 pb-32">
-        {/* Messages Area */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-[#393E46]/30 backdrop-blur-sm rounded-2xl border border-[#393E46]/50 overflow-hidden"
-        >
-          <div 
-            ref={chatScrollContainerRef} 
-            className="h-[calc(100vh-300px)] overflow-y-auto px-6 py-6 space-y-4"
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#00ADB5 transparent'
-            }}
-          >
-            <AnimatePresence mode="popLayout">
-              {messages.map((message, index) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ 
-                    duration: 0.3, 
-                    delay: index * 0.02,
-                  }}
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`flex items-start gap-3 max-w-[80%] group ${
-                    message.type === 'user' ? 'flex-row-reverse' : ''
-                  }`}>
-                    {/* Enhanced Avatar */}
-                    <motion.div 
-                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        message.type === 'user' 
-                          ? 'bg-gradient-to-br from-[#00ADB5] to-[#00ADB5]/80' 
-                          : 'bg-gradient-to-br from-[#393E46] to-[#393E46]/80'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                    >
-                      {message.type === 'user' ? (
-                        <User className="w-5 h-5 text-white" />
-                      ) : (
-                        <Bot className="w-5 h-5 text-[#00ADB5]" />
-                      )}
-                    </motion.div>
 
-                    {/* Enhanced Message Bubble */}
-                    <motion.div 
-                      className={`relative ${
-                        message.type === 'user'
-                          ? 'bg-[#00ADB5] text-white' 
-                          : 'bg-[#393E46] text-[#EEEEEE] border border-[#393E46]/70'
-                      } rounded-2xl p-4 shadow-lg`}
-                      whileHover={{ scale: 1.01 }}
-                    >
-                      {/* Message Content */}
-                      <p className="leading-relaxed whitespace-pre-wrap text-sm">
-                        {message.content}
-                      </p>
-                      
-                      {/* Message Footer */}
-                      <div className="flex items-center justify-between mt-3 gap-3">
-                        <span className={`text-xs ${
-                          message.type === 'user' ? 'text-white/70' : 'text-[#EEEEEE]/50'
-                        }`}>
-                          {message.timestamp.toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </span>
-                          {/* Message Actions */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {message.type === 'bot' && (
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => speakMessage(message.content)}
-                              className="p-1 rounded transition-colors hover:bg-[#00ADB5]/20"
-                              title="Read aloud"
-                              disabled={isSpeaking}
-                            >
-                              {isSpeaking ? (
-                                <Pause className="w-3 h-3 text-[#00ADB5]" />
-                              ) : (
-                                <Play className="w-3 h-3 text-[#EEEEEE]/70" />
+            {/* Voice Options Section */}
+            <div className="px-4 mb-4">
+              <div className="mb-2">
+                <h3 className="text-xs uppercase font-semibold text-[#EEEEEE]/50 tracking-wider px-1">Voice Options</h3>
+              </div>
+              
+              {/* Voice Toggle */}
+              <div className="flex items-center justify-between p-3 bg-[#222831] rounded-lg mb-2">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-[#00ADB5]" />
+                  <span className="text-sm font-medium text-[#EEEEEE]">Voice Enabled</span>
+                </div>
+                <button 
+                  onClick={() => setVoiceEnabled(!voiceEnabled)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${voiceEnabled ? 'bg-[#00ADB5]' : 'bg-[#393E46]'}`}
+                >
+                  <motion.div 
+                    className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white"
+                    animate={{ x: voiceEnabled ? '1.25rem' : 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
+              
+              {/* Voice Selection - Only show if voice is enabled */}
+              {voiceEnabled && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowVoiceDropdown(!showVoiceDropdown)}
+                    disabled={!voiceEnabled || availableVoices.length === 0}
+                    className={`flex items-center justify-between w-full p-3 bg-[#222831] hover:bg-[#222831]/80 rounded-lg transition-colors ${!voiceEnabled || availableVoices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-[#00ADB5]" />
+                      <span className="text-sm font-medium text-[#EEEEEE] truncate max-w-[150px]">
+                        {availableVoices.length === 0 ? 'Loading voices...' : 
+                          selectedVoice ? selectedVoice.name.replace('Google ', '') : 'Select Voice'}
+                      </span>
+                    </div>
+                    {(voiceEnabled && availableVoices.length > 0) && (
+                      <ChevronRight className={`w-4 h-4 text-[#EEEEEE]/70 transition-transform ${showVoiceDropdown ? 'rotate-90' : ''}`} />
+                    )}
+                  </button>
+
+                  {/* Voice Dropdown */}
+                  <AnimatePresence>
+                    {showVoiceDropdown && voiceEnabled && availableVoices.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute left-0 right-0 mt-2 bg-[#222831] border border-[#00ADB5]/20 rounded-lg shadow-lg z-10 overflow-y-auto max-h-60"
+                      >
+                        {availableVoices.map((voice, index) => (
+                          <button
+                            key={`${voice.name}-${index}`}
+                            className={`flex flex-col w-full text-left p-3 hover:bg-[#00ADB5]/10 transition-colors ${selectedVoice && voice.name === selectedVoice.name ? 'bg-[#00ADB5]/20' : ''}`}
+                            onClick={() => {
+                              setSelectedVoice(voice);
+                              setShowVoiceDropdown(false);
+                              
+                              // Say a short sample
+                              if (synthRef.current) {
+                                synthRef.current.cancel();
+                                const utterance = new SpeechSynthesisUtterance("Hello, I'm Seriva.");
+                                utterance.voice = voice;
+                                utterance.volume = 0.8;
+                                utterance.onstart = () => setIsSpeaking(true);
+                                utterance.onend = () => setIsSpeaking(false);
+                                synthRef.current.speak(utterance);
+                              }
+                            }}
+                          >
+                            <span className="font-medium text-sm text-[#EEEEEE] truncate">{voice.name.replace('Google ', '')}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-[#EEEEEE]/60">{voice.lang}</span>
+                              {voice.name.includes('Google') && (
+                                <span className="text-[7px] uppercase bg-[#00ADB5]/30 text-[#00ADB5] px-1 rounded">Google</span>
                               )}
-                            </motion.button>
-                          )}
+                            </div>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+              
+              {/* Voice Status Indicators */}
+              {voiceEnabled && (
+                <div className="mt-2 px-1">
+                  {isSpeaking && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#00ADB5] flex items-center gap-1">
+                        <motion.span
+                          animate={{ opacity: [0.5, 1, 0.5] }}
+                          transition={{ repeat: Infinity, duration: 1.5 }}
+                        >⬤</motion.span>
+                        Speaking...
+                      </span>
+                      <button
+                        onClick={stopSpeaking}
+                        className="text-xs text-red-400 hover:text-red-500"
+                      >
+                        Stop
+                      </button>
+                    </div>
+                  )}
+                  
+                  {availableVoices.length === 0 && (
+                    <span className="text-xs text-yellow-400">Loading available voices...</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Chat History */}
+            <div className="flex-1 overflow-y-auto px-2">
+              <div className="px-2 mb-2">
+                <h2 className="text-xs uppercase font-semibold text-[#EEEEEE]/50 tracking-wider">Chat History</h2>
+              </div>
+              
+              {Object.entries(groupedChatHistory).map(([date, chats]) => (
+                <div key={date} className="mb-4">
+                  <div className="px-2 mb-2">
+                    <h3 className="text-xs font-medium text-[#EEEEEE]/60">{date}</h3>
+                  </div>
+                  
+                  {chats.map(chat => (
+                    <motion.button
+                      key={chat.id}
+                      whileHover={{ x: 4 }}
+                      className="flex items-start w-full p-2 rounded-lg hover:bg-[#00ADB5]/10 transition-colors text-left"
+                    >
+                      <MessageSquare className="w-4 h-4 mt-0.5 mr-3 text-[#EEEEEE]/70" />
+                      <div className="flex-1 overflow-hidden">
+                        <h4 className="text-sm font-medium text-[#EEEEEE] truncate">{chat.title}</h4>
+                        <p className="text-xs text-[#EEEEEE]/60 truncate">
+                          {chat.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              ))}
+
+              {/* Empty State */}
+              {Object.keys(groupedChatHistory).length === 0 && (
+                <div className="flex flex-col items-center justify-center h-32 px-4 text-center">
+                  <MessageSquare className="w-8 h-8 text-[#EEEEEE]/30 mb-2" />
+                  <p className="text-sm text-[#EEEEEE]/50">No chat history yet</p>
+                  <p className="text-xs text-[#EEEEEE]/30">Start a new conversation</p>
+                </div>
+              )}
+            </div>
+
+            {/* User Profile */}
+            <div className="p-3 border-t border-[#00ADB5]/20">
+              <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-[#222831]/50 transition-colors">
+                <div className="w-8 h-8 rounded-full bg-[#00ADB5] flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[#EEEEEE] truncate">
+                    {currentUser?.displayName || "User"}
+                  </p>
+                  <p className="text-xs text-[#EEEEEE]/50 truncate">
+                    {currentUser?.email || "user@example.com"}
+                  </p>
+                </div>
+                
+              </div>
+            </div>
+          </aside>      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col h-full">
+        {/* Chat Messages */}
+        <div 
+          ref={chatScrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 py-5 space-y-6" 
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#00ADB5 transparent'
+          }}
+        >
+          <AnimatePresence mode="popLayout">
+            {messages.map((message, index) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ 
+                  duration: 0.3, 
+                  delay: index * 0.02,
+                }}
+                className={`flex max-w-4xl mx-auto ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`flex items-start gap-3 max-w-[85%] group ${
+                  message.type === 'user' ? 'flex-row-reverse' : ''
+                }`}>                  
+                {/* Avatar */}
+                  <motion.div 
+                    className={`w-14 h-14 flex items-center justify-center flex-shrink-0 ${
+                      message.type === 'user' 
+                        ? 'rounded-full bg-gradient-to-br from-[#00ADB5] to-[#00ADB5]/80' 
+                        : ''
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {message.type === 'user' ? (
+                      <User className="w-5 h-5 text-white" />
+                    ) : (
+                      <img 
+                        src="/logo.png" 
+                        alt="Seriva" 
+                        className="w-12 h-12 object-contain"
+                      />
+                    )}
+                  </motion.div>
+
+                  {/* Message Bubble */}
+                  <motion.div 
+                    className={`relative ${
+                      message.type === 'user'
+                        ? 'bg-[#00ADB5] text-white' 
+                        : 'bg-[#393E46] text-[#EEEEEE] border border-[#393E46]/70'
+                    } rounded-2xl px-5 py-3 shadow-lg`}
+                    whileHover={{ scale: 1.01 }}
+                  >
+                    {/* Message Content */}
+                    <p className="leading-relaxed whitespace-pre-wrap text-sm">
+                      {message.content}
+                    </p>
+                    
+                    {/* Message Footer */}
+                    <div className="flex items-center justify-between mt-3 gap-3">
+                      <span className={`text-xs ${
+                        message.type === 'user' ? 'text-white/70' : 'text-[#EEEEEE]/50'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                      
+                      {/* Message Actions */}
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {message.type === 'bot' && (
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
-                            onClick={() => copyMessage(message.id, message.content)}
-                            className={`p-1 rounded transition-colors ${
-                              message.type === 'user' 
-                                ? 'hover:bg-white/20' 
-                                : 'hover:bg-[#00ADB5]/20'
-                            }`}
-                            title="Copy message"
+                            onClick={() => speakMessage(message.content)}
+                            className="p-1 rounded transition-colors hover:bg-[#00ADB5]/20"
+                            title="Read aloud"
+                            disabled={isSpeaking}
                           >
-                            {copiedMessageId === message.id ? (
-                              <Check className="w-3 h-3 text-green-400" />
+                            {isSpeaking ? (
+                              <Pause className="w-3 h-3 text-[#00ADB5]" />
                             ) : (
-                              <Copy className={`w-3 h-3 ${
-                                message.type === 'user' ? 'text-white/70' : 'text-[#EEEEEE]/70'
-                              }`} />
+                              <Play className="w-3 h-3 text-[#EEEEEE]/70" />
                             )}
                           </motion.button>
-                        </div>
+                        )}
+                        
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => copyMessage(message.content)}
+                          className="p-1 rounded transition-colors hover:bg-[#00ADB5]/20"
+                          title="Copy message"
+                        >
+                          {copiedMessageId === message.content ? (
+                            <Check className="w-3 h-3 text-green-400" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-[#EEEEEE]/70" />
+                          )}
+                        </motion.button>
                       </div>
-                    </motion.div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            
-            {/* Enhanced Loading Indicator */}
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
+            ))}
+
+            {/* Loading Indicator */}
             {isLoading && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex justify-start"
-              >
-                <div className="flex items-start gap-3 max-w-[80%]">
-                  <motion.div 
-                    className="w-10 h-10 rounded-full bg-gradient-to-br from-[#393E46] to-[#393E46]/80 flex items-center justify-center"
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Bot className="w-5 h-5 text-[#00ADB5]" />
-                  </motion.div>
-                  <div className="bg-[#393E46] text-[#EEEEEE] border border-[#393E46]/70 rounded-2xl p-4 shadow-lg">
-                    <div className="flex items-center gap-3">
+                className="flex justify-start max-w-4xl mx-auto"
+              >                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 flex items-center justify-center">
+                    <img 
+                      src="/logo.png" 
+                      alt="Seriva" 
+                      className="w-12 h-12 object-contain"
+                    />
+                  </div>
+                  <div className="px-4 py-3 bg-[#393E46] rounded-2xl shadow-lg">
+                    <div className="flex items-center gap-2">
                       <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Loader2 className="w-4 h-4 text-[#00ADB5]" />
-                      </motion.div>
-                      <span className="text-sm text-[#EEEEEE]/80">Seriva is thinking...</span>
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [0.4, 1, 0.4]
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="w-2 h-2 bg-[#00ADB5] rounded-full"
+                      />
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [0.4, 1, 0.4]
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          delay: 0.2
+                        }}
+                        className="w-2 h-2 bg-[#00ADB5] rounded-full"
+                      />
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [0.4, 1, 0.4]
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          delay: 0.4
+                        }}
+                        className="w-2 h-2 bg-[#00ADB5] rounded-full"
+                      />
                     </div>
                   </div>
                 </div>
               </motion.div>
             )}
-            
-            <div ref={messagesEndRef} />
-          </div>
-        </motion.div>
-      </div>      {/* Enhanced Chat Input - Fixed at bottom */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="fixed bottom-0 left-0 right-0 bg-[#222831]/95 backdrop-blur-sm border-t border-[#393E46]/50 z-30"
-      >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex gap-4 items-end">
-            <div className="flex-1 relative">
-              <textarea
+          </AnimatePresence>
+
+          {/* Empty space for scrolling and reference for auto-scroll */}
+          <div ref={messagesEndRef} style={{ height: '100px' }}></div>
+        </div>        {/* Input Area */}
+        <div className="px-4 py-2 border-t border-[#00ADB5]/10 bg-[#222831] sticky bottom-0">
+          <div className="max-w-4xl mx-auto">
+            <form onSubmit={handleSubmit} className="relative">
+              <input
+                ref={inputRef}
+                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
                 placeholder="Share your thoughts... I'm here to listen with empathy and understanding."
-                className="w-full bg-[#393E46]/80 backdrop-blur-sm border border-[#393E46] rounded-xl px-4 py-3 pr-16 text-[#EEEEEE] placeholder-[#EEEEEE]/50 resize-none focus:ring-2 focus:ring-[#00ADB5] focus:border-[#00ADB5] transition-all duration-200 text-sm"
-                rows="2"
-                disabled={isLoading}
+                className="w-full py-3 px-4 pr-24 bg-[#393E46]/80 border border-[#00ADB5]/20 rounded-xl text-[#EEEEEE] placeholder-[#EEEEEE]/40 focus:outline-none focus:ring-2 focus:ring-[#00ADB5]/50 focus:border-[#00ADB5]"
               />
               
-              {/* Enhanced Send Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleSendMessage}
-                disabled={!input.trim() || isLoading}
-                className="absolute bottom-2 right-2 w-10 h-10 bg-[#00ADB5] hover:bg-[#00ADB5]/90 rounded-lg flex items-center justify-center shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                <Send className="w-4 h-4 text-white" />
-              </motion.button>
-            </div>
-              {/* Voice Input and Actions */}
-            <div className="flex gap-2">              {/* Voice Input Button */}
-              {speechSupported && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={isListening ? stopListening : startListening}
-                  className={`p-2 rounded-lg transition-colors relative ${
-                    isListening 
-                      ? 'bg-red-500/30 hover:bg-red-500/40 ring-2 ring-red-400 ring-opacity-50' 
-                      : 'bg-[#393E46]/80 hover:bg-[#393E46]'
-                  }`}
-                  title={isListening ? "Stop listening (click or wait)" : "Voice input"}
-                  disabled={isLoading}
-                >
-                  {isListening ? (
-                    <motion.div
-                      animate={{ 
-                        scale: [1, 1.1, 1],
-                        rotate: [0, 5, -5, 0] 
-                      }}
-                      transition={{ 
-                        duration: 0.8, 
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className="relative"
-                    >
-                      <Mic className="w-5 h-5 text-red-400" />
-                      {/* Listening pulse effect */}
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+                {/* Speech Recognition Button */}
+                {speechSupported && (
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => isListening ? stopListening() : startListening()}
+                    className={`p-2 rounded-lg transition-all ${
+                      isListening 
+                        ? 'bg-red-500/30 hover:bg-red-500/40 text-red-400' 
+                        : 'bg-[#393E46] hover:bg-[#00ADB5]/20 text-[#EEEEEE]/70 hover:text-[#00ADB5]'
+                    }`}
+                  >
+                    {isListening ? (
                       <motion.div
-                        className="absolute inset-0 rounded-full bg-red-400"
                         animate={{ 
-                          scale: [1, 1.5, 1],
-                          opacity: [0.3, 0, 0.3]
+                          scale: [1, 1.2, 1],
                         }}
                         transition={{ 
                           duration: 1.5, 
                           repeat: Infinity,
                           ease: "easeOut"
                         }}
-                      />
-                    </motion.div>
-                  ) : (
-                    <Mic className="w-5 h-5 text-[#00ADB5]" />
-                  )}
-                </motion.button>
-              )}
-              
-              {/* Voice Toggle Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleVoice}
-                className={`p-2 rounded-lg transition-colors ${
-                  voiceEnabled 
-                    ? 'bg-[#00ADB5]/20 hover:bg-[#00ADB5]/30' 
-                    : 'bg-[#393E46]/80 hover:bg-[#393E46]'
-                }`}
-                title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
-              >
-                {voiceEnabled ? (
-                  <Volume2 className="w-5 h-5 text-[#00ADB5]" />
-                ) : (
-                  <VolumeX className="w-5 h-5 text-[#EEEEEE]/50" />
+                      >
+                        <MicOff className="w-5 h-5" />
+                      </motion.div>
+                    ) : (
+                      <Mic className="w-5 h-5" />
+                    )}
+                  </motion.button>
                 )}
-              </motion.button>
-              
-              {/* Stop Speaking Button */}
-              {isSpeaking && (
+                
+                {/* Send Button */}
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={stopSpeaking}
-                  className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
-                  title="Stop speaking"
+                  type="submit"
+                  disabled={isLoading || input.trim() === ''}
+                  whileHover={{ scale: input.trim() ? 1.05 : 1 }}
+                  whileTap={{ scale: input.trim() ? 0.95 : 1 }}
+                  className={`p-2 rounded-lg ${
+                    input.trim() 
+                      ? 'bg-[#00ADB5] hover:bg-[#00ADB5]/90 text-white' 
+                      : 'bg-[#393E46] text-[#EEEEEE]/30 cursor-not-allowed'
+                  }`}
                 >
-                  <Pause className="w-5 h-5 text-red-400" />
+                  <Send className="w-5 h-5" />
                 </motion.button>
+              </div>
+            </form>
+            
+            {/* Voice and Style Status */}
+            <div className="flex items-center justify-center mt-2 space-x-2">
+              <AnimatePresence>
+                {isListening && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center space-x-2"
+                  >
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      className="w-2 h-2 bg-red-400 rounded-full"
+                    />
+                    <span className="text-xs text-red-400 font-medium">
+                      Listening... Speak clearly or click mic to stop
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              
+              {!isListening && (
+                <span className="text-xs text-[#EEEEEE]/40">
+                  {selectedModel === 'default' ? 'Seriva is ready to chat' : `Using ${modelOptions.find(m => m.id === selectedModel)?.name}`}
+                </span>
               )}
             </div>
           </div>
-            {/* Conversation Style and Voice Status Indicators */}
-          <div className="flex items-center justify-center mt-2 space-y-1 flex-col">
-            <span className="text-xs text-[#EEEEEE]/50">
-              Conversation style: {conversationStyles.find(s => s.value === conversationStyle)?.label}
-            </span>
-            
-            {/* Voice Listening Status */}
-            <AnimatePresence>
-              {isListening && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center space-x-2"
-                >
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                    className="w-2 h-2 bg-red-400 rounded-full"
-                  />                  <span className="text-xs text-red-400 font-medium">
-                    Listening... Speak clearly or click mic to stop (20s timeout)
-                  </span>
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.5 }}
-                    className="w-2 h-2 bg-red-400 rounded-full"
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
-            {/* Speech Not Supported Warning */}
-            {!speechSupported && (
-              <span className="text-xs text-yellow-400">
-                Voice input not supported in this browser
-              </span>
-            )}
-          </div>
         </div>
-      </motion.div>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default ChatPage
+export default ChatPage;

@@ -85,31 +85,29 @@ const SignupPage = () => {
         formData.email, 
         formData.password
       );
-      
-      // Update user profile with display name
+        // Update user profile with display name
       await updateProfile(userCredential.user, {
         displayName: formData.name
       });
       
-      navigate('/chat'); // Redirect to chat page after successful signup
+      navigate('/'); // Redirect to home page after successful signup
     } catch (err) {
       setError(err.message);
       console.error("Firebase signup error:", err);
     }    setIsLoading(false);
   };
-
   const handleGoogleSignup = async () => {
     setIsLoading(true);
     setError('');
     try {
       await signInWithPopup(auth, googleProvider);
-      navigate('/chat');
+      navigate('/');
     } catch (err) {
       setError(err.message);
       console.error("Google signup error:", err);
     }
     setIsLoading(false);
-  };  return (
+  };return (
     <div className="min-h-screen bg-dark relative overflow-hidden">
       
       {/* Main content - Split Layout */}

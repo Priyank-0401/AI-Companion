@@ -28,11 +28,82 @@
   
   html::-webkit-scrollbar, 
   body::-webkit-scrollbar {
-    display: none;  /* Safari, Chrome, Brave */
+    display: none;  /* Safari and Chrome */
   }
-
-  * {
-    box-sizing: border-box;
+  
+  /* Custom scrollbar styling for chat containers */
+  .chat-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #00ADB5 #393E46;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+    display: block;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-track {
+    background: #393E46;
+    border-radius: 8px;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #00ADB5;
+    border-radius: 8px;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #00c2cc;
+  }
+  
+  /* Message Bubble Animation */
+  @keyframes pulse-bg {
+    0% {
+      box-shadow: 0 0 0 0 rgba(0, 173, 181, 0.4);
+    }
+    70% {
+      box-shadow: 0 0 0 6px rgba(0, 173, 181, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(0, 173, 181, 0);
+    }
+  }
+  
+  .pulse-animation {
+    animation: pulse-bg 2s infinite;
+  }
+  
+  /* Chat message transitions */
+  .message-enter {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  
+  .message-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms, transform 300ms;
+  }
+  
+  .message-exit {
+    opacity: 1;
+  }
+  
+  .message-exit-active {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 300ms, transform 300ms;
+  }
+  
+  /* Sidebar enhancements */
+  .sidebar-shadow {
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Chat input focus effect */
+  .chat-input:focus {
+    box-shadow: 0 0 0 2px rgba(0, 173, 181, 0.3);
   }
 }
 

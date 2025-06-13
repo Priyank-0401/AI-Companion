@@ -17,11 +17,10 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
-    const result = await signInWithEmail(email, password);
+      const result = await signInWithEmail(email, password);
     
     if (result.success) {
-      navigate('/chat'); // Redirect to chat page after successful login
+      navigate('/'); // Redirect to home page after successful login
     } else {
       setError(result.error);
     }
@@ -32,11 +31,10 @@ const LoginPage = () => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
-    
-    const result = await signInWithGoogle();
+      const result = await signInWithGoogle();
     
     if (result.success) {
-      navigate('/chat');
+      navigate('/');
     } else {
       setError(result.error);
     }
