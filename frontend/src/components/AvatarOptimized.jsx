@@ -1,8 +1,8 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations, PerspectiveCamera, Html } from '@react-three/drei';
+import { useGLTF, useAnimations, PerspectiveCamera, Html, OrbitControls, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { AVATAR_CONFIG, optimizationUtils } from '../config/avatarConfig';  
+import { AVATAR_CONFIG, optimizationUtils } from '../config/avatarConfig';
 
 // Preload the main avatar model and both animation files
 useGLTF.preload('/models/avatar.glb');
@@ -115,17 +115,23 @@ function ErrorFallback({ error }) {
   );
 }
 
-// AnimatedModel component with proper positioning and rotation
+// AnimatedModel component with interactive positioning and real-time tracking
 const AnimatedModel = React.memo(({ 
   isTalking, 
   expression = 'neutral', 
   audioElement = null,
   lipSyncEnabled = false,
+  onTransformChange = null,
   ...props 
 }) => {
   const group = useRef();
   const [currentExpression, setCurrentExpression] = useState('neutral');
   const [lipSyncData, setLipSyncData] = useState({ volume: 0, frequency: 0 });
+  const [avatarTransform, setAvatarTransform] = useState({
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1]
+  });
   const audioAnalyzer = useRef(new AudioAnalyzer());
   const blinkTimer = useRef(null);
   const expressionTimer = useRef(null);
@@ -137,11 +143,38 @@ const AnimatedModel = React.memo(({
     // Load both animation files (Mixamo)
   const idleAnimationFile = useGLTF('/models/Idle.glb');
   const talkingAnimationFile = useGLTF('/models/Talking.glb');
-
   // Debug: Log loaded models
   console.log('🎬 Avatar model loaded:', avatarModel);
   console.log('🎬 Idle animations loaded:', idleAnimationFile?.animations?.length || 0);
-  console.log('🎬 Talking animations loaded:', talkingAnimationFile?.animations?.length || 0);  // Sanitize animation clips to remove only problematic root transform tracks
+  console.log('🎬 Talking animations loaded:', talkingAnimationFile?.animations?.length || 0);
+  
+  // Debug: Log model's initial transform and inspect structure
+  console.log('🧭 Model initial rotation:', avatarModel.scene.rotation);
+  console.log('📍 Model initial position:', avatarModel.scene.position);
+  console.log('📏 Model initial scale:', avatarModel.scene.scale);
+  
+  // Debug: Inspect model structure to understand orientation
+  console.log('🔍 Model children:', avatarModel.scene.children.map(child => ({
+    name: child.name,
+    type: child.type,
+    position: child.position.toArray(),
+    rotation: child.rotation.toArray()
+  })));
+  
+  // Find head/face bones to understand forward direction
+  avatarModel.scene.traverse((child) => {
+    if (child.name && (
+      child.name.toLowerCase().includes('head') ||
+      child.name.toLowerCase().includes('face') ||
+      child.name.toLowerCase().includes('eye')
+    )) {
+      console.log(`👤 Found face/head bone "${child.name}":`, {
+        position: child.position.toArray(),
+        rotation: child.rotation.toArray(),
+        worldPosition: child.getWorldPosition(new THREE.Vector3()).toArray()
+      });
+    }
+  });// Sanitize animation clips to remove only problematic root transform tracks
   const sanitizeClip = (clip) => {
     const originalTrackCount = clip.tracks.length;
     
@@ -291,10 +324,24 @@ const AnimatedModel = React.memo(({
     if (!targetAction && availableActions.length > 0) {
       targetAction = actions[availableActions[0]];
     }    if (targetAction) {
-      // Force reset avatar position/rotation to prevent animation drift
-      avatarModel.scene.position.set(...AVATAR_CONFIG.MODEL.POSITION);
-      avatarModel.scene.rotation.set(0, 0, 0);
-      avatarModel.scene.scale.set(...AVATAR_CONFIG.MODEL.SCALE);
+      // Log transform BEFORE forced reset
+      console.log('🔍 Transform BEFORE animation reset:', {
+        position: avatarModel.scene.position.toArray(),
+        rotation: avatarModel.scene.rotation.toArray(),
+        scale: avatarModel.scene.scale.toArray()
+      });      // Reset model to local coordinates (critical for proper animation alignment)
+      avatarModel.scene.position.set(0, 0, 0);    // Local position reset
+      avatarModel.scene.rotation.set(0, 0, 0);    // Local rotation reset  
+      avatarModel.scene.scale.set(1, 1, 1);       // Local scale reset
+      
+      // Note: Group wrapper handles global positioning and axis correction
+      
+      // Log transform AFTER forced reset
+      console.log('🔧 Transform AFTER forced reset:', {
+        position: avatarModel.scene.position.toArray(),
+        rotation: avatarModel.scene.rotation.toArray(),
+        scale: avatarModel.scene.scale.toArray()
+      });
       
       // Configure and play the animation
       targetAction.reset();
@@ -307,21 +354,33 @@ const AnimatedModel = React.memo(({
       // Fade in the new animation
       targetAction.fadeIn(AVATAR_CONFIG.ANIMATION.FADE_DURATION);
       targetAction.play();
-      
-      console.log(`🎬 Playing animation: ${targetAction.getClip().name} (${isTalking ? 'talking' : 'idle'})`);
+        console.log(`🎬 Playing animation: ${targetAction.getClip().name} (${isTalking ? 'talking' : 'idle'})`);
       console.log(`⏱️ Animation duration: ${targetAction.getClip().duration}s`);
+        // Log transform AFTER animation starts
+      setTimeout(() => {
+        console.log('🎭 Transform AFTER animation starts:', {
+          position: avatarModel.scene.position.toArray(),
+          rotation: avatarModel.scene.rotation.toArray(),
+          scale: avatarModel.scene.scale.toArray()
+        });
+        
+        // Debug: Check forward direction vector
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(avatarModel.scene.quaternion);
+        console.log('🧭 Model forward direction:', forward.toArray());
+        console.log('✅ Expected forward: [0, 0, -1] or [0, 0, 1]');
+      }, 100);
+      
       animationsReady.current = true;
     } else {
       console.warn('❌ No suitable animations found');
     }
 
   }, [isTalking, actions, mixer]);  // Animation frame update
-  useFrame((state, delta) => {
-    // Enforce camera position (keeping this as safety measure)
-    if (state.camera) {
+  useFrame((state, delta) => {    // Only enforce camera position if OrbitControls are disabled
+    if (state.camera && !AVATAR_CONFIG.DEV.ENABLE_ORBIT_CONTROLS) {
       const targetPosition = AVATAR_CONFIG.MODEL.CAMERA.position;
       state.camera.position.set(targetPosition[0], targetPosition[1], targetPosition[2]);
-      state.camera.lookAt(0, -1, 0);
+      state.camera.lookAt(0, 0, 0);  // Look at center, not feet
       state.camera.updateProjectionMatrix();
     }
     
@@ -331,11 +390,35 @@ const AnimatedModel = React.memo(({
       
       if (frameCount.current % 60 === 0) {
         console.log(`🔄 Mixer updating - delta: ${delta.toFixed(3)}s, time: ${mixer.time.toFixed(2)}s`);
-      }
-    }
+      }    }
     
     frameCount.current++;
-      // Lip-sync handling
+    
+    // Track avatar transform changes (every 10 frames to avoid excessive updates)
+    if (group.current && frameCount.current % 10 === 0) {
+      const pos = group.current.position;
+      const rot = group.current.rotation;
+      const scale = group.current.scale;
+      
+      const newTransform = {
+        position: [pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2)],
+        rotation: [
+          THREE.MathUtils.radToDeg(rot.x).toFixed(1), 
+          THREE.MathUtils.radToDeg(rot.y).toFixed(1), 
+          THREE.MathUtils.radToDeg(rot.z).toFixed(1)
+        ],
+        scale: [scale.x.toFixed(2), scale.y.toFixed(2), scale.z.toFixed(2)]
+      };
+      
+      setAvatarTransform(newTransform);
+      
+      // Callback for parent component
+      if (onTransformChange) {
+        onTransformChange(newTransform);
+      }
+    }
+
+    // Lip-sync handling
     if (lipSyncEnabled && audioElement && group.current) {
       if (frameCount.current % AVATAR_CONFIG.AUDIO.LIPSYNC_UPDATE_FREQUENCY === 0) {
         const volumeData = audioAnalyzer.current.getVolumeData();
@@ -393,13 +476,12 @@ const AnimatedModel = React.memo(({
       if (expressionTimer.current) {
         clearTimeout(expressionTimer.current);
       }
-    };  }, []);
-  return (
+    };  }, []);  return (
     <group
       ref={group}
-      position={AVATAR_CONFIG.MODEL.POSITION}
-      scale={AVATAR_CONFIG.MODEL.SCALE}
-      rotation={[0, 0, 0]}
+      position={[0, -0.8, 0]}      // Slightly down to center torso/chest area
+      scale={[1.2, 1.2, 1.2]}      // Moderate scale for better proportions
+      rotation={[0, 0, 0]}         // No rotation - test default orientation first
       {...props}
     >
       <primitive object={avatarModel.scene} />
@@ -407,19 +489,31 @@ const AnimatedModel = React.memo(({
   );
 });
 
-// Avatar Scene Component with OrbitControls for debugging
+// Avatar Scene Component with interactive controls and real-time stats
 const AvatarScene = React.memo(({ 
   isTalking, 
   expression, 
   audioElement, 
   lipSyncEnabled,
-  className 
+  className,
+  showStats = true
 }) => {
   const [error, setError] = useState(null);
+  const [avatarTransform, setAvatarTransform] = useState({
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1]
+  });
+  const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate', 'scale'
+  const [showTransformControls, setShowTransformControls] = useState(true);
 
   const handleError = useCallback((err) => {
     console.error('Avatar loading error:', err);
     setError(err);
+  }, []);
+
+  const handleTransformChange = useCallback((transform) => {
+    setAvatarTransform(transform);
   }, []);
 
   if (error) {
@@ -429,9 +523,96 @@ const AvatarScene = React.memo(({
       </div>
     );
   }
-
   return (
-    <div className={className} style={{ margin: 0, padding: 0, overflow: 'hidden' }}>
+    <div className={className} style={{ margin: 0, padding: 0, overflow: 'hidden', position: 'relative' }}>      {/* Real-time Avatar Stats Panel */}
+      {showStats && AVATAR_CONFIG.DEV.ENABLE_ORBIT_CONTROLS && (
+        <div className="absolute top-4 right-4 bg-black/80 text-white p-4 rounded-lg shadow-lg z-10 font-mono text-sm">
+          <div className="text-green-400 font-bold mb-2">🎮 Avatar Transform</div>
+          
+          {/* Transform Mode Controls */}
+          <div className="mb-3 pb-3 border-b border-gray-600">
+            <div className="text-orange-300 font-semibold mb-2">🔧 Transform Mode:</div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setTransformMode('translate')}
+                className={`px-2 py-1 text-xs rounded ${
+                  transformMode === 'translate' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+              >
+                Move
+              </button>
+              <button
+                onClick={() => setTransformMode('rotate')}
+                className={`px-2 py-1 text-xs rounded ${
+                  transformMode === 'rotate' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+              >
+                Rotate
+              </button>
+              <button
+                onClick={() => setTransformMode('scale')}
+                className={`px-2 py-1 text-xs rounded ${
+                  transformMode === 'scale' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+              >
+                Scale
+              </button>
+            </div>
+            <div className="mt-2">
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={showTransformControls}
+                  onChange={(e) => setShowTransformControls(e.target.checked)}
+                  className="rounded"
+                />
+                Show Gizmo
+              </label>
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <div className="text-blue-300 font-semibold">📍 Position:</div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>X: {avatarTransform.position[0]}</div>
+              <div>Y: {avatarTransform.position[1]}</div>
+              <div>Z: {avatarTransform.position[2]}</div>
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <div className="text-purple-300 font-semibold">🔄 Rotation (°):</div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>X: {avatarTransform.rotation[0]}</div>
+              <div>Y: {avatarTransform.rotation[1]}</div>
+              <div>Z: {avatarTransform.rotation[2]}</div>
+            </div>
+          </div>
+            <div className="mb-2">
+            <div className="text-yellow-300 font-semibold">📏 Scale:</div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>X: {avatarTransform.scale[0]}</div>
+              <div>Y: {avatarTransform.scale[1]}</div>
+              <div>Z: {avatarTransform.scale[2]}</div>
+            </div>
+          </div>
+          
+          <div className="mb-2">
+            <div className="text-cyan-300 font-semibold">📷 Camera:</div>
+            <div className="text-xs text-gray-300">
+              Pos: [{AVATAR_CONFIG.MODEL.CAMERA.position.join(', ')}]<br/>
+              FOV: {AVATAR_CONFIG.MODEL.CAMERA.fov}°
+            </div>
+          </div>
+            <div className="text-xs text-gray-400 mt-3 border-t border-gray-600 pt-2">            💡 Click gizmo to move avatar<br/>
+            🖱️ <strong>Left drag</strong> = rotate camera<br/>
+            🖱️ <strong>Right drag</strong> = pan camera<br/>
+            �️ <strong>Scroll</strong> = zoom camera<br/>
+            🔍 Check console for model logs
+          </div>
+        </div>
+      )}
+      
       <Canvas
         gl={{ 
           antialias: AVATAR_CONFIG.RENDERING.ANTIALIAS, 
@@ -459,31 +640,64 @@ const AvatarScene = React.memo(({
           position={AVATAR_CONFIG.MODEL.LIGHTING.directional.position} 
           intensity={AVATAR_CONFIG.MODEL.LIGHTING.directional.intensity}
           castShadow={AVATAR_CONFIG.MODEL.LIGHTING.directional.castShadow}
-        />
-        <pointLight 
+        />        <pointLight 
           position={AVATAR_CONFIG.MODEL.LIGHTING.point.position} 
           intensity={AVATAR_CONFIG.MODEL.LIGHTING.point.intensity} 
         />
         
-        <Suspense fallback={<LoadingFallback />}>
-          <AnimatedModel
-            isTalking={isTalking}
-            expression={expression}
-            audioElement={audioElement}
-            lipSyncEnabled={lipSyncEnabled}
-          />        
+        {/* Interactive Camera Controls */}
+        {AVATAR_CONFIG.DEV.ENABLE_ORBIT_CONTROLS && (
+          <OrbitControls 
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            zoomSpeed={0.5}
+            panSpeed={0.5}
+            rotateSpeed={0.5}
+            minDistance={1}
+            maxDistance={10}
+          />
+        )}        <Suspense fallback={<LoadingFallback />}>
+          {AVATAR_CONFIG.DEV.ENABLE_ORBIT_CONTROLS && showTransformControls ? (
+            <TransformControls
+              mode={transformMode}
+              showX={true}
+              showY={true}
+              showZ={true}
+              enabled={true}
+              size={1}
+              space="world"
+            >
+              <AnimatedModel
+                isTalking={isTalking}
+                expression={expression}
+                audioElement={audioElement}
+                lipSyncEnabled={lipSyncEnabled}
+                onTransformChange={handleTransformChange}
+              />
+            </TransformControls>
+          ) : (
+            <AnimatedModel
+              isTalking={isTalking}
+              expression={expression}
+              audioElement={audioElement}
+              lipSyncEnabled={lipSyncEnabled}
+              onTransformChange={handleTransformChange}
+            />
+          )}
         </Suspense>
       </Canvas>
     </div>
   );
 });
 
-// Main Avatar Component
+// Main Avatar Component with interactive controls
 const Avatar = React.memo(({ 
   isTalking = false, 
   expression = 'neutral',
   audioElement = null,
   lipSyncEnabled = false,
+  showStats = true,
   className = "w-full h-full"
 }) => {
   return (
@@ -492,6 +706,7 @@ const Avatar = React.memo(({
       expression={expression}
       audioElement={audioElement}
       lipSyncEnabled={lipSyncEnabled}
+      showStats={showStats}
       className={className}
     />
   );

@@ -1,14 +1,13 @@
 // Clean Avatar configuration optimized for hardware acceleration
 export const AVATAR_CONFIG = {
   // Model settings
-  MODEL: {
-    // Scale factor for the avatar model
-    SCALE: [1, 1, 1],    // Position offset for the avatar (centered, full body visible)
-    POSITION: [0, -1.2, 0],
-    // Camera settings (fixed position for stable view)
+  MODEL: {    // Scale factor for the avatar model
+    SCALE: [1, 1, 1],
+    // Position offset for the avatar (centered, full body visible)
+    POSITION: [0, -1.5, 0],    // Camera settings (optimized for front-facing avatar view)
     CAMERA: {
-      position: [0, -0.2, 3],
-      fov: 50,
+      position: [0, 0.5, 4],      // Slightly elevated to look at chest/face area
+      fov: 45,                    // Wider FOV for better view
       near: 0.1,
       far: 1000
     },
@@ -56,10 +55,9 @@ export const AVATAR_CONFIG = {
     MAX_PIXEL_RATIO: window.devicePixelRatio || 2,
     MIN_PERFORMANCE: 0.5,
     PERFORMANCE_DEBOUNCE: 100
-  },
-  // Development settings
+  },  // Development settings
   DEV: {
-    ENABLE_ORBIT_CONTROLS: true, // Temporarily enabled for positioning
+    ENABLE_ORBIT_CONTROLS: true, // Re-enabled for testing axis correction
     ENABLE_LOGGING: true,
     SHOW_STATS: false
   }
