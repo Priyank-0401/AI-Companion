@@ -153,12 +153,39 @@ const AvatarModel = React.memo(({
   const avatarModel = useGLTF('/models/avatar.glb');
   const idleFile = useGLTF('/models/Idle.glb');
   const talkingFile = useGLTF('/models/Talking.glb');
-  
-  // Debug: Log loaded files
+    // Debug: Log loaded files and check for conflicting meshes
   useEffect(() => {
     console.log('📦 Avatar model loaded:', !!avatarModel?.scene);
     console.log('🚶 Idle file loaded:', !!idleFile?.animations, `(${idleFile?.animations?.length || 0} animations)`);
     console.log('💬 Talking file loaded:', !!talkingFile?.animations, `(${talkingFile?.animations?.length || 0} animations)`);
+    
+    // 🔍 Step 1: Check what meshes are in Idle.glb (likely causing conflict)
+    if (idleFile?.scene) {
+      console.log('🔍 Checking Idle.glb meshes for conflicts:');
+      idleFile.scene.traverse((child) => {
+        if (child.isMesh) {
+          console.log('🧩 Idle.glb mesh:', child.name, 'Material:', child.material?.type);
+          if (child.name.toLowerCase().includes('head') || 
+              child.name.toLowerCase().includes('face')) {
+            console.warn('⚠️ CONFLICTING FACE MESH FOUND in Idle.glb:', child.name);
+          }
+        }
+      });
+    }
+    
+    // 🔍 Check Talking.glb for same issue
+    if (talkingFile?.scene) {
+      console.log('🔍 Checking Talking.glb meshes for conflicts:');
+      talkingFile.scene.traverse((child) => {
+        if (child.isMesh) {
+          console.log('🧩 Talking.glb mesh:', child.name, 'Material:', child.material?.type);
+          if (child.name.toLowerCase().includes('head') || 
+              child.name.toLowerCase().includes('face')) {
+            console.warn('⚠️ CONFLICTING FACE MESH FOUND in Talking.glb:', child.name);
+          }
+        }
+      });
+    }
     
     if (idleFile?.animations?.[0]) {
       console.log('🔍 First idle animation tracks:', idleFile.animations[0].tracks.length);
@@ -175,8 +202,7 @@ const AvatarModel = React.memo(({
   
   // State
   const [isInitialized, setIsInitialized] = useState(false);
-  const [lipSyncData, setLipSyncData] = useState({ volume: 0 });
-  // Process and combine animations with proper retargeting
+  const [lipSyncData, setLipSyncData] = useState({ volume: 0 });  // Process and combine animations - ONLY extract animations, NOT geometry
   const animations = React.useMemo(() => {
     const allAnimations = [];
     
@@ -184,14 +210,16 @@ const AvatarModel = React.memo(({
     console.log('Idle file animations:', idleFile?.animations?.length || 0);
     console.log('Talking file animations:', talkingFile?.animations?.length || 0);
     
-    // Process idle animations
+    // ✅ Step 2: Only extract animation clips from Mixamo files - NO geometry import
+    // Process idle animations - ONLY take .animations array, ignore .scene
     if (idleFile?.animations && idleFile.animations.length > 0) {
       idleFile.animations.forEach((clip, index) => {
+        // Clone the animation clip but DO NOT import any meshes from idleFile.scene
         const sanitizedClip = sanitizeAnimationClip(clip.clone());
         sanitizedClip.name = `idle_${index}`;
         
-        // Log track information for debugging
         console.log(`🎬 Idle animation ${index} tracks:`, sanitizedClip.tracks.map(t => t.name).slice(0, 5));
+        console.log('✅ Animation extracted - NO geometry imported from Idle.glb');
         
         allAnimations.push(sanitizedClip);
       });
@@ -199,14 +227,15 @@ const AvatarModel = React.memo(({
       console.warn('❌ No idle animations found or failed to load');
     }
     
-    // Process talking animations
+    // Process talking animations - ONLY take .animations array, ignore .scene  
     if (talkingFile?.animations && talkingFile.animations.length > 0) {
       talkingFile.animations.forEach((clip, index) => {
+        // Clone the animation clip but DO NOT import any meshes from talkingFile.scene
         const sanitizedClip = sanitizeAnimationClip(clip.clone());
         sanitizedClip.name = `talking_${index}`;
         
-        // Log track information for debugging
         console.log(`🎬 Talking animation ${index} tracks:`, sanitizedClip.tracks.map(t => t.name).slice(0, 5));
+        console.log('✅ Animation extracted - NO geometry imported from Talking.glb');
         
         allAnimations.push(sanitizedClip);
       });
@@ -215,11 +244,33 @@ const AvatarModel = React.memo(({
     }
     
     console.log('🎬 Total processed animations:', allAnimations.length, allAnimations.map(a => a.name));
+    console.log('🔥 IMPORTANT: Only ReadyPlayerMe geometry will render - Mixamo geometry ignored');
     return allAnimations;
   }, [idleFile, talkingFile]);
-
-  // Animation system
+  // Animation system - ONLY use animations, completely ignore Mixamo geometry
   const { actions, mixer } = useAnimations(animations, avatarModel.scene);
+
+  // 🔥 CRITICAL: Ensure Mixamo geometry is completely hidden/removed
+  useEffect(() => {
+    // Hide all geometry from Mixamo files to prevent conflicts
+    if (idleFile?.scene) {
+      idleFile.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.visible = false; // Hide all Mixamo idle geometry
+        }
+      });
+      console.log('🚫 Hidden all Idle.glb geometry to prevent conflicts');
+    }
+    
+    if (talkingFile?.scene) {
+      talkingFile.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.visible = false; // Hide all Mixamo talking geometry
+        }
+      });
+      console.log('🚫 Hidden all Talking.glb geometry to prevent conflicts');
+    }
+  }, [idleFile, talkingFile]);
 
   // Initialize audio analyzer
   useEffect(() => {
@@ -324,6 +375,50 @@ const AvatarModel = React.memo(({
       }
     }
   });
+  // 🔥 Enhanced face mesh cleanup for ReadyPlayerMe model
+  useEffect(() => {
+    if (avatarModel?.scene) {
+      console.log('🧹 Scanning ReadyPlayerMe avatar scene for face issues...');
+      
+      avatarModel.scene.traverse((child) => {
+        if (child.isMesh) {
+          const meshName = child.name.toLowerCase();
+          
+          // Log all meshes for debugging
+          console.log('🔍 Avatar mesh found:', child.name, 
+                     'Material type:', child.material?.type,
+                     'Visible:', child.visible);
+          
+          // Specifically look for head/face meshes
+          if (meshName.includes('wolf3d_head') || meshName.includes('head')) {
+            console.log('👤 Head mesh details:', {
+              name: child.name,
+              visible: child.visible,
+              material: child.material?.type,
+              metalness: child.material?.metalness,
+              opacity: child.material?.opacity,
+              transparent: child.material?.transparent
+            });
+            
+            // Ensure face materials are properly configured
+            if (child.material) {
+              child.material.transparent = false;
+              child.material.opacity = 1.0;
+              child.material.visible = true;
+              child.material.needsUpdate = true;
+              console.log('✅ Fixed face material properties for:', child.name);
+            }
+            
+            // Ensure mesh is visible
+            child.visible = true;
+            console.log('✅ Ensured face mesh visibility for:', child.name);
+          }
+        }
+      });
+      
+      console.log('✅ ReadyPlayerMe face mesh analysis completed');
+    }
+  }, [avatarModel]);
 
   // Error handling
   useEffect(() => {
@@ -336,11 +431,11 @@ const AvatarModel = React.memo(({
       position={AVATAR_CONFIG.MODEL.POSITION}
       scale={AVATAR_CONFIG.MODEL.SCALE}
       rotation={AVATAR_CONFIG.MODEL.ROTATION}
-    >
-      {/* 45-degree rotation on X-axis instead of Y-axis */}
+    >      {/* ✅ Step 3: ONLY render ReadyPlayerMe geometry - try different rotation for face visibility */}
       <group rotation={[Math.PI / 2, 0, 0]}>
         <primitive object={avatarModel.scene} />
       </group>
+      {/* 🚫 DO NOT render idleFile.scene or talkingFile.scene - only their animations are used */}
     </group>
   );
 });
