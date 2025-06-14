@@ -7,33 +7,34 @@ import {
   PhoneOff, 
   Mic, 
   MicOff, 
-  Video, 
-  VideoOff, 
-  Settings, 
-  AlertTriangle,
+  MessageSquare,
   Volume2,
   VolumeX,
-  MoreVertical,
+  AlertTriangle,
   Maximize,
   Minimize,
   Clock,
   Wifi,
-  WifiOff
+  WifiOff,
+  User
 } from 'lucide-react';
 
-const AvatarCallPage = () => {
-  const [isLoading, setIsLoading] = useState(true);
+const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isTalking, setIsTalking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showHeader, setShowHeader] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState('excellent');
-  const [audioElement, setAudioElement] = useState(null);
+  const [audioElement, setAudioElement] = useState(null);  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+  const [hasGreeted, setHasGreeted] = useState(false);
+  const [isGreeting, setIsGreeting] = useState(false);
   
   // Expression management
   const { currentExpression, setExpression } = useAvatarExpressions(
@@ -100,28 +101,255 @@ const AvatarCallPage = () => {
       setIsLoading(false);
       // Simulate an error for demonstration if needed
       // setError("Could not connect to the avatar service. Please try again later.");
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, []);  // Memoize toggle functions to prevent unnecessary re-renders
+    }, 2500);    return () => clearTimeout(timer);
+  }, []);
+
+  // Load available female voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = speechSynthesis.getVoices();
+      
+      // Filter for female voices (prioritize Google, Microsoft, Apple)
+      const femaleVoices = voices.filter(voice => {
+        const name = voice.name.toLowerCase();
+        const lang = voice.lang.toLowerCase();
+        
+        // Check if it's an English voice and likely female
+        if (!lang.startsWith('en')) return false;
+        
+        return (
+          name.includes('female') ||
+          name.includes('woman') ||
+          name.includes('girl') ||
+          name.includes('samantha') ||
+          name.includes('zira') ||
+          name.includes('susan') ||
+          name.includes('karen') ||
+          name.includes('hazel') ||
+          name.includes('moira') ||
+          name.includes('tessa') ||
+          name.includes('nicky') ||
+          name.includes('fiona') ||
+          name.includes('google') && (name.includes('us') || name.includes('uk')) ||
+          name.includes('microsoft') && name.includes('aria') ||
+          name.includes('cortana')
+        );
+      }).sort((a, b) => {
+        // Prioritize Google voices, then Microsoft, then others
+        const aGoogle = a.name.toLowerCase().includes('google');
+        const bGoogle = b.name.toLowerCase().includes('google');
+        const aMicrosoft = a.name.toLowerCase().includes('microsoft');
+        const bMicrosoft = b.name.toLowerCase().includes('microsoft');
+        
+        if (aGoogle && !bGoogle) return -1;
+        if (!aGoogle && bGoogle) return 1;
+        if (aMicrosoft && !bMicrosoft) return -1;
+        if (!aMicrosoft && bMicrosoft) return 1;
+        
+        return a.name.localeCompare(b.name);
+      });
+      
+      setAvailableVoices(femaleVoices);
+      
+      // Set default voice (prefer Google or Microsoft female voices)
+      if (femaleVoices.length > 0 && !selectedVoice) {
+        setSelectedVoice(femaleVoices[0]);
+      }
+      
+      console.log('🎵 Available female voices:', femaleVoices.map(v => v.name));
+    };
+
+    // Load voices immediately if available
+    loadVoices();
+    
+    // Also listen for voices changed event (some browsers load voices asynchronously)
+    speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    
+    return () => {
+      speechSynthesis.removeEventListener('voiceschanged', loadVoices);    };
+  }, [selectedVoice]);
+
+  // Close voice selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showVoiceSelector && !event.target.closest('.voice-selector-container')) {
+        setShowVoiceSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showVoiceSelector]);
+  // Function to play greeting message with realistic tone and lip-sync
+  const playGreeting = useCallback(() => {
+    if (!selectedVoice || !isSpeakerOn || hasGreeted) return;
+    
+    const greetingMessages = [
+      { 
+        text: "Hello there! *gentle smile* I'm so happy to meet you. How are you doing today?", 
+        rate: 0.85, 
+        pitch: 1.15, 
+        emphasis: "gentle"
+      },
+      { 
+        text: "Hi! *warm laugh* It's wonderful to see you. What would you like to talk about?", 
+        rate: 0.9, 
+        pitch: 1.1, 
+        emphasis: "cheerful"
+      },
+      { 
+        text: "Hello! *excited tone* I'm here and ready to chat with you. How can I help you today?", 
+        rate: 0.88, 
+        pitch: 1.12, 
+        emphasis: "enthusiastic"
+      },
+      { 
+        text: "Hi there! *soft voice* I'm excited to spend some time with you. What's on your mind?", 
+        rate: 0.82, 
+        pitch: 1.18, 
+        emphasis: "intimate"
+      },
+      { 
+        text: "Hello! *welcoming tone* Welcome! I'm looking forward to our conversation together.", 
+        rate: 0.87, 
+        pitch: 1.14, 
+        emphasis: "welcoming"
+      }
+    ];
+    
+    const randomGreeting = greetingMessages[Math.floor(Math.random() * greetingMessages.length)];
+    
+    // Clean text for speech synthesis (remove tone indicators)
+    const cleanText = randomGreeting.text.replace(/\*[^*]+\*/g, '');
+      setIsGreeting(true);
+    console.log('🎵 Playing greeting:', cleanText, 'with', randomGreeting.emphasis, 'tone');
+    
+    // Create audio element for lip-sync
+    const tempAudio = document.createElement('audio');
+    tempAudio.crossOrigin = "anonymous";
+    tempAudio.preload = "auto";
+    
+    // Use Speech Synthesis API with enhanced settings
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.voice = selectedVoice;
+    utterance.rate = randomGreeting.rate;
+    utterance.pitch = randomGreeting.pitch;
+    utterance.volume = isSpeakerOn ? 1 : 0;
+    
+    // Add pauses and emphasis based on tone
+    switch (randomGreeting.emphasis) {
+      case 'gentle':
+        utterance.rate = 0.8;
+        utterance.pitch = 1.2;
+        break;
+      case 'cheerful':
+        utterance.rate = 0.95;
+        utterance.pitch = 1.15;
+        break;
+      case 'enthusiastic':
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        break;
+      case 'intimate':
+        utterance.rate = 0.75;
+        utterance.pitch = 1.25;
+        break;
+      case 'welcoming':
+        utterance.rate = 0.85;
+        utterance.pitch = 1.18;
+        break;
+    }
+      utterance.onstart = () => {
+      console.log('🎵 Greeting started with', randomGreeting.emphasis, 'tone');
+      // Set audio element for lip-sync - connect to speech synthesis
+      console.log('🎤 Setting up lip-sync for greeting');
+      setAudioElement(tempAudio);
+    };
+    
+    utterance.onend = () => {
+      console.log('🎵 Greeting finished');
+      setIsGreeting(false);
+      setHasGreeted(true);
+      // Clear audio element
+      setAudioElement(null);
+      console.log('🎤 Lip-sync cleared');
+    };
+    
+    utterance.onerror = (event) => {
+      console.error('🎵 Greeting error:', event.error);
+      setIsGreeting(false);
+      setAudioElement(null);
+    };
+    
+    // Add boundary events for more natural speech
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        // Trigger subtle expression changes during speech
+        const expressions = ['smile', 'happy', 'talking', 'neutral'];
+        const randomExpression = expressions[Math.floor(Math.random() * expressions.length)];
+        setExpression(randomExpression);
+      }
+    };
+      speechSynthesis.speak(utterance);
+  }, [selectedVoice, isSpeakerOn, hasGreeted, setExpression]);
+
+  // Play greeting when switching to talking mode
+  useEffect(() => {
+    if (isTalking && selectedVoice && !hasGreeted && !isGreeting) {
+      // Small delay to ensure talking animation has started
+      const greetingTimer = setTimeout(() => {
+        playGreeting();
+      }, 800);
+      
+      return () => clearTimeout(greetingTimer);
+    }
+  }, [isTalking, selectedVoice, hasGreeted, isGreeting, playGreeting]);// Memoize toggle functions to prevent unnecessary re-renders
   const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
-  const toggleVideo = useCallback(() => {
-    setIsVideoOn(prev => {
+    const toggleTalkToModel = useCallback(() => {
+    setIsTalking(prev => {
       const newValue = !prev;
-      // Switch to talking model when camera is turned on, idle when off
-      setIsTalking(newValue);
+      if (newValue) {
+        // Start talking animation and trigger greeting if first time
+        console.log('🗣️ Starting conversation with model');
+      } else {
+        // Stop talking animation and any ongoing speech
+        console.log('🤐 Ending conversation with model');
+        speechSynthesis.cancel(); // Stop any ongoing speech
+        setIsGreeting(false);
+        // Reset greeting for next time if user wants to restart
+        setHasGreeted(false);
+      }
       return newValue;
     });
   }, []);
+
+  const toggleListening = useCallback(() => {
+    setIsListening(prev => {
+      const newValue = !prev;
+      if (newValue) {
+        // Start voice recognition
+        console.log('🎤 Started listening for user input');
+        // TODO: Implement speech recognition here
+      } else {
+        // Stop voice recognition
+        console.log('🔇 Stopped listening for user input');
+        // TODO: Stop speech recognition here
+      }
+      return newValue;
+    });
+  }, []);
+  
   const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
-
   // Memoize avatar props to prevent unnecessary re-renders
   const avatarProps = useMemo(() => ({
-    isTalking,
+    isTalking: isTalking || isGreeting, // Keep talking animation during greeting
     expression: currentExpression,
     audioElement,
     lipSyncEnabled: true
-  }), [isTalking, currentExpression, audioElement]);
+  }), [isTalking, isGreeting, currentExpression, audioElement]);
   
   const endCall = () => {
     // Handle ending the call
@@ -370,30 +598,13 @@ const AvatarCallPage = () => {
                       title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
                     >
                       {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-                    </button>
-                      {/* End Call Button */}
+                    </button>                    {/* End Call Button */}
                     <button 
                       onClick={endCall}
                       className="w-16 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30"
                       title="End Call"
                     >
                       <PhoneOff className="w-7 h-7" />
-                    </button>
-                    
-                    {/* Settings Button */}
-                    <button 
-                      className="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center"
-                      title="Settings"
-                    >
-                      <Settings className="w-6 h-6" />
-                    </button>
-
-                    {/* More Options */}
-                    <button 
-                      className="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center"
-                      title="More Options"
-                    >
-                      <MoreVertical className="w-6 h-6" />
                     </button>
                   </div>
                 </div>
@@ -404,31 +615,68 @@ const AvatarCallPage = () => {
       ) : (        // Always visible controls in windowed mode
         <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
           <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">
-              {/* Mute Button */}
+              {/* Talk to Model Button */}
               <button 
-                onClick={toggleMute}
+                onClick={toggleTalkToModel}
                 className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                  isMuted 
-                    ? 'bg-red-600 shadow-lg shadow-red-500/30' 
+                  isTalking 
+                    ? 'bg-blue-600 shadow-lg shadow-blue-500/30' 
                     : 'bg-gray-700'
                 }`}
-                title={isMuted ? 'Unmute' : 'Mute'}
+                title={isTalking ? 'Stop Talking' : 'Talk to Model'}
               >
-                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                <MessageSquare className="w-6 h-6" />
               </button>
               
-              {/* Video Button */}
+              {/* Voice Input Button */}
               <button 
-                onClick={toggleVideo}
+                onClick={toggleListening}
                 className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                  !isVideoOn 
-                    ? 'bg-red-600 shadow-lg shadow-red-500/30' 
+                  isListening 
+                    ? 'bg-green-600 shadow-lg shadow-green-500/30 animate-pulse' 
                     : 'bg-gray-700'
                 }`}
-                title={isVideoOn ? 'Switch to Idle Model' : 'Switch to Talking Model'}
+                title={isListening ? 'Stop Listening' : 'Start Voice Input'}
               >
-                {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-              </button>
+                {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+              </button>              {/* Voice Selection Button */}
+              <div className="relative voice-selector-container">
+                <button 
+                  onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+                  className="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center"
+                  title="Select Model Voice"
+                >
+                  <User className="w-6 h-6" />
+                </button>
+                
+                {/* Voice Selector Dropdown */}
+                {showVoiceSelector && (
+                  <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-64 max-h-48 overflow-y-auto">
+                    <div className="text-white text-sm font-medium mb-2 px-2">Select Female Voice:</div>
+                    {availableVoices.map((voice, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSelectedVoice(voice);
+                          setShowVoiceSelector(false);
+                          console.log('🎵 Selected voice:', voice.name);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded text-sm ${
+                          selectedVoice?.name === voice.name
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="font-medium">{voice.name}</div>
+                        <div className="text-xs text-gray-400">{voice.lang}</div>
+                      </button>
+                    ))}
+                    {availableVoices.length === 0 && (
+                      <div className="text-gray-400 text-sm px-2">No female voices available</div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Speaker Button */}
               <button 
@@ -441,28 +689,13 @@ const AvatarCallPage = () => {
                 title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
               >
                 {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-              </button>
-                {/* End Call Button */}
+              </button>              {/* End Call Button */}
               <button 
                 onClick={endCall}
                 className="w-16 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30"
                 title="End Call"
               >
                 <PhoneOff className="w-7 h-7" />
-              </button>
-              
-              {/* Settings Button */}
-              <button 
-                className="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center"
-                title="Settings"
-              >
-                <Settings className="w-6 h-6" />
-              </button>              {/* More Options */}
-              <button 
-                className="w-14 h-14 rounded-full bg-gray-700 hover:brightness-110 flex items-center justify-center"
-                title="More Options"
-              >
-                <MoreVertical className="w-6 h-6" />
               </button>
             </div>
           </div>

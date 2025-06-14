@@ -15,44 +15,66 @@ class AudioAnalyzer {
     this.analyser = null;
     this.dataArray = null;
     this.source = null;
-  }
-  async initialize() {
+  }  async initialize() {
     try {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Resume audio context if suspended (required for some browsers)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+      
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = AVATAR_CONFIG.AUDIO.FFT_SIZE;
+      this.analyser.smoothingTimeConstant = 0.8;
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      
+      console.log('🎤 Audio analyzer initialized successfully');
       return true;
     } catch (error) {
       console.warn('Audio context not available:', error);
       return false;
     }
   }
-
   connectAudio(audioElement) {
     if (!this.audioContext || !audioElement) return false;
     
     try {
+      // Ensure audio context is running
+      if (this.audioContext.state === 'suspended') {
+        this.audioContext.resume();
+      }
+      
       if (this.source) {
         this.source.disconnect();
       }
+      
+      // Set CORS for audio element
+      audioElement.crossOrigin = "anonymous";
+      
       this.source = this.audioContext.createMediaElementSource(audioElement);
       this.source.connect(this.analyser);
       this.analyser.connect(this.audioContext.destination);
+      
+      console.log('🎤 Audio connected to analyzer');
       return true;
     } catch (error) {
       console.warn('Failed to connect audio:', error);
       return false;
     }
   }
-
   getVolumeData() {
     if (!this.analyser || !this.dataArray) return { volume: 0, frequency: 0 };
     
     this.analyser.getByteFrequencyData(this.dataArray);
     
-    // Calculate average volume
-    const volume = this.dataArray.reduce((sum, value) => sum + value, 0) / this.dataArray.length / 255;
+    // Calculate RMS (Root Mean Square) for better volume detection
+    let sum = 0;
+    for (let i = 0; i < this.dataArray.length; i++) {
+      sum += this.dataArray[i] * this.dataArray[i];
+    }
+    const rms = Math.sqrt(sum / this.dataArray.length);
+    const volume = rms / 255; // Normalize to 0-1
     
     // Get dominant frequency for basic phoneme detection
     const maxIndex = this.dataArray.indexOf(Math.max(...this.dataArray));
@@ -248,19 +270,24 @@ const AnimatedModel = React.memo(({
     frameCount.current++;
     
     // Lip-sync handling (only if enabled)
-    if (!lipSyncEnabled || !audioElement || !group.current) return;
-    
-    // Use configured update frequency to reduce CPU load
-    if (frameCount.current % AVATAR_CONFIG.AUDIO.LIPSYNC_UPDATE_FREQUENCY !== 0) return;
+    if (lipSyncEnabled && audioElement && group.current) {
+      // Use configured update frequency to reduce CPU load
+      if (frameCount.current % AVATAR_CONFIG.AUDIO.LIPSYNC_UPDATE_FREQUENCY === 0) {
+        const volumeData = audioAnalyzer.current.getVolumeData();
+        setLipSyncData(volumeData);
 
-    const volumeData = audioAnalyzer.current.getVolumeData();
-    setLipSyncData(volumeData);
-
-    // Basic lip-sync morphing (if model supports it)
-    if (group.current.children[0]?.morphTargetInfluences) {
-      const intensity = Math.min(volumeData.volume * AVATAR_CONFIG.AUDIO.VOLUME_SENSITIVITY, 1);
-      // Assume first morph target is mouth opening
-      group.current.children[0].morphTargetInfluences[0] = intensity;
+        // Basic lip-sync morphing (if model supports it)
+        if (group.current.children[0]?.morphTargetInfluences) {
+          const intensity = Math.min(volumeData.volume * AVATAR_CONFIG.AUDIO.VOLUME_SENSITIVITY, 1);
+          // Assume first morph target is mouth opening
+          group.current.children[0].morphTargetInfluences[0] = intensity;
+          
+          // Debug lip-sync values
+          if (volumeData.volume > 0.01) {
+            console.log(`👄 Lip-sync: ${intensity.toFixed(2)} (volume: ${volumeData.volume.toFixed(2)})`);
+          }
+        }
+      }
     }
   });
 
