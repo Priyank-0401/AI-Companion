@@ -39,13 +39,12 @@ export const AVATAR_CONFIG = {
     // Frame loop mode ("always", "demand", "never")
     FRAME_LOOP: "demand"
   },
-
   // Model optimization settings
   MODEL: {
-    // Scale factor for models
-    SCALE: [2.5, 2.5, 2.5],
+    // Scale factor for models (increased for larger appearance)
+    SCALE: [3.2, 3.2, 3.2],
     // Position offset
-    POSITION: [0, -2.5, 0],
+    POSITION: [0, -3, 0],
     // Camera settings
     CAMERA: {
       position: [0, 0, 8],
