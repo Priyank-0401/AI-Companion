@@ -104,9 +104,10 @@ const AvatarCallPage = () => {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
-
   // Note: Removed automatic talking simulation
-  // The isTalking state should be controlled by actual voice detection or manual triggers  const toggleMute = () => setIsMuted(!isMuted);
+  // The isTalking state should be controlled by actual voice detection or manual triggers
+  
+  const toggleMute = () => setIsMuted(!isMuted);
   const toggleVideo = () => {
     setIsVideoOn(!isVideoOn);
     // Switch to talking model when camera is turned on, idle when off
