@@ -1,96 +1,72 @@
-// Performance configuration for 3D Avatar optimization
+// Clean Avatar configuration optimized for hardware acceleration
 export const AVATAR_CONFIG = {
-  // Performance settings
-  PERFORMANCE: {
-    // Limit FPS to reduce GPU load (can be 30 instead of 60 for better performance)
-    TARGET_FPS: 30,
-    // Reduce device pixel ratio for better performance on high-DPI displays
-    MAX_PIXEL_RATIO: 2,
-    // Enable performance monitoring
-    PERFORMANCE_MONITORING: true,
-    // Minimum performance threshold before quality reduction
-    MIN_PERFORMANCE: 0.8,
-    // Debounce time for performance adjustments (ms)
-    PERFORMANCE_DEBOUNCE: 200
-  },
-
-  // Animation settings
-  ANIMATION: {
-    // Cache animations to prevent re-loading
-    ENABLE_CACHE: true,
-    // Reduce animation update frequency (every N frames)
-    UPDATE_FREQUENCY: 3,
-    // Blink interval range (ms)
-    BLINK_INTERVAL: { min: 3000, max: 8000 },
-    // Expression duration (ms)
-    EXPRESSION_DURATION: 3000
-  },
-
-  // Rendering settings
-  RENDERING: {
-    // Disable shadows for better performance
-    SHADOWS: false,
-    // Antialiasing (can be disabled for better performance)
-    ANTIALIAS: true,
-    // Use high-performance GPU preference
-    POWER_PREFERENCE: "high-performance",
-    // Disable stencil buffer if not needed
-    STENCIL: false,
-    // Frame loop mode ("always", "demand", "never")
-    FRAME_LOOP: "demand"
-  },
-  // Model optimization settings
+  // Model settings
   MODEL: {
-    // Scale factor for models (increased for larger appearance)
-    SCALE: [3.2, 3.2, 3.2],
-    // Position offset
-    POSITION: [0, -3, 0],
-    // Camera settings
+    // Scale factor for the avatar model
+    SCALE: [1, 1, 1],    // Position offset for the avatar (centered, full body visible)
+    POSITION: [0, -1.2, 0],
+    // Camera settings (fixed position for stable view)
     CAMERA: {
-      position: [0, 0, 8],
+      position: [0, -0.2, 3],
       fov: 50,
       near: 0.1,
       far: 1000
     },
-    // Lighting settings (optimized for performance)
+    // Lighting settings
     LIGHTING: {
-      ambient: { intensity: 0.6 },
+      ambient: { intensity: 0.8 },
       directional: { 
         position: [5, 5, 5], 
-        intensity: 0.8,
+        intensity: 1.0,
         castShadow: false 
       },
       point: { 
         position: [-5, 5, 5], 
-        intensity: 0.4 
+        intensity: 0.6 
       }
     }
   },
 
-  // Audio settings
-  AUDIO: {
-    // Audio analyzer settings
-    FFT_SIZE: 256,
-    // Lip-sync update frequency (every N frames)
-    LIPSYNC_UPDATE_FREQUENCY: 3,
-    // Volume sensitivity multiplier
-    VOLUME_SENSITIVITY: 2
+  // Animation settings
+  ANIMATION: {
+    // Blink interval range (ms)
+    BLINK_INTERVAL: { min: 3000, max: 8000 },
+    // Expression duration (ms)
+    EXPRESSION_DURATION: 3000,
+    // Animation fade duration for smooth transitions (seconds)
+    FADE_DURATION: 0.5
   },
 
+  // Audio settings for lip-sync
+  AUDIO: {
+    FFT_SIZE: 256,
+    VOLUME_SENSITIVITY: 2,
+    LIPSYNC_UPDATE_FREQUENCY: 3
+  },
+
+  // Rendering settings (optimized for hardware acceleration)
+  RENDERING: {
+    ANTIALIAS: true,
+    POWER_PREFERENCE: "high-performance",
+    STENCIL: false
+  },
+
+  // Performance settings (minimal since hardware acceleration is on)
+  PERFORMANCE: {
+    MAX_PIXEL_RATIO: window.devicePixelRatio || 2,
+    MIN_PERFORMANCE: 0.5,
+    PERFORMANCE_DEBOUNCE: 100
+  },
   // Development settings
   DEV: {
-    // Enable orbit controls in development
-    ENABLE_ORBIT_CONTROLS: process.env.NODE_ENV === 'development',
-    // Console logging
-    ENABLE_LOGGING: process.env.NODE_ENV === 'development',
-    // Performance stats
+    ENABLE_ORBIT_CONTROLS: true, // Temporarily enabled for positioning
+    ENABLE_LOGGING: true,
     SHOW_STATS: false
   }
 };
 
-// Utility functions for optimization
+// Simple utility functions
 export const optimizationUtils = {
-  // Throttle function to limit function calls
   throttle: (func, limit) => {
     let inThrottle;
     return function() {
@@ -102,38 +78,6 @@ export const optimizationUtils = {
         setTimeout(() => inThrottle = false, limit);
       }
     }
-  },
-
-  // Debounce function to delay function calls
-  debounce: (func, delay) => {
-    let debounceTimer;
-    return function() {
-      const context = this;
-      const args = arguments;
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => func.apply(context, args), delay);
-    }
-  },
-
-  // Check if device has high performance capabilities
-  isHighPerformanceDevice: () => {
-    // Simple heuristic based on hardware concurrency and memory
-    const cores = navigator.hardwareConcurrency || 4;
-    const memory = navigator.deviceMemory || 4;
-    return cores >= 4 && memory >= 4;
-  },
-
-  // Get optimal performance settings based on device
-  getOptimalSettings: () => {
-    const isHighPerf = optimizationUtils.isHighPerformanceDevice();
-    
-    return {
-      pixelRatio: isHighPerf ? 2 : 1,
-      antialias: isHighPerf,
-      targetFPS: isHighPerf ? 60 : 30,
-      shadowsEnabled: isHighPerf,
-      updateFrequency: isHighPerf ? 1 : 3
-    };
   }
 };
 

@@ -1,10 +1,11 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations, OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
+import { useGLTF, useAnimations, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { AVATAR_CONFIG, optimizationUtils } from '../config/avatarConfig';
+import { AVATAR_CONFIG, optimizationUtils } from '../config/avatarConfig';  
 
-// Preload both models immediately to prevent loading flicker
+// Preload the main avatar model and both animation files
+useGLTF.preload('/models/avatar.glb');
 useGLTF.preload('/models/Idle.glb');
 useGLTF.preload('/models/Talking.glb');
 
@@ -15,11 +16,12 @@ class AudioAnalyzer {
     this.analyser = null;
     this.dataArray = null;
     this.source = null;
-  }  async initialize() {
+  }
+
+  async initialize() {
     try {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       
-      // Resume audio context if suspended (required for some browsers)
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
@@ -36,11 +38,11 @@ class AudioAnalyzer {
       return false;
     }
   }
+
   connectAudio(audioElement) {
     if (!this.audioContext || !audioElement) return false;
     
     try {
-      // Ensure audio context is running
       if (this.audioContext.state === 'suspended') {
         this.audioContext.resume();
       }
@@ -49,7 +51,6 @@ class AudioAnalyzer {
         this.source.disconnect();
       }
       
-      // Set CORS for audio element
       audioElement.crossOrigin = "anonymous";
       
       this.source = this.audioContext.createMediaElementSource(audioElement);
@@ -63,20 +64,19 @@ class AudioAnalyzer {
       return false;
     }
   }
+
   getVolumeData() {
     if (!this.analyser || !this.dataArray) return { volume: 0, frequency: 0 };
     
     this.analyser.getByteFrequencyData(this.dataArray);
     
-    // Calculate RMS (Root Mean Square) for better volume detection
     let sum = 0;
     for (let i = 0; i < this.dataArray.length; i++) {
       sum += this.dataArray[i] * this.dataArray[i];
     }
     const rms = Math.sqrt(sum / this.dataArray.length);
-    const volume = rms / 255; // Normalize to 0-1
+    const volume = rms / 255;
     
-    // Get dominant frequency for basic phoneme detection
     const maxIndex = this.dataArray.indexOf(Math.max(...this.dataArray));
     const frequency = (maxIndex / this.dataArray.length) * (this.audioContext.sampleRate / 2);
     
@@ -115,7 +115,7 @@ function ErrorFallback({ error }) {
   );
 }
 
-// Optimized Model component with memoization to prevent re-renders
+// AnimatedModel component with proper positioning and rotation
 const AnimatedModel = React.memo(({ 
   isTalking, 
   expression = 'neutral', 
@@ -131,28 +131,116 @@ const AnimatedModel = React.memo(({
   const expressionTimer = useRef(null);
   const lastExpression = useRef('neutral');
   const frameCount = useRef(0);
-  const animationCache = useRef({});
-  
-  // Preload both models to eliminate loading delays
-  const idleModel = useGLTF('/models/Idle.glb');
-  const talkingModel = useGLTF('/models/Talking.glb');
-  
-  // Use stable references for animations to prevent re-initialization
-  const idleAnimations = useAnimations(idleModel.animations, group);
-  const talkingAnimations = useAnimations(talkingModel.animations, group);
-    // Current model and animations based on isTalking state - memoized for stability
-  const { scene, actions, mixer, modelName } = React.useMemo(() => {
-    const model = isTalking ? talkingModel : idleModel;
-    const animations = isTalking ? talkingAnimations : idleAnimations;
-    const modelName = isTalking ? 'Talking' : 'Idle';
+  const animationsReady = useRef(false);
+  // Load the main avatar model (ReadyPlayerMe)
+  const avatarModel = useGLTF('/models/avatar.glb');
+    // Load both animation files (Mixamo)
+  const idleAnimationFile = useGLTF('/models/Idle.glb');
+  const talkingAnimationFile = useGLTF('/models/Talking.glb');
+
+  // Debug: Log loaded models
+  console.log('🎬 Avatar model loaded:', avatarModel);
+  console.log('🎬 Idle animations loaded:', idleAnimationFile?.animations?.length || 0);
+  console.log('🎬 Talking animations loaded:', talkingAnimationFile?.animations?.length || 0);  // Sanitize animation clips to remove only problematic root transform tracks
+  const sanitizeClip = (clip) => {
+    const originalTrackCount = clip.tracks.length;
     
-    return {
-      scene: model.scene,
-      actions: animations.actions,
-      mixer: animations.mixer,
-      modelName
-    };
-  }, [isTalking, idleModel, talkingModel, idleAnimations, talkingAnimations]);
+    clip.tracks = clip.tracks.filter((track) => {
+      // Only remove very specific root-level transforms that cause positioning issues
+      const isProblematicRootTransform = (
+        // Mixamo root transforms
+        track.name.startsWith('mixamo.com') ||
+        track.name.includes('mixamo') ||
+        // Scene-level transforms
+        track.name.startsWith('Scene.') ||
+        // Root node transforms
+        track.name.startsWith('RootNode') ||
+        // Only remove Hips position (not rotation/scale) - this is the main culprit
+        track.name === 'Hips.position' ||
+        track.name === 'mixamorig:Hips.position' ||
+        // Root armature transforms (only if they include "Armature" as the root object)
+        (track.name.startsWith('Armature.') && (
+          track.name.includes('position') ||
+          track.name.includes('scale')
+        ))
+      );
+      
+      if (isProblematicRootTransform) {
+        console.log(`🚫 Removing problematic root transform: "${track.name}"`);
+      }
+      
+      return !isProblematicRootTransform;
+    });
+    
+    console.log(`🔧 Sanitized ${originalTrackCount - clip.tracks.length} problematic tracks, kept ${clip.tracks.length} bone animation tracks`);
+    return clip;
+  };
+  // Combine all animations into a single array for useAnimations
+  const allAnimations = React.useMemo(() => {
+    const animations = [];
+    
+    // Add idle animations with proper naming and sanitization
+    if (idleAnimationFile?.animations && idleAnimationFile.animations.length > 0) {
+      idleAnimationFile.animations.forEach((clip, index) => {
+        const idleClip = clip.clone();
+        idleClip.name = `idle_${index}`;
+          // Debug: Log a sample of tracks before sanitization
+        const sampleTracks = idleClip.tracks.slice(0, 10).map(t => t.name);
+        console.log(`🔍 Idle animation sample tracks:`, sampleTracks);
+          // Sanitize the clip to remove root transforms
+        sanitizeClip(idleClip);
+        
+        // Debug: Check for any remaining problematic tracks
+        idleClip.tracks.forEach((track) => {
+          if (track.name.includes('Hips') || track.name.includes('position')) {
+            console.warn('⚠️ Idle track still moving model:', track.name);
+          }
+        });
+        
+        // Debug: Log a sample of tracks after sanitization
+        const remainingTracks = idleClip.tracks.slice(0, 10).map(t => t.name);
+        console.log(`✅ Idle animation remaining tracks:`, remainingTracks);
+        
+        animations.push(idleClip);
+      });
+    } else {
+      console.warn('❌ No idle animations found');
+    }
+    
+    // Add talking animations with proper naming and sanitization
+    if (talkingAnimationFile?.animations && talkingAnimationFile.animations.length > 0) {
+      talkingAnimationFile.animations.forEach((clip, index) => {
+        const talkingClip = clip.clone();
+        talkingClip.name = `talking_${index}`;
+          // Debug: Log a sample of tracks before sanitization
+        const sampleTracks = talkingClip.tracks.slice(0, 10).map(t => t.name);
+        console.log(`🔍 Talking animation sample tracks:`, sampleTracks);
+          // Sanitize the clip to remove root transforms
+        sanitizeClip(talkingClip);
+        
+        // Debug: Check for any remaining problematic tracks
+        talkingClip.tracks.forEach((track) => {
+          if (track.name.includes('Hips') || track.name.includes('position')) {
+            console.warn('⚠️ Talking track still moving model:', track.name);
+          }
+        });
+        
+        // Debug: Log a sample of tracks after sanitization
+        const remainingTracks = talkingClip.tracks.slice(0, 10).map(t => t.name);
+        console.log(`✅ Talking animation remaining tracks:`, remainingTracks);
+        
+        animations.push(talkingClip);
+      });
+    } else {
+      console.warn('❌ No talking animations found');
+    }
+    
+    console.log('🎬 Combined sanitized animations:', animations.map(a => a.name));
+    console.log('🎬 Total animations loaded:', animations.length);
+    return animations;
+  }, [idleAnimationFile?.animations, talkingAnimationFile?.animations]);
+  // Use animations on the avatar model (not the group wrapper)
+  const { actions, mixer } = useAnimations(allAnimations, avatarModel.scene);
 
   // Initialize audio analyzer only once
   useEffect(() => {
@@ -170,119 +258,95 @@ const AnimatedModel = React.memo(({
     if (lipSyncEnabled && audioElement) {
       audioAnalyzer.current.connectAudio(audioElement);
     }
-  }, [audioElement, lipSyncEnabled]);  // Animation management with caching and improved debugging
+  }, [audioElement, lipSyncEnabled]);  // Animation management - with transform protection
   useEffect(() => {
-    if (!actions) return;
+    if (!actions || !mixer) return;
 
-    const cacheKey = `${modelName.toLowerCase()}-${isTalking ? 'talking' : 'idle'}`;
     const availableActions = Object.keys(actions);
+    console.log('🎬 Available animations:', availableActions);
     
-    // Debug: Log available animations for this model
-    console.log(`🔍 ${modelName} model animations:`, availableActions);
-      // Use cached animation if available
-    if (animationCache.current[cacheKey]) {
-      const cachedAction = animationCache.current[cacheKey];
-      cachedAction.reset();
-      cachedAction.play();
-      console.log(`♻️ Using cached ${cacheKey} animation - time: ${cachedAction.time}, enabled: ${cachedAction.enabled}`);
-      return;
-    }    // Stop all current animations completely
+    // Stop all current animations
     Object.values(actions).forEach(action => {
       if (action && action.isRunning()) {
-        action.stop();
-        action.reset();
+        action.fadeOut(AVATAR_CONFIG.ANIMATION.FADE_DURATION);
       }
     });
 
-    // Also ensure mixer is properly reset
-    if (mixer) {
-      mixer.stopAllAction();
-    }
-
-    // Start appropriate animation
+    // Select the appropriate animation
     let targetAction;
     
     if (isTalking) {
-      // Try different possible talking animation names
-      targetAction = actions['Talking'] || 
+      targetAction = actions['talking_0'] || 
+                    actions['Talking'] || 
                     actions['Talk'] || 
-                    actions['Speaking'] || 
-                    actions['Animation'] ||
-                    actions['Armature|mixamo.com|Layer0'] || // Mixamo format
-                    actions[availableActions[0]]; // Fallback to first available
+                    actions['Speaking'];
     } else {
-      // Try different possible idle animation names  
-      targetAction = actions['Idle'] || 
+      targetAction = actions['idle_0'] || 
+                    actions['Idle'] || 
                     actions['Breathing'] || 
-                    actions['Default'] || 
-                    actions['Animation'] ||
-                    actions['Armature|mixamo.com|Layer0'] || // Mixamo format
-                    actions[availableActions[0]]; // Fallback to first available
+                    actions['Default'];
+    }
+
+    // Fallback to first available animation
+    if (!targetAction && availableActions.length > 0) {
+      targetAction = actions[availableActions[0]];
     }    if (targetAction) {
-      // Cache the animation for future use
-      animationCache.current[cacheKey] = targetAction;
+      // Force reset avatar position/rotation to prevent animation drift
+      avatarModel.scene.position.set(...AVATAR_CONFIG.MODEL.POSITION);
+      avatarModel.scene.rotation.set(0, 0, 0);
+      avatarModel.scene.scale.set(...AVATAR_CONFIG.MODEL.SCALE);
       
-      // Properly configure the animation
+      // Configure and play the animation
       targetAction.reset();
       targetAction.setLoop(THREE.LoopRepeat);
       targetAction.clampWhenFinished = false;
       targetAction.enabled = true;
       targetAction.timeScale = 1;
       targetAction.weight = 1;
+      
+      // Fade in the new animation
+      targetAction.fadeIn(AVATAR_CONFIG.ANIMATION.FADE_DURATION);
       targetAction.play();
       
-      console.log(`🎬 Playing ${modelName} animation:`, targetAction.getClip().name);
-      console.log(`⏱️ Animation duration:`, targetAction.getClip().duration, 'seconds');
-    } else if (availableActions.length > 0) {
-      // Fallback: play the first available animation
-      const fallbackAction = actions[availableActions[0]];
-      if (fallbackAction) {
-        animationCache.current[cacheKey] = fallbackAction;
-        
-        // Properly configure the fallback animation
-        fallbackAction.reset();
-        fallbackAction.setLoop(THREE.LoopRepeat);
-        fallbackAction.clampWhenFinished = false;
-        fallbackAction.enabled = true;
-        fallbackAction.timeScale = 1;
-        fallbackAction.weight = 1;
-        fallbackAction.play();
-        
-        console.log(`🎬 Playing fallback ${modelName} animation:`, fallbackAction.getClip().name);
-        console.log(`⏱️ Animation duration:`, fallbackAction.getClip().duration, 'seconds');
-      }
+      console.log(`🎬 Playing animation: ${targetAction.getClip().name} (${isTalking ? 'talking' : 'idle'})`);
+      console.log(`⏱️ Animation duration: ${targetAction.getClip().duration}s`);
+      animationsReady.current = true;
     } else {
-      console.warn(`❌ No animations available for ${modelName} model`);
+      console.warn('❌ No suitable animations found');
     }
 
-  }, [isTalking, actions, modelName]);  // Animation frame update - handles both mixer updates and lip-sync
+  }, [isTalking, actions, mixer]);  // Animation frame update
   useFrame((state, delta) => {
-    // Update animation mixer - CRITICAL for animations to play
+    // Enforce camera position (keeping this as safety measure)
+    if (state.camera) {
+      const targetPosition = AVATAR_CONFIG.MODEL.CAMERA.position;
+      state.camera.position.set(targetPosition[0], targetPosition[1], targetPosition[2]);
+      state.camera.lookAt(0, -1, 0);
+      state.camera.updateProjectionMatrix();
+    }
+    
+    // Update animation mixer
     if (mixer) {
       mixer.update(delta);
       
-      // Debug: Log mixer update (remove this after testing)
-      if (frameCount.current % 60 === 0) { // Log every 60 frames (roughly once per second)
+      if (frameCount.current % 60 === 0) {
         console.log(`🔄 Mixer updating - delta: ${delta.toFixed(3)}s, time: ${mixer.time.toFixed(2)}s`);
       }
     }
     
     frameCount.current++;
-    
-    // Lip-sync handling (only if enabled)
+      // Lip-sync handling
     if (lipSyncEnabled && audioElement && group.current) {
-      // Use configured update frequency to reduce CPU load
       if (frameCount.current % AVATAR_CONFIG.AUDIO.LIPSYNC_UPDATE_FREQUENCY === 0) {
         const volumeData = audioAnalyzer.current.getVolumeData();
         setLipSyncData(volumeData);
 
-        // Basic lip-sync morphing (if model supports it)
-        if (group.current.children[0]?.morphTargetInfluences) {
+        // Access morph targets directly from the avatar model
+        const avatarMesh = group.current.children[0];
+        if (avatarMesh?.morphTargetInfluences) {
           const intensity = Math.min(volumeData.volume * AVATAR_CONFIG.AUDIO.VOLUME_SENSITIVITY, 1);
-          // Assume first morph target is mouth opening
-          group.current.children[0].morphTargetInfluences[0] = intensity;
+          avatarMesh.morphTargetInfluences[0] = intensity;
           
-          // Debug lip-sync values
           if (volumeData.volume > 0.01) {
             console.log(`👄 Lip-sync: ${intensity.toFixed(2)} (volume: ${volumeData.volume.toFixed(2)})`);
           }
@@ -291,17 +355,17 @@ const AnimatedModel = React.memo(({
     }
   });
 
-  // Expression changes with reduced frequency
+  // Expression changes
   useEffect(() => {
     if (expression === lastExpression.current) return;
     
     lastExpression.current = expression;
     setCurrentExpression(expression);
 
-    // Clear existing timer
     if (expressionTimer.current) {
       clearTimeout(expressionTimer.current);
-    }    // Reset to neutral after expression duration
+    }
+    
     if (expression !== 'neutral') {
       expressionTimer.current = setTimeout(() => {
         setCurrentExpression('neutral');
@@ -309,13 +373,12 @@ const AnimatedModel = React.memo(({
     }
   }, [expression]);
 
-  // Optimized blinking effect with configurable intervals
+  // Blinking effect
   useEffect(() => {
     const blink = () => {
       setCurrentExpression('blink');
       setTimeout(() => setCurrentExpression('neutral'), 150);
       
-      // Random interval using configured range
       const { min, max } = AVATAR_CONFIG.ANIMATION.BLINK_INTERVAL;
       const nextBlink = Math.random() * (max - min) + min;
       blinkTimer.current = setTimeout(blink, nextBlink);
@@ -330,21 +393,21 @@ const AnimatedModel = React.memo(({
       if (expressionTimer.current) {
         clearTimeout(expressionTimer.current);
       }
-    };
-  }, []);
+    };  }, []);
   return (
-    <group ref={group} {...props}>
-      <primitive 
-        object={scene} 
-        scale={AVATAR_CONFIG.MODEL.SCALE} 
-        position={AVATAR_CONFIG.MODEL.POSITION}
-        rotation={[0, 0, 0]}
-      />
+    <group
+      ref={group}
+      position={AVATAR_CONFIG.MODEL.POSITION}
+      scale={AVATAR_CONFIG.MODEL.SCALE}
+      rotation={[0, 0, 0]}
+      {...props}
+    >
+      <primitive object={avatarModel.scene} />
     </group>
   );
 });
 
-// Optimized Avatar Scene Component - Memoized to prevent unnecessary re-renders
+// Avatar Scene Component with OrbitControls for debugging
 const AvatarScene = React.memo(({ 
   isTalking, 
   expression, 
@@ -366,10 +429,10 @@ const AvatarScene = React.memo(({
       </div>
     );
   }
+
   return (
-    <div className={className}>
+    <div className={className} style={{ margin: 0, padding: 0, overflow: 'hidden' }}>
       <Canvas
-        camera={AVATAR_CONFIG.MODEL.CAMERA}
         gl={{ 
           antialias: AVATAR_CONFIG.RENDERING.ANTIALIAS, 
           alpha: true,
@@ -377,12 +440,20 @@ const AvatarScene = React.memo(({
           stencil: AVATAR_CONFIG.RENDERING.STENCIL,
           depth: true
         }}
-        dpr={[1, AVATAR_CONFIG.PERFORMANCE.MAX_PIXEL_RATIO]}        performance={{ 
+        dpr={[1, AVATAR_CONFIG.PERFORMANCE.MAX_PIXEL_RATIO]}
+        performance={{ 
           min: AVATAR_CONFIG.PERFORMANCE.MIN_PERFORMANCE,
           debounce: AVATAR_CONFIG.PERFORMANCE.PERFORMANCE_DEBOUNCE
         }}
         frameloop="always"
+        style={{ margin: 0, padding: 0, display: 'block' }}
       >
+        <PerspectiveCamera 
+          makeDefault
+          position={AVATAR_CONFIG.MODEL.CAMERA.position}
+          fov={AVATAR_CONFIG.MODEL.CAMERA.fov}
+          near={AVATAR_CONFIG.MODEL.CAMERA.near}
+          far={AVATAR_CONFIG.MODEL.CAMERA.far}        />
         <ambientLight intensity={AVATAR_CONFIG.MODEL.LIGHTING.ambient.intensity} />
         <directionalLight 
           position={AVATAR_CONFIG.MODEL.LIGHTING.directional.position} 
@@ -400,23 +471,14 @@ const AvatarScene = React.memo(({
             expression={expression}
             audioElement={audioElement}
             lipSyncEnabled={lipSyncEnabled}
-          />
+          />        
         </Suspense>
-
-        {/* Conditionally render OrbitControls based on configuration */}
-        {AVATAR_CONFIG.DEV.ENABLE_ORBIT_CONTROLS && (
-          <OrbitControls 
-            enablePan={false} 
-            enableZoom={false} 
-            enableRotate={false}
-          />
-        )}
       </Canvas>
     </div>
   );
 });
 
-// Main Avatar Component - Now optimized and memoized
+// Main Avatar Component
 const Avatar = React.memo(({ 
   isTalking = false, 
   expression = 'neutral',
