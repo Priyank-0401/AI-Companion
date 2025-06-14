@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Avatar from '../components/Avatar'; // Import the Avatar component
+import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
 import { useAvatarExpressions } from '../hooks/useAvatarExpressions'; // Import the expression hook
 import { 
   Loader2, 
@@ -55,9 +55,8 @@ const AvatarCallPage = () => {
       return () => clearInterval(timer);
     }
   }, [isLoading, error]);
-
-  // Format call duration
-  const formatDuration = (seconds) => {
+  // Memoize format duration function to prevent re-creation
+  const formatDuration = useCallback((seconds) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -65,7 +64,7 @@ const AvatarCallPage = () => {
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };  // Auto-hide controls in fullscreen mode only
+  }, []);// Auto-hide controls in fullscreen mode only
   useEffect(() => {
     let timer;
     if (isFullscreen && showControls) {
@@ -103,18 +102,26 @@ const AvatarCallPage = () => {
       // setError("Could not connect to the avatar service. Please try again later.");
     }, 2500);
     return () => clearTimeout(timer);
+  }, []);  // Memoize toggle functions to prevent unnecessary re-renders
+  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
+  const toggleVideo = useCallback(() => {
+    setIsVideoOn(prev => {
+      const newValue = !prev;
+      // Switch to talking model when camera is turned on, idle when off
+      setIsTalking(newValue);
+      return newValue;
+    });
   }, []);
-  // Note: Removed automatic talking simulation
-  // The isTalking state should be controlled by actual voice detection or manual triggers
-  
-  const toggleMute = () => setIsMuted(!isMuted);
-  const toggleVideo = () => {
-    setIsVideoOn(!isVideoOn);
-    // Switch to talking model when camera is turned on, idle when off
-    setIsTalking(!isVideoOn);
-  };
-  const toggleSpeaker = () => setIsSpeakerOn(!isSpeakerOn);
-  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
+  const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
+
+  // Memoize avatar props to prevent unnecessary re-renders
+  const avatarProps = useMemo(() => ({
+    isTalking,
+    expression: currentExpression,
+    audioElement,
+    lipSyncEnabled: true
+  }), [isTalking, currentExpression, audioElement]);
   
   const endCall = () => {
     // Handle ending the call
@@ -273,14 +280,9 @@ const AvatarCallPage = () => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
             style={{ pointerEvents: 'none' }}
-          >            {/* Avatar Component */}
+          >            {/* Avatar Component - Optimized with memoized props */}
             <div className="absolute inset-0">
-              <Avatar 
-                isTalking={isTalking} 
-                expression={currentExpression}
-                audioElement={audioElement}
-                lipSyncEnabled={true}
-              />
+              <Avatar {...avatarProps} />
             </div>
             
             {/* Video Overlays */}
