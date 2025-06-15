@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
-import { useAvatarExpressions } from '../hooks/useAvatarExpressions'; // Import the expression hook
+// Removed expression hook import - keeping it simple
 import { 
   Loader2, 
   PhoneOff, 
@@ -33,19 +33,8 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   const [audioElement, setAudioElement] = useState(null);  const [selectedVoice, setSelectedVoice] = useState(null);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [hasGreeted, setHasGreeted] = useState(false);
-  const [isGreeting, setIsGreeting] = useState(false);
   
-  // Expression management
-  const { currentExpression, setExpression } = useAvatarExpressions(
-    isTalking, 
-    '', // No bot messages for chat
-    {
-      enableAutoExpression: true,
-      enableBlinking: true,
-      lipSyncEnabled: true
-    }
-  );
+  // Removed greeting and expression management - keeping it simple
 
   // Simulate call duration timer
   useEffect(() => {
@@ -177,149 +166,24 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
+    document.addEventListener('mousedown', handleClickOutside);    return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showVoiceSelector]);
-  // Function to play greeting message with realistic tone and lip-sync
-  const playGreeting = useCallback(() => {
-    if (!selectedVoice || !isSpeakerOn || hasGreeted) return;
-    
-    const greetingMessages = [
-      { 
-        text: "Hello there! *gentle smile* I'm so happy to meet you. How are you doing today?", 
-        rate: 0.85, 
-        pitch: 1.15, 
-        emphasis: "gentle"
-      },
-      { 
-        text: "Hi! *warm laugh* It's wonderful to see you. What would you like to talk about?", 
-        rate: 0.9, 
-        pitch: 1.1, 
-        emphasis: "cheerful"
-      },
-      { 
-        text: "Hello! *excited tone* I'm here and ready to chat with you. How can I help you today?", 
-        rate: 0.88, 
-        pitch: 1.12, 
-        emphasis: "enthusiastic"
-      },
-      { 
-        text: "Hi there! *soft voice* I'm excited to spend some time with you. What's on your mind?", 
-        rate: 0.82, 
-        pitch: 1.18, 
-        emphasis: "intimate"
-      },
-      { 
-        text: "Hello! *welcoming tone* Welcome! I'm looking forward to our conversation together.", 
-        rate: 0.87, 
-        pitch: 1.14, 
-        emphasis: "welcoming"
-      }
-    ];
-    
-    const randomGreeting = greetingMessages[Math.floor(Math.random() * greetingMessages.length)];
-    
-    // Clean text for speech synthesis (remove tone indicators)
-    const cleanText = randomGreeting.text.replace(/\*[^*]+\*/g, '');
-      setIsGreeting(true);
-    console.log('🎵 Playing greeting:', cleanText, 'with', randomGreeting.emphasis, 'tone');
-    
-    // Create audio element for lip-sync
-    const tempAudio = document.createElement('audio');
-    tempAudio.crossOrigin = "anonymous";
-    tempAudio.preload = "auto";
-    
-    // Use Speech Synthesis API with enhanced settings
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.voice = selectedVoice;
-    utterance.rate = randomGreeting.rate;
-    utterance.pitch = randomGreeting.pitch;
-    utterance.volume = isSpeakerOn ? 1 : 0;
-    
-    // Add pauses and emphasis based on tone
-    switch (randomGreeting.emphasis) {
-      case 'gentle':
-        utterance.rate = 0.8;
-        utterance.pitch = 1.2;
-        break;
-      case 'cheerful':
-        utterance.rate = 0.95;
-        utterance.pitch = 1.15;
-        break;
-      case 'enthusiastic':
-        utterance.rate = 1.0;
-        utterance.pitch = 1.1;
-        break;
-      case 'intimate':
-        utterance.rate = 0.75;
-        utterance.pitch = 1.25;
-        break;
-      case 'welcoming':
-        utterance.rate = 0.85;
-        utterance.pitch = 1.18;
-        break;
-    }
-      utterance.onstart = () => {
-      console.log('🎵 Greeting started with', randomGreeting.emphasis, 'tone');
-      // Set audio element for lip-sync - connect to speech synthesis
-      console.log('🎤 Setting up lip-sync for greeting');
-      setAudioElement(tempAudio);
-    };
-    
-    utterance.onend = () => {
-      console.log('🎵 Greeting finished');
-      setIsGreeting(false);
-      setHasGreeted(true);
-      // Clear audio element
-      setAudioElement(null);
-      console.log('🎤 Lip-sync cleared');
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('🎵 Greeting error:', event.error);
-      setIsGreeting(false);
-      setAudioElement(null);
-    };
-    
-    // Add boundary events for more natural speech
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        // Trigger subtle expression changes during speech
-        const expressions = ['smile', 'happy', 'talking', 'neutral'];
-        const randomExpression = expressions[Math.floor(Math.random() * expressions.length)];
-        setExpression(randomExpression);
-      }
-    };
-      speechSynthesis.speak(utterance);
-  }, [selectedVoice, isSpeakerOn, hasGreeted, setExpression]);
 
-  // Play greeting when switching to talking mode
-  useEffect(() => {
-    if (isTalking && selectedVoice && !hasGreeted && !isGreeting) {
-      // Small delay to ensure talking animation has started
-      const greetingTimer = setTimeout(() => {
-        playGreeting();
-      }, 800);
-      
-      return () => clearTimeout(greetingTimer);
-    }
-  }, [isTalking, selectedVoice, hasGreeted, isGreeting, playGreeting]);// Memoize toggle functions to prevent unnecessary re-renders
+  // Removed greeting functionality - keeping it simple
+
+  // Memoize toggle functions to prevent unnecessary re-renders
   const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
     const toggleTalkToModel = useCallback(() => {
     setIsTalking(prev => {
       const newValue = !prev;
       if (newValue) {
         // Start talking animation and trigger greeting if first time
-        console.log('🗣️ Starting conversation with model');
-      } else {
+        console.log('🗣️ Starting conversation with model');      } else {
         // Stop talking animation and any ongoing speech
         console.log('🤐 Ending conversation with model');
         speechSynthesis.cancel(); // Stop any ongoing speech
-        setIsGreeting(false);
-        // Reset greeting for next time if user wants to restart
-        setHasGreeted(false);
       }
       return newValue;
     });
@@ -342,14 +206,10 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   }, []);
   
   const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
-  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
-  // Memoize avatar props to prevent unnecessary re-renders
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified without expressions/greeting
   const avatarProps = useMemo(() => ({
-    isTalking: isTalking || isGreeting, // Keep talking animation during greeting
-    expression: currentExpression,
-    audioElement,
-    lipSyncEnabled: true
-  }), [isTalking, isGreeting, currentExpression, audioElement]);
+    isTalking: isTalking
+  }), [isTalking]);
   
   const endCall = () => {
     // Handle ending the call
