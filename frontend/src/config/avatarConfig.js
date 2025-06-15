@@ -9,7 +9,7 @@ export const AVATAR_CONFIG = {
 
   // Camera settings - Position at eye level and look at head
   CAMERA: {
-    POSITION: [0, 1.6, 2.5],           // Y = eye level, closer for better view
+    POSITION: [0, 2.2, 2.5],           // Y = eye level, closer for better view
     FOV: 60,                           // Good framing
     NEAR: 0.1,
     FAR: 1000,
@@ -18,7 +18,7 @@ export const AVATAR_CONFIG = {
 
   // Avatar positioning - Keep upright, no rotation
   AVATAR: {
-    POSITION: [0, 0.25, 0],              // Lower to bring head into view
+    POSITION: [0, 0.2, 0],              // Lower to bring head into view
     SCALE: [1.5, 1.5, 1.5],            // Good size
     ROTATION: [0, 0, 0],               // Keep upright - no destructive rotation
   },
@@ -51,8 +51,7 @@ export const AVATAR_CONFIG = {
       POSITION: [0, 0, 4],              // Direct face lighting
       COLOR: 0xffffff,
     },
-  },
-  // Animation settings - Simple and clean
+  },  // Animation settings - Simple and clean
   ANIMATIONS: {
     FADE_DURATION: 0.3,                // Smooth transitions
     DEFAULT: 'idle',
@@ -63,6 +62,31 @@ export const AVATAR_CONFIG = {
     SPEEDS: {
       IDLE: 1.0,                       // Normal speed for idle
       TALKING: 0.3,                    // Slower speed for talking (60% of original)
+    },
+    LOOP_SETTINGS: {
+      CONTINUOUS: true,                // Keep looping until manually stopped
+      BUFFER_TIME: 0.1,               // Brief pause between animation loops (in seconds)
+      SMOOTH_TRANSITIONS: true,        // Enable smooth transitions between loops
+    },
+  },
+  // Blinking and Expression Settings
+  EXPRESSIONS: {
+    ENABLE_BLINKING: false,            // Disabled - no blink morph targets in current model
+    ENABLE_AUTO_EXPRESSIONS: true,
+    BLINK_INTERVAL: [2000, 5000],      // Min and max blink interval (ms)
+    BLINK_DURATION: 150,               // How long a blink lasts (ms)
+    EXPRESSION_DURATION: 3000,         // How long expressions last (ms)
+    BLINK_PROBABILITY: 0.7,            // Probability of blinking when scheduled
+    MORPH_TARGETS: {
+      // Eye blinking morph targets (NOT AVAILABLE in current model)
+      EYE_BLINK_LEFT: 'eyeBlinkLeft',
+      EYE_BLINK_RIGHT: 'eyeBlinkRight',
+      EYE_BLINK: 'eyesClosed',         // Fallback if separate targets don't exist
+      // Additional expression targets (AVAILABLE)
+      MOUTH_SMILE: 'mouthSmile',       // ✅ Available
+      MOUTH_OPEN: 'mouthOpen',         // ✅ Available - can be used for talking
+      MOUTH_FROWN: 'mouthFrown',       // Not available
+      EYEBROW_UP: 'browInnerUp',       // Not available
     },
   },
 

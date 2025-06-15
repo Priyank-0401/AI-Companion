@@ -30,7 +30,10 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   const [showHeader, setShowHeader] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState('excellent');
-  const [audioElement, setAudioElement] = useState(null);  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [audioElement, setAudioElement] = useState(null);
+  const [lastMessage, setLastMessage] = useState(''); // For expression system
+
+  const [selectedVoice, setSelectedVoice] = useState(null);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   
@@ -174,15 +177,14 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   // Removed greeting functionality - keeping it simple
 
   // Memoize toggle functions to prevent unnecessary re-renders
-  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
-    const toggleTalkToModel = useCallback(() => {
+  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);    const toggleTalkToModel = useCallback(() => {
     setIsTalking(prev => {
       const newValue = !prev;
       if (newValue) {
-        // Start talking animation and trigger greeting if first time
-        console.log('🗣️ Starting conversation with model');      } else {
+        // Start talking animation - will loop continuously until manually stopped
+        console.log('🗣️ Starting continuous talking animation');      } else {
         // Stop talking animation and any ongoing speech
-        console.log('🤐 Ending conversation with model');
+        console.log('🤐 Stopping continuous talking animation');
         speechSynthesis.cancel(); // Stop any ongoing speech
       }
       return newValue;
@@ -208,13 +210,42 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified without expressions/greeting
   const avatarProps = useMemo(() => ({
-    isTalking: isTalking
-  }), [isTalking]);
+    isTalking: isTalking,
+    lastMessage: lastMessage
+  }), [isTalking, lastMessage]);
   
   const endCall = () => {
     // Handle ending the call
     console.log('Ending call...');
-  };
+  };  // Demo messages for expression system (without automatic talking)
+  useEffect(() => {
+    if (isLoading || error) return;
+
+    const demoMessages = [
+      "Hello! I'm so happy to see you today!",
+      "How are you feeling right now?",
+      "That's wonderful to hear!",
+      "I understand how you feel.",
+      "Oh no, I'm sorry to hear that.",
+      "That's amazing! Congratulations!",
+      "I'm here to listen and support you.",
+      "What would you like to talk about?",
+      "You're doing great!",
+      "I appreciate you sharing that with me."
+    ];
+
+    let messageIndex = 0;
+    const messageInterval = setInterval(() => {
+      setLastMessage(demoMessages[messageIndex]);
+      messageIndex = (messageIndex + 1) % demoMessages.length;
+      
+      // Only update message for expression system, don't auto-start talking
+      console.log('� Demo message updated for expressions:', demoMessages[messageIndex - 1]);
+    }, 8000); // New message every 8 seconds
+
+    return () => clearInterval(messageInterval);
+  }, [isLoading, error]);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
@@ -433,18 +464,20 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
                     >
                       {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                     </button>
-                    
-                    {/* Video Button */}
+                      {/* Talk to Model Button */}
                     <button 
-                      onClick={toggleVideo}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                        !isVideoOn 
-                          ? 'bg-red-600 shadow-lg shadow-red-500/30' 
-                          : 'bg-gray-700'
+                      onClick={toggleTalkToModel}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                        isTalking 
+                          ? 'bg-blue-600/90 shadow-lg shadow-blue-500/30 animate-pulse' 
+                          : 'bg-gray-700 hover:bg-gray-600'
                       }`}
-                      title={isVideoOn ? 'Switch to Idle Model' : 'Switch to Talking Model'}
+                      title={isTalking ? 'Stop Continuous Talking' : 'Start Continuous Talking'}
                     >
-                      {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                      <MessageSquare className={`w-6 h-6 ${isTalking ? 'text-white' : 'text-gray-300'}`} />
+                      {isTalking && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                      )}
                     </button>
 
                     {/* Speaker Button */}
@@ -474,18 +507,20 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
         </div>
       ) : (        // Always visible controls in windowed mode
         <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
-          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">
-              {/* Talk to Model Button */}
+          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Talk to Model Button */}
               <button 
                 onClick={toggleTalkToModel}
-                className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                   isTalking 
-                    ? 'bg-blue-600 shadow-lg shadow-blue-500/30' 
-                    : 'bg-gray-700'
+                    ? 'bg-blue-600/90 shadow-lg shadow-blue-500/30 animate-pulse' 
+                    : 'bg-gray-700 hover:bg-gray-600'
                 }`}
-                title={isTalking ? 'Stop Talking' : 'Talk to Model'}
+                title={isTalking ? 'Stop Continuous Talking' : 'Start Continuous Talking'}
               >
-                <MessageSquare className="w-6 h-6" />
+                <MessageSquare className={`w-6 h-6 ${isTalking ? 'text-white' : 'text-gray-300'}`} />
+                {isTalking && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                )}
               </button>
               
               {/* Voice Input Button */}

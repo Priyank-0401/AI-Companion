@@ -57,35 +57,42 @@ export const useAvatarExpressions = (isTalking, lastMessage, options = {}) => {
         }, expressionDuration);
       }
     }
-  }, [lastMessage, analyzeMessage, expressionDuration, enableAutoExpression]);
-
-  // Automatic blinking system
+  }, [lastMessage, analyzeMessage, expressionDuration, enableAutoExpression]);  // Automatic blinking system
   useEffect(() => {
-    if (!enableBlinking) return;
+    if (!enableBlinking) {
+      return; // Silently disabled
+    }
 
     const scheduleBlink = () => {
       const [minInterval, maxInterval] = blinkInterval;
       const interval = minInterval + Math.random() * (maxInterval - minInterval);
       
-      blinkTimer.current = setTimeout(() => {
-        // Only blink if not in the middle of another expression
-        if (currentExpression === 'neutral' && Math.random() < 0.7) {
+      console.log(`👁️ Next blink scheduled in ${interval}ms`);
+        blinkTimer.current = setTimeout(() => {
+        console.log(`👁️ Blink timer fired. Current expression: ${currentExpression}`);
+        
+        // Allow blinking even with mild expressions, but not during strong emotions
+        const allowBlinking = currentExpression === 'neutral' || 
+                              currentExpression === 'smile' || 
+                              Math.random() < 0.3; // 30% chance to blink during other expressions
+        
+        if (allowBlinking && Math.random() < 0.8) { // Increased probability to 80%
+          console.log('👁️ Starting blink');
           setIsBlinking(true);
-          setCurrentExpression('blink');
           
-          // End blink quickly
+          // Brief blink without changing the main expression
           setTimeout(() => {
+            console.log('👁️ Ending blink');
             setIsBlinking(false);
-            setCurrentExpression('neutral');
           }, 150);
+        } else {
+          console.log(`👁️ Skipping blink - expression: ${currentExpression}, allowBlinking: ${allowBlinking}`);
         }
         
         // Schedule next blink
         scheduleBlink();
       }, interval);
-    };
-
-    scheduleBlink();
+    };    scheduleBlink();
 
     return () => {
       if (blinkTimer.current) {
