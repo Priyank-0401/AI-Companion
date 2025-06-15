@@ -23,7 +23,47 @@ export const AVATAR_CONFIG = {  // Model Transform Settings
     LOOP: true                // Loop animations
   },
 
+<<<<<<< Updated upstream
   // Performance Settings
+=======
+  // Enhanced lighting for face visibility
+  LIGHTING: {
+    AMBIENT: {
+      INTENSITY: 1.0,
+      COLOR: 0xffffff,
+    },
+    DIRECTIONAL: {
+      INTENSITY: 1.2,
+      POSITION: [5, 10, 5],
+      COLOR: 0xffffff,
+    },
+    POINT: {
+      INTENSITY: 0.8,
+      POSITION: [0, 2, 3],              // Light from front to illuminate face
+      COLOR: 0xffffff,
+    },
+    FACE_LIGHT: {
+      INTENSITY: 0.6,
+      POSITION: [0, 0, 4],              // Direct face lighting
+      COLOR: 0xffffff,
+    },
+  },
+  // Animation settings - Simple and clean
+  ANIMATIONS: {
+    FADE_DURATION: 0.3,                // Smooth transitions
+    DEFAULT: 'idle',
+    NAMES: {
+      IDLE: 'idle',
+      TALKING: 'talking',
+    },
+    SPEEDS: {
+      IDLE: 1.0,                       // Normal speed for idle
+      TALKING: 0.4,                    // Slower speed for talking (60% of original)
+    },
+  },
+
+  // Performance settings
+>>>>>>> Stashed changes
   PERFORMANCE: {
     UPDATE_FREQUENCY: 60      // 60fps target
   }

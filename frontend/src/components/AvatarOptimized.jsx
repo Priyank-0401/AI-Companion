@@ -310,6 +310,7 @@ const AvatarModel = React.memo(({
     if (availableActions.length === 0) {
       console.warn('❌ No actions available for animation');
       return;
+<<<<<<< Updated upstream
     }
     
     // Determine which animation to play
@@ -325,13 +326,45 @@ const AvatarModel = React.memo(({
         }
         
         // Start new animation
+=======
+    }    // Determine target animation - use first animation of each type
+    const targetAnimation = isTalking 
+      ? `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`
+      : `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;
+
+    console.log(`🎯 Target animation: ${targetAnimation} (isTalking: ${isTalking})`);
+
+    // Only switch if different from current
+    if (lastAnimationRef.current !== targetAnimation) {
+      // Stop current animation
+      if (lastAnimationRef.current && actions[lastAnimationRef.current]) {
+        console.log(`⏹️ Stopping: ${lastAnimationRef.current}`);
+        actions[lastAnimationRef.current].fadeOut(AVATAR_CONFIG.ANIMATIONS.FADE_DURATION);
+      }      // Start new animation
+      if (actions[targetAnimation]) {
+        console.log(`▶️ Starting: ${targetAnimation}`);
+>>>>>>> Stashed changes
         const action = actions[targetAnimation];
         console.log(`▶️ Starting animation: ${targetAnimation}`);
         
         action.reset();
+<<<<<<< Updated upstream
         action.setLoop(THREE.LoopRepeat);
         action.clampWhenFinished = false;
         action.fadeIn(AVATAR_CONFIG.ANIMATION.FADE_DURATION);
+=======
+        action.setLoop(true);
+        
+        // Set animation speed based on type
+        const animationSpeed = isTalking 
+          ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.TALKING 
+          : AVATAR_CONFIG.ANIMATIONS.SPEEDS.IDLE;
+        
+        action.setEffectiveTimeScale(animationSpeed);
+        console.log(`🎛️ Animation speed set to: ${animationSpeed}x`);
+        
+        action.fadeIn(AVATAR_CONFIG.ANIMATIONS.FADE_DURATION);
+>>>>>>> Stashed changes
         action.play();
         
         lastAnimationRef.current = targetAnimation;
