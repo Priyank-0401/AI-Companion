@@ -20,7 +20,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { currentUser, logout, loading } = useAuth()
+  const { currentUser, logout, loading, isRedirecting } = useAuth()
   const isDashboardPage = location.pathname === '/dashboard'
 
   const navItems = [    
@@ -44,7 +44,8 @@ const Navbar = () => {
     }
   }
 
-  const filteredNavItems = currentUser 
+  // Don't show protected nav items if user is redirecting after login
+  const filteredNavItems = (currentUser && !isRedirecting) 
     ? navItems 
     : navItems.filter(item => item.public)
   return (
@@ -79,18 +80,18 @@ const Navbar = () => {
                 </Link>
               )
             })}
-            
-            {/* Authentication Buttons */}
+              {/* Authentication Buttons */}
             {!loading && (
               <div className="flex items-center space-x-2 ml-4">
-                {currentUser ? (                  <button
+                {(currentUser && !isRedirecting) ? (
+                  <button
                     onClick={handleLogout}
                     className="flex items-center space-x-2 px-4 py-2 rounded-lg text-[#EEEEEE] hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
                   >
                     <LogOut className="w-4 h-4" />
                     <span>Logout</span>
                   </button>
-                ) : (
+                ) : !currentUser ? (
                   <>
                     <Link
                       to="/login"
@@ -107,7 +108,7 @@ const Navbar = () => {
                       <span>Sign Up</span>
                     </Link>
                   </>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -149,7 +150,7 @@ const Navbar = () => {
             })}            {/* Mobile Authentication Buttons */}
             {!loading && (
               <div className="pt-2 border-t border-[#00ADB5]/20 mt-2">
-                {currentUser ? (
+                {(currentUser && !isRedirecting) ? (
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-[#EEEEEE] hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
@@ -157,7 +158,7 @@ const Navbar = () => {
                     <LogOut className="w-5 h-5" />
                     <span>Logout</span>
                   </button>
-                ) : (
+                ) : !currentUser ? (
                   <>
                     <Link
                       to="/login"
@@ -176,7 +177,7 @@ const Navbar = () => {
                       <span>Sign Up</span>
                     </Link>
                   </>
-                )}
+                ) : null}
               </div>
             )}
           </div>
