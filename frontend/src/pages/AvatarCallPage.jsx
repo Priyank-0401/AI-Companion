@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
-import { useAvatarExpressions } from '../hooks/useAvatarExpressions'; // Import the expression hook
+// Expression hook removed to isolate face rendering issues
 import { 
   Loader2, 
   PhoneOff, 
@@ -35,17 +35,16 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const [hasGreeted, setHasGreeted] = useState(false);
   const [isGreeting, setIsGreeting] = useState(false);
-  
-  // Expression management
-  const { currentExpression, setExpression } = useAvatarExpressions(
-    isTalking, 
-    '', // No bot messages for chat
-    {
-      enableAutoExpression: true,
-      enableBlinking: true,
-      lipSyncEnabled: true
-    }
-  );
+    // Expression management disabled to isolate face rendering issues
+  // const { currentExpression, setExpression } = useAvatarExpressions(
+  //   isTalking, 
+  //   '', // No bot messages for chat
+  //   {
+  //     enableAutoExpression: true,
+  //     enableBlinking: true,
+  //     lipSyncEnabled: true
+  //   }
+  // );
 
   // Simulate call duration timer
   useEffect(() => {
@@ -282,18 +281,16 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
       setIsGreeting(false);
       setAudioElement(null);
     };
-    
-    // Add boundary events for more natural speech
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        // Trigger subtle expression changes during speech
-        const expressions = ['smile', 'happy', 'talking', 'neutral'];
-        const randomExpression = expressions[Math.floor(Math.random() * expressions.length)];
-        setExpression(randomExpression);
-      }
-    };
-      speechSynthesis.speak(utterance);
-  }, [selectedVoice, isSpeakerOn, hasGreeted, setExpression]);
+      // Expression triggers disabled to isolate face rendering issues
+    // utterance.onboundary = (event) => {
+    //   if (event.name === 'word') {
+    //     // Trigger subtle expression changes during speech
+    //     const expressions = ['smile', 'happy', 'talking', 'neutral'];
+    //     const randomExpression = expressions[Math.floor(Math.random() * expressions.length)];
+    //     setExpression(randomExpression);
+    //   }
+    // };      speechSynthesis.speak(utterance);
+  }, [selectedVoice, isSpeakerOn, hasGreeted]);
 
   // Play greeting when switching to talking mode
   useEffect(() => {
@@ -342,14 +339,12 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   }, []);
   
   const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
-  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
-  // Memoize avatar props to prevent unnecessary re-renders
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props to prevent unnecessary re-renders - expression and lip-sync disabled
   const avatarProps = useMemo(() => ({
     isTalking: isTalking || isGreeting, // Keep talking animation during greeting
-    expression: currentExpression,
     audioElement,
-    lipSyncEnabled: true
-  }), [isTalking, isGreeting, currentExpression, audioElement]);
+    lipSyncEnabled: false // Disabled to isolate face rendering issues
+  }), [isTalking, isGreeting, audioElement]);
   
   const endCall = () => {
     // Handle ending the call
