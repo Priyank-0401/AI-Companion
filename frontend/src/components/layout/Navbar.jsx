@@ -11,11 +11,10 @@ import {
   X,
   User,
   Brain,
-  LogIn,
-  LogOut,
+  LogIn,  LogOut,
   UserPlus
 } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../hooks/useAuth'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)

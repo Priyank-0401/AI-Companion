@@ -21,21 +21,18 @@ import {
 
 const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isTalking, setIsTalking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showHeader, setShowHeader] = useState(true);
-  const [callDuration, setCallDuration] = useState(0);
+  const [showHeader, setShowHeader] = useState(true);  const [callDuration, setCallDuration] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState('excellent');
-  const [audioElement, setAudioElement] = useState(null);
-  const [lastMessage, setLastMessage] = useState(''); // For expression system
-
-  const [selectedVoice, setSelectedVoice] = useState(null);
-  const [availableVoices, setAvailableVoices] = useState([]);
+  const [audioElement, setAudioElement] = useState(null);  const [lastMessage, setLastMessage] = useState(''); // For expression system
+  const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState(null);
   
   // Removed greeting and expression management - keeping it simple
 
@@ -95,100 +92,80 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
       // setError("Could not connect to the avatar service. Please try again later.");
     }, 2500);    return () => clearTimeout(timer);
   }, []);
-
-  // Load available female voices
-  useEffect(() => {
-    const loadVoices = () => {
-      const voices = speechSynthesis.getVoices();
-      
-      // Filter for female voices (prioritize Google, Microsoft, Apple)
-      const femaleVoices = voices.filter(voice => {
-        const name = voice.name.toLowerCase();
-        const lang = voice.lang.toLowerCase();
-        
-        // Check if it's an English voice and likely female
-        if (!lang.startsWith('en')) return false;
-        
-        return (
-          name.includes('female') ||
-          name.includes('woman') ||
-          name.includes('girl') ||
-          name.includes('samantha') ||
-          name.includes('zira') ||
-          name.includes('susan') ||
-          name.includes('karen') ||
-          name.includes('hazel') ||
-          name.includes('moira') ||
-          name.includes('tessa') ||
-          name.includes('nicky') ||
-          name.includes('fiona') ||
-          name.includes('google') && (name.includes('us') || name.includes('uk')) ||
-          name.includes('microsoft') && name.includes('aria') ||
-          name.includes('cortana')
-        );
-      }).sort((a, b) => {
-        // Prioritize Google voices, then Microsoft, then others
-        const aGoogle = a.name.toLowerCase().includes('google');
-        const bGoogle = b.name.toLowerCase().includes('google');
-        const aMicrosoft = a.name.toLowerCase().includes('microsoft');
-        const bMicrosoft = b.name.toLowerCase().includes('microsoft');
-        
-        if (aGoogle && !bGoogle) return -1;
-        if (!aGoogle && bGoogle) return 1;
-        if (aMicrosoft && !bMicrosoft) return -1;
-        if (!aMicrosoft && bMicrosoft) return 1;
-        
-        return a.name.localeCompare(b.name);
-      });
-      
-      setAvailableVoices(femaleVoices);
-      
-      // Set default voice (prefer Google or Microsoft female voices)
-      if (femaleVoices.length > 0 && !selectedVoice) {
-        setSelectedVoice(femaleVoices[0]);
-      }
-      
-      console.log('🎵 Available female voices:', femaleVoices.map(v => v.name));
-    };
-
-    // Load voices immediately if available
-    loadVoices();
-    
-    // Also listen for voices changed event (some browsers load voices asynchronously)
-    speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    
-    return () => {
-      speechSynthesis.removeEventListener('voiceschanged', loadVoices);    };
-  }, [selectedVoice]);
-
-  // Close voice selector when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showVoiceSelector && !event.target.closest('.voice-selector-container')) {
-        setShowVoiceSelector(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showVoiceSelector]);
-
   // Removed greeting functionality - keeping it simple
 
-  // Memoize toggle functions to prevent unnecessary re-renders
-  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);    const toggleTalkToModel = useCallback(() => {
-    setIsTalking(prev => {
-      const newValue = !prev;
-      if (newValue) {
-        // Start talking animation - will loop continuously until manually stopped
-        console.log('🗣️ Starting continuous talking animation');      } else {
-        // Stop talking animation and any ongoing speech
-        console.log('🤐 Stopping continuous talking animation');
-        speechSynthesis.cancel(); // Stop any ongoing speech
-      }
-      return newValue;
-    });
+  // Memoize toggle functions to prevent unnecessary re-renders  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
+  const selectVoice = useCallback((voice) => {
+    setSelectedVoice(voice);
+    setShowVoiceSelector(false);
+    
+    // Test the selected Azure Neural voice with a sample phrase
+    if (voiceEnabled && voice) {
+      // Import and use the voice service for testing
+      import('../services/voiceService').then(({ default: voiceService }) => {
+        voiceService.testVoice(voice, "Hello! I'm Seriva. This is how I sound with Azure Neural TTS.")
+          .then(() => {
+            console.log('✅ Voice test completed successfully');
+          })
+          .catch(error => {
+            console.error('❌ Voice test failed:', error);
+          });
+      });
+    }
+    
+    console.log('🎵 Selected Azure Neural voice:', voice.displayName, '(' + voice.name + ')');
+  }, [voiceEnabled]);
+
+  // Voice enable/disable handler with immediate talking activation
+  const toggleVoiceEnabled = useCallback(() => {
+    const newVoiceState = !voiceEnabled;
+    setVoiceEnabled(newVoiceState);
+    
+    if (newVoiceState) {      // When enabling voice, prepare welcome message but don't set it yet
+      const welcomeMessage = "Hey! I am Seriva, your AI companion. I'm ready to talk with you!";
+      
+      // Import and use the voice service to speak immediately
+      import('../services/voiceService').then(({ default: voiceService }) => {
+        if (selectedVoice) {
+          voiceService.setVoice(selectedVoice);
+        }
+          // Speak the welcome message with synchronized animation
+        voiceService.speak(welcomeMessage, {
+          onStart: () => {
+            // Only switch to talking mode when voice actually starts
+            setLastMessage(welcomeMessage);
+            console.log('🎵 Welcome message started - Avatar switching to talking mode now');
+          },
+          onEnd: () => {
+            // When message ends, turn off voice and return to idle
+            setVoiceEnabled(false);
+            setLastMessage(''); // Clear message to return to idle
+            console.log('🎵 Welcome message ended - Avatar returning to idle and voice disabled');
+          },
+          onError: (error) => {
+            console.error('❌ Welcome message failed:', error);
+            // On error, also turn off voice
+            setVoiceEnabled(false);
+            setLastMessage('');
+          }
+        });
+      });
+      
+      console.log('✅ Voice enabled - Preparing welcome message...');    } else {
+      // When disabling voice, stop any ongoing speech and clear message
+      setLastMessage(''); // Clear message to return to idle immediately
+      import('../services/voiceService').then(({ default: voiceService }) => {
+        voiceService.stop();
+        console.log('🔇 Voice disabled - stopping any ongoing speech');
+      });
+    }
+  }, [voiceEnabled, selectedVoice]);
+
+  // Callback for when voice ends - turns off voice button
+  const handleVoiceEnd = useCallback(() => {
+    setVoiceEnabled(false);
+    setLastMessage(''); // Clear message to return to idle
+    console.log('🔇 Voice ended - Avatar voice disabled and returning to idle');
   }, []);
 
   const toggleListening = useCallback(() => {
@@ -208,11 +185,13 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   }, []);
   
   const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
-  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified without expressions/greeting
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified with voice support
   const avatarProps = useMemo(() => ({
-    isTalking: isTalking,
-    lastMessage: lastMessage
-  }), [isTalking, lastMessage]);
+    lastMessage: lastMessage,
+    voiceEnabled: voiceEnabled && isSpeakerOn,
+    selectedVoice: selectedVoice,
+    onVoiceEnd: handleVoiceEnd
+  }), [lastMessage, voiceEnabled, isSpeakerOn, selectedVoice, handleVoiceEnd]);
   
   const endCall = () => {
     // Handle ending the call
@@ -241,10 +220,57 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
       
       // Only update message for expression system, don't auto-start talking
       console.log('� Demo message updated for expressions:', demoMessages[messageIndex - 1]);
-    }, 8000); // New message every 8 seconds
+    }, 8000); // New message every 8 seconds    return () => clearInterval(messageInterval);
+  }, [isLoading, error]);  // Stop avatar speaking when voice is disabled
+  useEffect(() => {
+    if (!voiceEnabled) {
+      // Import and stop the voice service when voice is disabled
+      import('../services/voiceService').then(({ default: voiceService }) => {
+        voiceService.stop();
+        console.log('🔇 Voice disabled - stopping any ongoing speech');
+      });
+    }
+  }, [voiceEnabled]);
+  // Load available Azure Neural voices
+  useEffect(() => {
+    const loadVoices = () => {
+      // Import Azure Neural voices directly
+      import('../services/voiceService').then(({ AZURE_NEURAL_VOICES }) => {
+        setAvailableVoices(AZURE_NEURAL_VOICES);
+        
+        // Set default voice (Jenny Neural - friendly and warm)
+        if (AZURE_NEURAL_VOICES.length > 0 && !selectedVoice) {
+          const defaultVoice = AZURE_NEURAL_VOICES.find(v => 
+            v.name.includes('JennyNeural')
+          ) || AZURE_NEURAL_VOICES[0];
+          
+          setSelectedVoice(defaultVoice);
+        }
+        
+        console.log('🎵 Available Azure Neural voices:', AZURE_NEURAL_VOICES.map(v => ({ 
+          name: v.displayName, 
+          technical: v.name,
+          styles: v.styles 
+        })));
+      });
+    };
 
-    return () => clearInterval(messageInterval);
-  }, [isLoading, error]);
+    loadVoices();
+  }, [selectedVoice]);
+
+  // Close voice selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showVoiceSelector && !event.target.closest('.voice-selector-container')) {
+        setShowVoiceSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showVoiceSelector]);
 
   if (isLoading) {
     return (
@@ -273,7 +299,7 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
           <div className="flex justify-center space-x-2 text-sm text-gray-500">
             <span>●</span>
             <span>Preparing 3D Environment</span>
-          </div>
+          </div> 
         </motion.div>
       </div>
     );
@@ -405,31 +431,37 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
             </div>
             
             {/* Video Overlays */}
-            <div className="absolute inset-0 pointer-events-none">
-              {/* Top Status Indicators */}
-              <div className="absolute top-6 left-6 flex flex-col space-y-2">
+            <div className="absolute inset-0 pointer-events-none">              {/* Top Status Indicators */}              <div className="absolute top-6 left-6 flex flex-col space-y-2">
                 <div className="px-3 py-2 bg-black/60 rounded-lg backdrop-blur-sm">
-                  <span className={`text-sm font-medium flex items-center space-x-2 ${isTalking ? 'text-blue-400' : 'text-gray-400'}`}>
-                    <div className={`w-2 h-2 rounded-full ${isTalking ? 'bg-blue-400 animate-pulse' : 'bg-gray-400'}`}></div>
-                    <span>{isTalking ? 'Speaking' : 'Listening'}</span>
+                  <span className={`text-sm font-medium flex items-center space-x-2 ${voiceEnabled ? 'text-purple-400' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${voiceEnabled ? 'bg-purple-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                    <span>{voiceEnabled ? 'Voice Enabled' : 'Voice Disabled'}</span>
                   </span>
                 </div>
-                {isTalking && (
+                {selectedVoice && voiceEnabled && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="px-3 py-2 bg-blue-500/20 rounded-lg backdrop-blur-sm border border-blue-500/30"
+                    className="px-3 py-2 bg-purple-500/20 rounded-lg backdrop-blur-sm border border-purple-500/30"
                   >
                     <div className="flex items-center space-x-2">
                       <div className="flex space-x-1">
-                        <div className="w-1 h-4 bg-blue-400 rounded-full animate-pulse"></div>
-                        <div className="w-1 h-6 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-1 h-3 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                        <div className="w-1 h-5 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                        <div className="w-1 h-4 bg-purple-400 rounded-full animate-pulse"></div>
+                        <div className="w-1 h-6 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1 h-3 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                        <div className="w-1 h-5 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
                       </div>
-                      <span className="text-xs text-blue-300">Audio Waveform</span>
+                      <span className="text-xs text-purple-300">{selectedVoice?.displayName || selectedVoice?.name?.replace('Neural', '') || 'Azure Neural Voice Ready'}</span>
                     </div>
-                  </motion.div>                )}
+                  </motion.div>
+                )}
+                {/* Show current avatar state */}
+                <div className="px-3 py-2 bg-black/50 rounded-lg backdrop-blur-sm">
+                  <span className="text-xs text-gray-300 flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${voiceEnabled ? 'bg-green-400' : 'bg-blue-400'}`}></div>
+                    <span>Avatar: {voiceEnabled ? 'Ready to Talk' : 'Idle Mode'}</span>
+                  </span>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -460,27 +492,51 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
                           ? 'bg-red-600 shadow-lg shadow-red-500/30' 
                           : 'bg-gray-700'
                       }`}
-                      title={isMuted ? 'Unmute' : 'Mute'}
-                    >
+                      title={isMuted ? 'Unmute' : 'Mute'}                    >
                       {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                    </button>
-                      {/* Talk to Model Button */}
-                    <button 
-                      onClick={toggleTalkToModel}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                        isTalking 
-                          ? 'bg-blue-600/90 shadow-lg shadow-blue-500/30 animate-pulse' 
-                          : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                      title={isTalking ? 'Stop Continuous Talking' : 'Start Continuous Talking'}
-                    >
-                      <MessageSquare className={`w-6 h-6 ${isTalking ? 'text-white' : 'text-gray-300'}`} />
-                      {isTalking && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      )}
-                    </button>
+                    </button>                    {/* Select Voice Button */}
+                    <div className="relative voice-selector-container">
+                      <button 
+                        onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+                        disabled={availableVoices.length === 0}
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                          voiceEnabled && availableVoices.length > 0
+                            ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30' 
+                            : 'bg-gray-700 opacity-50 cursor-not-allowed'
+                        }`}
+                        title={voiceEnabled ? 'Select Avatar Voice' : 'Enable voice first'}
+                      >
+                        <User className="w-6 h-6 text-white" />
+                        {selectedVoice && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full"></div>
+                        )}
+                      </button>
 
-                    {/* Speaker Button */}
+                      {/* Voice Selector Dropdown */}
+                      {showVoiceSelector && voiceEnabled && availableVoices.length > 0 && (
+                        <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-80 max-h-60 overflow-y-auto z-50">
+                          <div className="text-white text-sm font-medium mb-2 px-2">Select Azure Neural Voice:</div>
+                          {availableVoices.map((voice, index) => (
+                            <button
+                              key={`${voice.name}-${index}`}
+                              onClick={() => selectVoice(voice)}
+                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                selectedVoice?.name === voice.name
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'text-gray-300 hover:bg-gray-700'
+                              }`}
+                            >
+                              <div className="font-medium truncate">{voice.displayName}</div>
+                              <div className="text-xs text-gray-400">{voice.language} • Neural • Styles: {voice.styles.join(', ')}</div>
+                              <div className="text-xs text-gray-500 mt-1">{voice.characteristics}</div>
+                            </button>
+                          ))}
+                          {availableVoices.length === 0 && (
+                            <div className="text-gray-400 text-sm px-2 py-4 text-center">No Azure Neural voices available</div>
+                          )}
+                        </div>
+                      )}
+                    </div>{/* Speaker Button */}
                     <button 
                       onClick={toggleSpeaker}
                       className={`w-14 h-14 rounded-full flex items-center justify-center ${
@@ -491,7 +547,23 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
                       title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
                     >
                       {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-                    </button>                    {/* End Call Button */}
+                    </button>                    {/* Voice Toggle Button */}
+                    <button 
+                      onClick={toggleVoiceEnabled}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                        voiceEnabled 
+                          ? 'bg-purple-600 shadow-lg shadow-purple-500/30' 
+                          : 'bg-gray-700'
+                      }`}
+                      title={voiceEnabled ? 'Disable Avatar Voice - Avatar will stop speaking and return to idle' : 'Enable Avatar Voice - Avatar will speak welcome message and switch to talking mode'}
+                    >
+                      <User className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
+                      {voiceEnabled && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
+                      )}
+                    </button>
+
+                    {/* End Call Button */}
                     <button 
                       onClick={endCall}
                       className="w-16 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30"
@@ -507,21 +579,49 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
         </div>
       ) : (        // Always visible controls in windowed mode
         <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
-          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Talk to Model Button */}
-              <button 
-                onClick={toggleTalkToModel}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                  isTalking 
-                    ? 'bg-blue-600/90 shadow-lg shadow-blue-500/30 animate-pulse' 
-                    : 'bg-gray-700 hover:bg-gray-600'
-                }`}
-                title={isTalking ? 'Stop Continuous Talking' : 'Start Continuous Talking'}
-              >
-                <MessageSquare className={`w-6 h-6 ${isTalking ? 'text-white' : 'text-gray-300'}`} />
-                {isTalking && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Select Voice Button */}
+              <div className="relative voice-selector-container">
+                <button 
+                  onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+                  disabled={!voiceEnabled || availableVoices.length === 0}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                    voiceEnabled && availableVoices.length > 0
+                      ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30' 
+                      : 'bg-gray-700 opacity-50 cursor-not-allowed'
+                  }`}
+                  title={voiceEnabled ? 'Select Avatar Voice' : 'Enable voice first'}
+                >
+                  <User className="w-6 h-6 text-white" />
+                  {selectedVoice && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full"></div>
+                  )}
+                </button>
+
+                {/* Voice Selector Dropdown */}
+                {showVoiceSelector && voiceEnabled && availableVoices.length > 0 && (
+                  <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-80 max-h-60 overflow-y-auto z-50">
+                    <div className="text-white text-sm font-medium mb-2 px-2">Select Azure Neural Voice:</div>
+                    {availableVoices.map((voice, index) => (
+                      <button
+                        key={`${voice.name}-${index}`}
+                        onClick={() => selectVoice(voice)}
+                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                          selectedVoice?.name === voice.name
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="font-medium truncate">{voice.displayName}</div>
+                        <div className="text-xs text-gray-400">{voice.language} • Neural • Styles: {voice.styles.join(', ')}</div>
+                        <div className="text-xs text-gray-500 mt-1">{voice.characteristics}</div>
+                      </button>
+                    ))}
+                    {availableVoices.length === 0 && (
+                      <div className="text-gray-400 text-sm px-2 py-4 text-center">No Azure Neural voices available</div>
+                    )}
+                  </div>
                 )}
-              </button>
+              </div>
               
               {/* Voice Input Button */}
               <button 
@@ -534,44 +634,21 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
                 title={isListening ? 'Stop Listening' : 'Start Voice Input'}
               >
                 {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-              </button>              {/* Voice Selection Button */}
-              <div className="relative voice-selector-container">
-                <button 
-                  onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                  className="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center"
-                  title="Select Model Voice"
-                >
-                  <User className="w-6 h-6" />
-                </button>
-                
-                {/* Voice Selector Dropdown */}
-                {showVoiceSelector && (
-                  <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-64 max-h-48 overflow-y-auto">
-                    <div className="text-white text-sm font-medium mb-2 px-2">Select Female Voice:</div>
-                    {availableVoices.map((voice, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          setSelectedVoice(voice);
-                          setShowVoiceSelector(false);
-                          console.log('🎵 Selected voice:', voice.name);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded text-sm ${
-                          selectedVoice?.name === voice.name
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-300 hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="font-medium">{voice.name}</div>
-                        <div className="text-xs text-gray-400">{voice.lang}</div>
-                      </button>
-                    ))}
-                    {availableVoices.length === 0 && (
-                      <div className="text-gray-400 text-sm px-2">No female voices available</div>
-                    )}
-                  </div>
+              </button>              {/* Voice Toggle Button */}
+              <button 
+                onClick={toggleVoiceEnabled}
+                className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                  voiceEnabled 
+                    ? 'bg-purple-600 shadow-lg shadow-purple-500/30' 
+                    : 'bg-gray-700'
+                }`}
+                title={voiceEnabled ? 'Disable Avatar Voice - Avatar will stop speaking and return to idle' : 'Enable Avatar Voice - Avatar will speak messages and switch to talking mode'}
+              >
+                <User className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
+                {voiceEnabled && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
                 )}
-              </div>
+              </button>
 
               {/* Speaker Button */}
               <button 

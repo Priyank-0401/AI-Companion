@@ -12,7 +12,7 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import Footer from './components/layout/Footer'
 import { ChatProvider } from './contexts/ChatContext'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthContextProvider } from './contexts/AuthContextProvider'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
@@ -101,14 +101,13 @@ function AppContent() {
   );
 }
 
-function App() {
-  return (
+function App() {  return (
     <Router>
-      <AuthProvider>
+      <AuthContextProvider>
         <ChatProvider>
           <AppContent />
         </ChatProvider>
-      </AuthProvider>
+      </AuthContextProvider>
     </Router>
   )
 }

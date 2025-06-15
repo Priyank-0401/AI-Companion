@@ -4,16 +4,22 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
-// IMPORTANT: Replace with your actual Firebase project configuration
+// Using environment variables for secure configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBOml90ossDRdWFIMqtoKXJDs-I4V1Pajw",
-  authDomain: "ai-companion-agent.firebaseapp.com",
-  projectId: "ai-companion-agent",
-  storageBucket: "ai-companion-agent.firebasestorage.app",
-  messagingSenderId: "779763358854",
-  appId: "1:779763358854:web:9257c831e7bc5764634507",
-  measurementId: "G-347BS4ENE6"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// Validate that required Firebase environment variables are loaded
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error('❌ Firebase configuration missing! Please check your .env file:');
+  console.error('Required: VITE_FIREBASE_API_KEY, VITE_FIREBASE_PROJECT_ID, etc.');
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

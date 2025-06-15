@@ -31,11 +31,10 @@ import {
   Plus,
   ChevronRight,
   Menu,
-  X,
-  Save
+  X,  Save
 } from 'lucide-react'
 import { useChat } from '../contexts/ChatContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { chatApi } from '../services/api';
 
 const ChatPage = () => {

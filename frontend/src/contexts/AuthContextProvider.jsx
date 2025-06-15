@@ -1,18 +1,9 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { AuthContext } from './AuthContext';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
-const AuthContext = createContext({});
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider = ({ children }) => {
+export function AuthContextProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +12,6 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       setLoading(false);
     });
-
     return unsubscribe;
   }, []);
 
@@ -45,4 +35,4 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
+}

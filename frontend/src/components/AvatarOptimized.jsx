@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, PerspectiveCamera } from '@react-three/drei';
 import { AVATAR_CONFIG } from '../config/avatarConfig';
 import { useAvatarExpressions } from '../hooks/useAvatarExpressions';
+import { useAvatarVoice } from '../hooks/useAvatarVoice';
 
 // Preload all model files for better performance
 useGLTF.preload(AVATAR_CONFIG.MODELS.AVATAR);
@@ -21,7 +22,7 @@ function LoadingFallback() {
   );
 }
 
-// Error boundary component
+// Error boundary component 
 function ErrorFallback({ error }) {
   return (
     <div className="flex items-center justify-center h-full bg-gray-900 text-red-400">
@@ -33,8 +34,8 @@ function ErrorFallback({ error }) {
   );
 }
 
-// Main Avatar Model Component - Clean and focused
-const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }) => {
+// Main Avatar Model Component - Clean and focused with voice integration
+const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', voiceEnabled = true, selectedVoice = null, onVoiceEnd = null, onError }) => {
   // Load models
   const avatarModel = useGLTF(AVATAR_CONFIG.MODELS.AVATAR);
   const idleFile = useGLTF(AVATAR_CONFIG.MODELS.IDLE);
@@ -45,7 +46,6 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
   const morphTargetRefs = useRef({});
   const animationBufferRef = useRef(null);
   const loopTimeoutRef = useRef(null);
-
   // Expression system - handles blinking and facial expressions
   const { currentExpression, isBlinking } = useAvatarExpressions(
     isTalking, 
@@ -57,6 +57,16 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
       blinkInterval: AVATAR_CONFIG.EXPRESSIONS.BLINK_INTERVAL,
     }
   );
+  // Voice system - handles speech synthesis for avatar responses
+  const {
+    isSpeaking,
+    speak,
+    stopSpeaking,
+    availableVoices
+  } = useAvatarVoice({
+    enabled: voiceEnabled,
+    selectedVoice: selectedVoice
+  });
   // Prepare animations with clear naming
   const animations = React.useMemo(() => {
     const allAnimations = [];
@@ -204,18 +214,36 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
       }
     });
   }, [isBlinking, currentExpression]);
-  // Animation switching logic with continuous looping
+  // Auto-speak new messages
+  useEffect(() => {
+    if (voiceEnabled && lastMessage && lastMessage.trim() && !isTalking) {
+      // Delay speaking slightly to allow for visual transition
+      const speakTimeout = setTimeout(() => {
+        speak(lastMessage, {
+          onStart: () => {
+            // Avatar starts talking animation when voice starts
+          },
+          onEnd: () => {
+            // Avatar returns to idle when voice ends
+            // If this is a demo message (not the welcome message), turn off voice
+            if (!lastMessage.includes('Seriva') || !lastMessage.includes('companion')) {
+              onVoiceEnd?.(); // Call callback to disable voice
+            }
+          }
+        });
+      }, 500);
+
+      return () => clearTimeout(speakTimeout);
+    }
+  }, [lastMessage, voiceEnabled, speak, isTalking, onVoiceEnd]);// Animation switching logic with continuous looping
   useEffect(() => {
     if (!actions || !mixer) {
-      console.log('⏳ Waiting for animations to initialize...');
       return;
     }
 
     const availableActions = Object.keys(actions);
-    console.log('🎭 Available actions:', availableActions);
 
     if (availableActions.length === 0) {
-      console.warn('❌ No actions available');
       return;
     }
 
@@ -225,25 +253,21 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
       loopTimeoutRef.current = null;
     }
 
+    // Determine if avatar should be talking (manual isTalking or voice speaking)
+    const shouldBeTalking = isTalking || isSpeaking;
+
     // Determine target animation - use first animation of each type
-    const targetAnimation = isTalking 
+    const targetAnimation = shouldBeTalking 
       ? `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`
-      : `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;
-
-    console.log(`🎯 Target animation: ${targetAnimation} (isTalking: ${isTalking})`);
-
-    // Only switch if different from current
+      : `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;    // Only switch if different from current
     if (lastAnimationRef.current !== targetAnimation) {
       // Stop current animation smoothly
       if (lastAnimationRef.current && actions[lastAnimationRef.current]) {
-        console.log(`⏹️ Stopping: ${lastAnimationRef.current}`);
         actions[lastAnimationRef.current].fadeOut(AVATAR_CONFIG.ANIMATIONS.FADE_DURATION);
       }
 
       // Start new animation with continuous looping
       if (actions[targetAnimation]) {
-        console.log(`▶️ Starting: ${targetAnimation}`);
-        
         const startAnimation = () => {
           const action = actions[targetAnimation];
           action.reset();
@@ -252,7 +276,7 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
           action.setLoop(false);
           
           // Set animation speed based on type
-          const animationSpeed = isTalking 
+          const animationSpeed = shouldBeTalking 
             ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.TALKING 
             : AVATAR_CONFIG.ANIMATIONS.SPEEDS.IDLE;
             action.setEffectiveTimeScale(animationSpeed);
@@ -264,7 +288,8 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
           if (AVATAR_CONFIG.ANIMATIONS.LOOP_SETTINGS.CONTINUOUS) {
             const setupNextLoop = () => {
               // Only continue looping if we're still in the same animation state
-              if (lastAnimationRef.current === targetAnimation) {                loopTimeoutRef.current = setTimeout(() => {
+              if (lastAnimationRef.current === targetAnimation) {
+                loopTimeoutRef.current = setTimeout(() => {
                   if (lastAnimationRef.current === targetAnimation && actions[targetAnimation]) {
                     startAnimation(); // Recursively restart the animation
                   }
@@ -279,12 +304,9 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
         startAnimation();
         lastAnimationRef.current = targetAnimation;
       } else {
-        console.warn(`❌ Animation "${targetAnimation}" not found`);
-        
         // Fallback to first available
         const fallback = availableActions[0];
         if (fallback) {
-          console.log(`🔄 Using fallback: ${fallback}`);
           actions[fallback].reset().play();
           lastAnimationRef.current = fallback;
         }
@@ -295,18 +317,16 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
     return () => {
       if (loopTimeoutRef.current) {
         clearTimeout(loopTimeoutRef.current);
-        loopTimeoutRef.current = null;
-      }
-    };
-  }, [isTalking, actions, mixer]);
-  // Animation frame updates
+        loopTimeoutRef.current = null;      }    };
+  }, [isTalking, isSpeaking, actions, mixer]);// Animation frame updates
   useFrame(() => {
     if (mixer) {
       mixer.update(0.016); // ~60fps
     }
     
-    // Apply jaw movement during talking (real-time)
-    if (isTalking) {
+    // Apply jaw movement during talking (manual or voice-driven)
+    const shouldMoveMouth = isTalking || isSpeaking;
+    if (shouldMoveMouth) {
       const morphTargets = morphTargetRefs.current;
       Object.keys(morphTargets).forEach(meshName => {
         const { dictionary, influences } = morphTargets[meshName];
@@ -316,10 +336,6 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
           // More pronounced jaw movement for testing
           const jawMovement = Math.sin(Date.now() * 0.01) * 0.5 + 0.5; // Oscillates between 0 and 1.0
           influences[targetIndex] = jawMovement;
-            // Debug logging (occasional)
-          if (Math.random() < 0.001) { // Reduced logging frequency
-            console.log(`🦷 Jaw movement: ${jawMovement.toFixed(2)}`);
-          }
         }
       });
     }
@@ -363,7 +379,7 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', onError }
 });
 
 // Main Avatar Scene Component
-const AvatarScene = React.memo(({ isTalking, lastMessage = '', className = "w-full h-full" }) => {
+const AvatarScene = React.memo(({ isTalking, lastMessage = '', voiceEnabled = true, selectedVoice = null, onVoiceEnd = null, className = "w-full h-full" }) => {
   const [error, setError] = useState(null);
 
   const handleError = (err) => {
@@ -416,13 +432,14 @@ const AvatarScene = React.memo(({ isTalking, lastMessage = '', className = "w-fu
           position={AVATAR_CONFIG.LIGHTING.FACE_LIGHT.POSITION}
           intensity={AVATAR_CONFIG.LIGHTING.FACE_LIGHT.INTENSITY}
           color={AVATAR_CONFIG.LIGHTING.FACE_LIGHT.COLOR}
-        />
-
-        {/* Avatar Model */}
+        />        {/* Avatar Model */}
         <Suspense fallback={null}>
           <AvatarModel
             isTalking={isTalking}
             lastMessage={lastMessage}
+            voiceEnabled={voiceEnabled}
+            selectedVoice={selectedVoice}
+            onVoiceEnd={onVoiceEnd}
             onError={handleError}
           />
         </Suspense>
@@ -431,16 +448,22 @@ const AvatarScene = React.memo(({ isTalking, lastMessage = '', className = "w-fu
   );
 });
 
-// Main Export Component - Simple interface
+// Main Export Component - Simple interface with voice support
 const Avatar = React.memo(({ 
   isTalking = false,
   lastMessage = '',
+  voiceEnabled = true,
+  selectedVoice = null,
+  onVoiceEnd = null,
   className = "w-full h-full"
 }) => {
   return (
     <AvatarScene
       isTalking={isTalking}
       lastMessage={lastMessage}
+      voiceEnabled={voiceEnabled}
+      selectedVoice={selectedVoice}
+      onVoiceEnd={onVoiceEnd}
       className={className}
     />
   );
