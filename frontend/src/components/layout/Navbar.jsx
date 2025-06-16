@@ -29,7 +29,7 @@ const Navbar = () => {
     { path: '/avatar-call', label: 'Avatar', icon: User, public: false },
     { path: '/chat', label: 'AI Chat', icon: MessageCircle, public: false },
     { path: '/journal', label: 'Journal', icon: BookOpen, public: false },
-    { path: '/settings', label: 'Settings', icon: Settings, public: false },
+    { path: '/settings', label: 'Settings', icon: Settings, public: false },  
   ]
 
   const isActive = (path) => location.pathname === path
