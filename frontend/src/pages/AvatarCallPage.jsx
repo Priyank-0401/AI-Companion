@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
+import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volume lip sync hook
 // Removed expression hook import - keeping it simple
 import { 
   Loader2, 
@@ -19,20 +20,32 @@ import {
   User
 } from 'lucide-react';
 
-const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true);
+const AvatarCallPage = () => {  
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showHeader, setShowHeader] = useState(true);  const [callDuration, setCallDuration] = useState(0);
+  const [showHeader, setShowHeader] = useState(true);  
+  const [callDuration, setCallDuration] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState('excellent');
-  const [audioElement, setAudioElement] = useState(null);  const [lastMessage, setLastMessage] = useState(''); // For expression system
+  const [audioElement, setAudioElement] = useState(null);  
+  const [lastMessage, setLastMessage] = useState(''); // For expression system
   const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
+  // Volume lip sync integration
+  const audioRef = useRef(null);
+  const { 
+    currentVolume: volume, 
+    isAnalyzing: lipSyncActive, 
+    setupVolumeAnalysis,
+    startVolumeAnalysis: startLipSync, 
+    stopVolumeAnalysis: stopLipSync 
+  } = useVolumeLipSync();
   
   // Removed greeting and expression management - keeping it simple
 
@@ -115,7 +128,6 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
     
     console.log('🎵 Selected Azure Neural voice:', voice.displayName, '(' + voice.name + ')');
   }, [voiceEnabled]);
-
   // Voice enable/disable handler with immediate talking activation
   const toggleVoiceEnabled = useCallback(() => {
     const newVoiceState = !voiceEnabled;
@@ -129,24 +141,43 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
         if (selectedVoice) {
           voiceService.setVoice(selectedVoice);
         }
-          // Speak the welcome message with synchronized animation
+          // Set up the audio element reference for lip sync
+        const audioElement = voiceService.getAudioElement();
+        if (audioElement && audioRef.current !== audioElement) {
+          audioRef.current = audioElement;
+          setupVolumeAnalysis(audioElement);
+          console.log('🎵 Audio element connected to lip sync system');
+        }
+          
+        // Speak the welcome message with synchronized animation
         voiceService.speak(welcomeMessage, {
           onStart: () => {
             // Only switch to talking mode when voice actually starts
             setLastMessage(welcomeMessage);
-            console.log('🎵 Welcome message started - Avatar switching to talking mode now');
+            
+            // Get the audio element again in case it changed
+            const currentAudioElement = voiceService.getAudioElement();
+            if (currentAudioElement && currentAudioElement !== audioRef.current) {
+              audioRef.current = currentAudioElement;
+              setupVolumeAnalysis(currentAudioElement);
+            }
+            
+            startLipSync(); // Start lip sync when speaking begins
+            console.log('🎵 Welcome message started - Avatar switching to talking mode and lip sync enabled');
           },
           onEnd: () => {
             // When message ends, turn off voice and return to idle
             setVoiceEnabled(false);
             setLastMessage(''); // Clear message to return to idle
-            console.log('🎵 Welcome message ended - Avatar returning to idle and voice disabled');
+            stopLipSync(); // Stop lip sync when speaking ends
+            console.log('🎵 Welcome message ended - Avatar returning to idle, voice disabled, and lip sync stopped');
           },
           onError: (error) => {
             console.error('❌ Welcome message failed:', error);
             // On error, also turn off voice
             setVoiceEnabled(false);
             setLastMessage('');
+            stopLipSync(); // Stop lip sync on error
           }
         });
       });
@@ -154,19 +185,20 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
       console.log('✅ Voice enabled - Preparing welcome message...');    } else {
       // When disabling voice, stop any ongoing speech and clear message
       setLastMessage(''); // Clear message to return to idle immediately
+      stopLipSync(); // Stop lip sync when voice is disabled
       import('../services/voiceService').then(({ default: voiceService }) => {
         voiceService.stop();
-        console.log('🔇 Voice disabled - stopping any ongoing speech');
+        console.log('🔇 Voice disabled - stopping any ongoing speech and lip sync');
       });
     }
-  }, [voiceEnabled, selectedVoice]);
-
+  }, [voiceEnabled, selectedVoice, setupVolumeAnalysis, startLipSync, stopLipSync]);
   // Callback for when voice ends - turns off voice button
   const handleVoiceEnd = useCallback(() => {
     setVoiceEnabled(false);
     setLastMessage(''); // Clear message to return to idle
-    console.log('🔇 Voice ended - Avatar voice disabled and returning to idle');
-  }, []);
+    stopLipSync(); // Stop lip sync when voice ends
+    console.log('🔇 Voice ended - Avatar voice disabled, returning to idle, and lip sync stopped');
+  }, [stopLipSync]);
 
   const toggleListening = useCallback(() => {
     setIsListening(prev => {
@@ -185,13 +217,19 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   }, []);
   
   const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
-  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified with voice support
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified with voice support and lip sync
   const avatarProps = useMemo(() => ({
     lastMessage: lastMessage,
     voiceEnabled: voiceEnabled && isSpeakerOn,
     selectedVoice: selectedVoice,
-    onVoiceEnd: handleVoiceEnd
-  }), [lastMessage, voiceEnabled, isSpeakerOn, selectedVoice, handleVoiceEnd]);
+    onVoiceEnd: handleVoiceEnd,
+    volumeLipSyncRef: { 
+      current: {
+        getVolumeValue: () => volume || 0,
+        isPlaying: () => lipSyncActive
+      }
+    } // Provide proper interface for lip sync
+  }), [lastMessage, voiceEnabled, isSpeakerOn, selectedVoice, handleVoiceEnd, volume, lipSyncActive]);
   
   const endCall = () => {
     // Handle ending the call
@@ -225,12 +263,13 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
   useEffect(() => {
     if (!voiceEnabled) {
       // Import and stop the voice service when voice is disabled
+      stopLipSync(); // Stop lip sync when voice is disabled
       import('../services/voiceService').then(({ default: voiceService }) => {
         voiceService.stop();
-        console.log('🔇 Voice disabled - stopping any ongoing speech');
+        console.log('🔇 Voice disabled - stopping any ongoing speech and lip sync');
       });
     }
-  }, [voiceEnabled]);
+  }, [voiceEnabled, stopLipSync]);
   // Load available Azure Neural voices
   useEffect(() => {
     const loadVoices = () => {
@@ -454,14 +493,38 @@ const AvatarCallPage = () => {  const [isLoading, setIsLoading] = useState(true)
                       <span className="text-xs text-purple-300">{selectedVoice?.displayName || selectedVoice?.name?.replace('Neural', '') || 'Azure Neural Voice Ready'}</span>
                     </div>
                   </motion.div>
-                )}
-                {/* Show current avatar state */}
+                )}                {/* Show current avatar state */}
                 <div className="px-3 py-2 bg-black/50 rounded-lg backdrop-blur-sm">
                   <span className="text-xs text-gray-300 flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full ${voiceEnabled ? 'bg-green-400' : 'bg-blue-400'}`}></div>
                     <span>Avatar: {voiceEnabled ? 'Ready to Talk' : 'Idle Mode'}</span>
                   </span>
                 </div>
+                {/* Lip sync status indicator */}
+                {lipSyncActive && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="px-3 py-2 bg-cyan-500/20 rounded-lg backdrop-blur-sm border border-cyan-500/30"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        {[...Array(4)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-1 bg-cyan-400 rounded-full animate-pulse"                            style={{
+                              height: `${12 + ((volume || 0) * 20)}px`,
+                              animationDelay: `${i * 0.1}s`
+                            }}
+                          />
+                        ))}
+                      </div>                      <span className="text-xs text-cyan-300">
+                        Lip Sync: {Math.round((volume || 0) * 100)}%
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </div>
           </motion.div>

@@ -14,6 +14,7 @@ import Footer from './components/layout/Footer'
 import { ChatProvider } from './contexts/ChatContext'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
 import ProtectedRoute from './components/ProtectedRoute'
+import VolumeLipSyncTest from './components/avatar/VolumeLipSyncTest'
 import './App.css'
 
 function AppContent() {
@@ -85,12 +86,19 @@ function AppContent() {
                 <JournalingPage />
               </ProtectedRoute>
             } 
-          />
-          <Route 
+          />          <Route 
             path="/settings" 
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/volume-lip-sync-test" 
+            element={
+              <ProtectedRoute>
+                <VolumeLipSyncTest />
               </ProtectedRoute>
             } 
           />

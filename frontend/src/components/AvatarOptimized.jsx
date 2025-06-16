@@ -35,7 +35,15 @@ function ErrorFallback({ error }) {
 }
 
 // Main Avatar Model Component - Clean and focused with voice integration
-const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', voiceEnabled = true, selectedVoice = null, onVoiceEnd = null, onError }) => {
+const AvatarModel = React.memo(({ 
+  isTalking = false, 
+  lastMessage = '', 
+  voiceEnabled = true, 
+  selectedVoice = null, 
+  onVoiceEnd = null, 
+  onError,
+  volumeLipSyncRef = null // New prop for volume-based lip sync
+}) => {
   // Load models
   const avatarModel = useGLTF(AVATAR_CONFIG.MODELS.AVATAR);
   const idleFile = useGLTF(AVATAR_CONFIG.MODELS.IDLE);
@@ -126,8 +134,7 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', voiceEnab
           }
         }      });    }
 
-  }, [idleFile, talkingFile, avatarModel]);
-  // Setup morph targets for expressions and blinking
+  }, [idleFile, talkingFile, avatarModel]);  // Setup morph targets for expressions and blinking
   useEffect(() => {
     if (!avatarModel?.scene) return;
 
@@ -136,15 +143,27 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', voiceEnab
     // Find meshes with morph targets (typically head/face meshes)
     avatarModel.scene.traverse((child) => {
       if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
+        console.log(`🎭 Found mesh with morph targets: ${child.name}`);
+        console.log(`🎭 Available morph targets:`, Object.keys(child.morphTargetDictionary));
+        
         // Store reference to morph target influences
         morphTargets[child.name] = {
           dictionary: child.morphTargetDictionary,
           influences: child.morphTargetInfluences
         };
+        
+        // Check specifically for mouth targets
+        const mouthTargets = Object.keys(child.morphTargetDictionary).filter(key => 
+          key.toLowerCase().includes('mouth') || key.toLowerCase().includes('jaw')
+        );
+        if (mouthTargets.length > 0) {
+          console.log(`👄 Found mouth-related morph targets:`, mouthTargets);
+        }
       }
     });
 
     morphTargetRefs.current = morphTargets;
+    console.log(`🎭 Total meshes with morph targets: ${Object.keys(morphTargets).length}`);
   }, [avatarModel]);// Apply blinking and expressions via morph targets
   useEffect(() => {
     const morphTargets = morphTargetRefs.current;
@@ -318,27 +337,46 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', voiceEnab
       if (loopTimeoutRef.current) {
         clearTimeout(loopTimeoutRef.current);
         loopTimeoutRef.current = null;      }    };
-  }, [isTalking, isSpeaking, actions, mixer]);// Animation frame updates
+  }, [isTalking, isSpeaking, actions, mixer]);  // Animation frame updates with volume-based lip sync
   useFrame(() => {
     if (mixer) {
       mixer.update(0.016); // ~60fps
     }
     
-    // Apply jaw movement during talking (manual or voice-driven)
-    const shouldMoveMouth = isTalking || isSpeaking;
-    if (shouldMoveMouth) {
-      const morphTargets = morphTargetRefs.current;
-      Object.keys(morphTargets).forEach(meshName => {
-        const { dictionary, influences } = morphTargets[meshName];
-        
-        if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_OPEN] !== undefined) {
-          const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_OPEN];
-          // More pronounced jaw movement for testing
-          const jawMovement = Math.sin(Date.now() * 0.01) * 0.5 + 0.5; // Oscillates between 0 and 1.0
-          influences[targetIndex] = jawMovement;
+    // Volume-based lip sync integration
+    const morphTargets = morphTargetRefs.current;
+    Object.keys(morphTargets).forEach(meshName => {
+      const { dictionary, influences } = morphTargets[meshName];
+      
+      if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_OPEN] !== undefined) {
+        const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_OPEN];
+          // Use volume-based lip sync if available
+        if (volumeLipSyncRef?.current?.getVolumeValue && volumeLipSyncRef.current.isPlaying()) {
+          const volumeValue = volumeLipSyncRef.current.getVolumeValue();
+          
+          if (volumeValue > 0) {
+            // Apply volume directly to mouth opening (0-1 range)
+            influences[targetIndex] = Math.max(0, Math.min(1, volumeValue));
+            
+            // Debug logging
+            if (Math.random() < 0.02) { // 2% chance
+              console.log(`🎵 Avatar mouth opening: ${volumeValue.toFixed(3)} -> morph target: ${influences[targetIndex].toFixed(3)}`);
+            }
+          } else {
+            influences[targetIndex] = 0;
+          }
+        } else {
+          // Fallback to simple oscillation for manual talking
+          const shouldMoveMouth = isTalking || isSpeaking;
+          if (shouldMoveMouth) {
+            const jawMovement = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+            influences[targetIndex] = jawMovement;
+          } else {
+            influences[targetIndex] = 0; // Close mouth when not talking
+          }
         }
-      });
-    }
+      }
+    });
   });
   // Error handling
   useEffect(() => {
@@ -379,7 +417,15 @@ const AvatarModel = React.memo(({ isTalking = false, lastMessage = '', voiceEnab
 });
 
 // Main Avatar Scene Component
-const AvatarScene = React.memo(({ isTalking, lastMessage = '', voiceEnabled = true, selectedVoice = null, onVoiceEnd = null, className = "w-full h-full" }) => {
+const AvatarScene = React.memo(({ 
+  isTalking, 
+  lastMessage = '', 
+  voiceEnabled = true, 
+  selectedVoice = null, 
+  onVoiceEnd = null, 
+  className = "w-full h-full",
+  volumeLipSyncRef = null // Pass through volume lip sync ref
+}) => {
   const [error, setError] = useState(null);
 
   const handleError = (err) => {
@@ -441,6 +487,7 @@ const AvatarScene = React.memo(({ isTalking, lastMessage = '', voiceEnabled = tr
             selectedVoice={selectedVoice}
             onVoiceEnd={onVoiceEnd}
             onError={handleError}
+            volumeLipSyncRef={volumeLipSyncRef}
           />
         </Suspense>
       </Canvas>
@@ -455,7 +502,8 @@ const Avatar = React.memo(({
   voiceEnabled = true,
   selectedVoice = null,
   onVoiceEnd = null,
-  className = "w-full h-full"
+  className = "w-full h-full",
+  volumeLipSyncRef = null // Pass through volume lip sync ref
 }) => {
   return (
     <AvatarScene
@@ -465,6 +513,7 @@ const Avatar = React.memo(({
       selectedVoice={selectedVoice}
       onVoiceEnd={onVoiceEnd}
       className={className}
+      volumeLipSyncRef={volumeLipSyncRef}
     />
   );
 });

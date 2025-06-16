@@ -80,36 +80,34 @@ class VoiceService {
     // Pre-cache common welcome messages for instant playback
     this.preCacheWelcomeMessages();
   }
-
-  // Pre-cache welcome messages for instant response
+  // Pre-cache welcome messages for instant response (with rate limiting)
   async preCacheWelcomeMessages() {
     const welcomeMessages = [
-      "Hey! I am Seriva, your AI companion. I'm ready to talk with you!",
-      "Hello! I'm Seriva, nice to meet you!",
-      "Hi there! I'm your AI companion Seriva."
+      "Hey! I am Seriva, your AI companion. I'm ready to talk with you!"
     ];
 
-    console.log('🚀 Pre-caching welcome messages for instant playback...');
+    console.log('🚀 Pre-caching welcome message for instant playback...');
     
-    // Cache welcome messages for each voice
-    for (const voice of this.availableVoices) {
-      for (const message of welcomeMessages) {
-        try {
-          const cacheKey = `${message}-${voice.name}`;
-          if (!this.audioCache.has(cacheKey)) {
-            const audioBlob = await this.fetchAzureTTS(message, { voice });
-            this.audioCache.set(cacheKey, audioBlob);
-            console.log(`✅ Cached: "${message.substring(0, 30)}..." for ${voice.displayName}`);
-          }
-        } catch (error) {
-          console.warn(`⚠️ Failed to cache message for ${voice.displayName}:`, error);
-        }
+    // Only cache for the default voice to avoid rate limiting
+    const defaultVoice = this.availableVoices[0];
+    
+    try {
+      const message = welcomeMessages[0];
+      const cacheKey = `${message}-${defaultVoice.name}`;
+      if (!this.audioCache.has(cacheKey)) {
+        // Add delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const audioBlob = await this.fetchAzureTTS(message, { voice: defaultVoice });
+        this.audioCache.set(cacheKey, audioBlob);
+        console.log(`✅ Cached welcome message for ${defaultVoice.displayName}`);
       }
+    } catch (error) {
+      console.warn(`⚠️ Failed to cache welcome message:`, error);
+      // Don't throw error, just log it - the app should still work without pre-caching
     }
     
-    console.log('🎉 Welcome messages pre-cached for instant playback!');
-  }
-  // Fetch Azure Neural TTS Audio
+    console.log('🎉 Welcome message pre-caching completed!');
+  }  // Fetch Azure Neural TTS Audio with rate limiting and retry logic
   async fetchAzureTTS(text, options = {}) {
     if (!text || text.trim().length === 0) {
       throw new Error('Text cannot be empty');
@@ -120,45 +118,74 @@ class VoiceService {
     const voiceName = voice.name || 'en-US-JennyNeural';
     const style = options.style || this.voiceSettings.style;
     const rate = options.rate || this.voiceSettings.rate;
-    const pitch = options.pitch || this.voiceSettings.pitch;    // Create simple SSML without complex features for debugging
+    const pitch = options.pitch || this.voiceSettings.pitch;    
+
+    // Create simple SSML without complex features for debugging
     const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
         <voice name="${voiceName}">
           ${this.escapeXML(text)}
         </voice>
       </speak>`;
 
-    try {
-      console.log('🎵 Fetching Azure TTS for:', text.substring(0, 50) + '...');
-      console.log('🔧 Using voice:', voiceName);
-      console.log('🔧 Using style:', style);
-      console.log('🔧 SSML:', ssml);
-        const response = await fetch(AZURE_CONFIG.endpoint, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': AZURE_CONFIG.apiKey,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3', // Faster, smaller format
-          'User-Agent': 'AI-COMPANION-Avatar'
-        },
-        body: ssml
-      });if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Azure TTS API Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: errorText
-        });
-        throw new Error(`Azure TTS API error: ${response.status} - ${errorText}`);
-      }
+    const maxRetries = 3;
+    let retryCount = 0;
 
-      const audioBlob = await response.blob();
-      console.log('✅ Azure TTS audio received, size:', audioBlob.size, 'bytes');
-      
-      return audioBlob;
-    } catch (error) {
-      console.error('❌ Azure TTS error:', error);
-      throw error;
+    while (retryCount < maxRetries) {
+      try {
+        console.log('🎵 Fetching Azure TTS for:', text.substring(0, 50) + '...');
+        console.log('🔧 Using voice:', voiceName);
+        console.log('🔧 Using style:', style);
+        
+        const response = await fetch(AZURE_CONFIG.endpoint, {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': AZURE_CONFIG.apiKey,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3',
+            'User-Agent': 'AI-COMPANION-Avatar'
+          },
+          body: ssml
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          
+          // Handle rate limiting specifically
+          if (response.status === 429) {
+            retryCount++;
+            const retryAfter = response.headers.get('Retry-After') || (retryCount * 2);
+            console.warn(`⚠️ Rate limited (429). Retry ${retryCount}/${maxRetries} after ${retryAfter}s`);
+            
+            if (retryCount < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+              continue;
+            }
+          }
+          
+          console.error('❌ Azure TTS API Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            body: errorText
+          });
+          throw new Error(`Azure TTS API error: ${response.status} - ${errorText}`);
+        }
+
+        const audioBlob = await response.blob();
+        console.log('✅ Azure TTS audio received, size:', audioBlob.size, 'bytes');
+        
+        return audioBlob;
+      } catch (error) {
+        if (error.message.includes('429') && retryCount < maxRetries - 1) {
+          retryCount++;
+          console.warn(`⚠️ Retrying due to rate limit: ${retryCount}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, retryCount * 2000));
+          continue;
+        }
+        
+        console.error('❌ Azure TTS error:', error);
+        throw error;
+      }
     }
   }
 
@@ -179,7 +206,7 @@ class VoiceService {
       // Stop any current audio
       this.stop();
 
-      console.log('🎵 Starting Azure TTS speech:', text.substring(0, 50) + '...');
+      console.log('🎵 Starting speech synthesis:', text.substring(0, 50) + '...');
       this.isSpeaking = true;
 
       // Check cache first for instant response
@@ -191,26 +218,8 @@ class VoiceService {
         return this.playAudioBlob(audioBlob, options);
       }
 
-      // For immediate response, use a hybrid approach
-      const isWelcomeMessage = text.toLowerCase().includes('seriva') || text.toLowerCase().includes('hello') || text.toLowerCase().includes('hey');
-      
-      if (isWelcomeMessage) {
-        // Start immediate Web Speech API for instant feedback
-        this.playWebSpeechFallback(text, options);
-        
-        // Then fetch Azure in background for better quality next time
-        this.fetchAzureTTS(text, options).then(blob => {
-          if (blob.size < 100000) {
-            this.audioCache.set(cacheKey, blob);
-            console.log('🎵 Azure audio cached for next time');
-          }
-        }).catch(error => {
-          console.warn('⚠️ Background Azure fetch failed:', error);
-        });
-        
-        return Promise.resolve();
-      } else {
-        // For other messages, use Azure TTS
+      // Try Azure TTS first, fallback to Web Speech API on rate limit
+      try {
         audioBlob = await this.fetchAzureTTS(text, options);
         
         // Cache small audio files
@@ -218,67 +227,91 @@ class VoiceService {
           this.audioCache.set(cacheKey, audioBlob);
           
           // Limit cache size
-          if (this.audioCache.size > 20) {
+          if (this.audioCache.size > 10) {
             const firstKey = this.audioCache.keys().next().value;
             this.audioCache.delete(firstKey);
           }
         }
         
         return this.playAudioBlob(audioBlob, options);
+      } catch (azureError) {
+        console.warn('⚠️ Azure TTS failed, falling back to Web Speech API:', azureError.message);
+        
+        // Fallback to Web Speech API
+        return this.playWebSpeechFallback(text, options);
       }
 
     } catch (error) {
       console.error('❌ Speech synthesis failed:', error);
       this.isSpeaking = false;
       this.currentAudio = null;
-      throw error;
+      
+      // Last resort: try Web Speech API
+      try {
+        console.log('🔄 Attempting Web Speech API as last resort...');
+        return this.playWebSpeechFallback(text, options);
+      } catch (fallbackError) {
+        console.error('❌ All speech synthesis methods failed:', fallbackError);
+        throw error;
+      }
     }
   }
-
   // Instant Web Speech API fallback for immediate response
   playWebSpeechFallback(text, options = {}) {
     if (!('speechSynthesis' in window)) {
       console.warn('⚠️ Web Speech API not available');
-      return;
+      throw new Error('Web Speech API not supported');
     }
 
-    console.log('⚡ Using Web Speech API for instant response');
+    console.log('⚡ Using Web Speech API for speech synthesis');
     
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Find a good female voice from system
-    const voices = speechSynthesis.getVoices();
-    const femaleVoice = voices.find(v => 
-      v.lang.startsWith('en') && 
-      (v.name.toLowerCase().includes('female') || 
-       v.name.toLowerCase().includes('samantha') ||
-       v.name.toLowerCase().includes('zoe'))
-    ) || voices.find(v => v.lang.startsWith('en'));
-    
-    if (femaleVoice) {
-      utterance.voice = femaleVoice;
-    }
-    
-    utterance.rate = 0.9;
-    utterance.pitch = 1.1;
-    utterance.volume = 0.8;
-    
-    utterance.onstart = () => {
-      this.isSpeaking = true;
-      options.onStart?.();
-    };
-    
-    utterance.onend = () => {
-      this.isSpeaking = false;
-      options.onEnd?.();
-    };
-    
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      options.onError?.();
-    };
-    
-    speechSynthesis.speak(utterance);
+    return new Promise((resolve, reject) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Find a good female voice from system
+      const voices = speechSynthesis.getVoices();
+      const femaleVoice = voices.find(v => 
+        v.lang.startsWith('en') && 
+        (v.name.toLowerCase().includes('female') || 
+         v.name.toLowerCase().includes('samantha') ||
+         v.name.toLowerCase().includes('zoe'))
+      ) || voices.find(v => v.lang.startsWith('en'));
+      
+      if (femaleVoice) {
+        utterance.voice = femaleVoice;
+        console.log('🔧 Using system voice:', femaleVoice.name);
+      }
+      
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.8;
+      
+      utterance.onstart = () => {
+        this.isSpeaking = true;
+        // Create a dummy audio element for consistency with Azure TTS
+        this.currentAudio = new Audio();
+        console.log('🎵 Web Speech synthesis started');
+        options.onStart?.();
+      };
+      
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        this.currentAudio = null;
+        console.log('🎵 Web Speech synthesis ended');
+        options.onEnd?.();
+        resolve();
+      };
+      
+      utterance.onerror = (error) => {
+        this.isSpeaking = false;
+        this.currentAudio = null;
+        console.error('❌ Web Speech synthesis error:', error);
+        options.onError?.(error);
+        reject(error);
+      };
+      
+      speechSynthesis.speak(utterance);
+    });
   }
   // Play audio blob with proper event handling
   async playAudioBlob(audioBlob, options = {}) {
@@ -456,6 +489,11 @@ class VoiceService {
       availableVoices: this.availableVoices.length,
       settings: this.voiceSettings
     };
+  }
+
+  // Get the current audio element for lip sync integration
+  getAudioElement() {
+    return this.currentAudio;
   }
 }
 
