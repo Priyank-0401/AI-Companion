@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   Maximize,
   Minimize,
-  Clock,
   Wifi,
   WifiOff,
   User
@@ -28,9 +27,7 @@ const AvatarCallPage = () => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showHeader, setShowHeader] = useState(true);  
-  const [callDuration, setCallDuration] = useState(0);
-  const [connectionQuality, setConnectionQuality] = useState('excellent');
+  const [showHeader, setShowHeader] = useState(true);    const [connectionQuality, setConnectionQuality] = useState('excellent');
   const [audioElement, setAudioElement] = useState(null);  
   const [lastMessage, setLastMessage] = useState(''); // For expression system
   const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
@@ -56,26 +53,7 @@ const AvatarCallPage = () => {
   } = useVolumeLipSync();
   
   // Removed greeting and expression management - keeping it simple
-
-  // Simulate call duration timer
-  useEffect(() => {
-    if (!isLoading && !error) {
-      const timer = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [isLoading, error]);
-  // Memoize format duration function to prevent re-creation
-  const formatDuration = useCallback((seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }, []);// Auto-hide controls in fullscreen mode only
+  // Memoize format duration function to prevent re-creation// Auto-hide controls in fullscreen mode only
   useEffect(() => {
     let timer;
     if (isFullscreen && showControls) {
@@ -483,15 +461,11 @@ const AvatarCallPage = () => {
                 transition={{ duration: 0.3 }}
                 className="bg-black/50 backdrop-blur-sm border-b border-gray-700/50 h-full"
               >
-                <div className="flex items-center justify-between px-6 py-4 h-full">
+              <div className="flex items-center justify-between px-6 py-4 h-full">
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-sm font-medium">Seriva AI Companion</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-400">
-                      <Clock className="w-4 h-4" />
-                      <span>{formatDuration(callDuration)}</span>
                     </div>
                   </div>
                   
@@ -524,10 +498,6 @@ const AvatarCallPage = () => {
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-sm font-medium">Seriva AI Companion</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-400">
-                <Clock className="w-4 h-4" />
-                <span>{formatDuration(callDuration)}</span>
               </div>
             </div>
             
@@ -566,62 +536,7 @@ const AvatarCallPage = () => {
             </div>
             
             {/* Video Overlays */}
-            <div className="absolute inset-0 pointer-events-none">              {/* Top Status Indicators */}              <div className="absolute top-6 left-6 flex flex-col space-y-2">
-                <div className="px-3 py-2 bg-black/60 rounded-lg backdrop-blur-sm">
-                  <span className={`text-sm font-medium flex items-center space-x-2 ${voiceEnabled ? 'text-purple-400' : 'text-gray-400'}`}>
-                    <div className={`w-2 h-2 rounded-full ${voiceEnabled ? 'bg-purple-400 animate-pulse' : 'bg-gray-400'}`}></div>
-                    <span>{voiceEnabled ? 'Voice Enabled' : 'Voice Disabled'}</span>
-                  </span>
-                </div>
-                {selectedVoice && voiceEnabled && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="px-3 py-2 bg-purple-500/20 rounded-lg backdrop-blur-sm border border-purple-500/30"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <div className="flex space-x-1">
-                        <div className="w-1 h-4 bg-purple-400 rounded-full animate-pulse"></div>
-                        <div className="w-1 h-6 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-1 h-3 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                        <div className="w-1 h-5 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-                      </div>
-                      <span className="text-xs text-purple-300">{selectedVoice?.displayName || selectedVoice?.name?.replace('Neural', '') || 'Azure Neural Voice Ready'}</span>
-                    </div>
-                  </motion.div>
-                )}                {/* Show current avatar state */}
-                <div className="px-3 py-2 bg-black/50 rounded-lg backdrop-blur-sm">
-                  <span className="text-xs text-gray-300 flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${voiceEnabled ? 'bg-green-400' : 'bg-blue-400'}`}></div>
-                    <span>Avatar: {voiceEnabled ? 'Ready to Talk' : 'Idle Mode'}</span>
-                  </span>
-                </div>
-                {/* Lip sync status indicator */}
-                {lipSyncActive && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="px-3 py-2 bg-cyan-500/20 rounded-lg backdrop-blur-sm border border-cyan-500/30"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <div className="flex space-x-1">
-                        {[...Array(4)].map((_, i) => (
-                          <div
-                            key={i}
-                            className="w-1 bg-cyan-400 rounded-full animate-pulse"                            style={{
-                              height: `${12 + ((volume || 0) * 20)}px`,
-                              animationDelay: `${i * 0.1}s`
-                            }}
-                          />
-                        ))}
-                      </div>                      <span className="text-xs text-cyan-300">
-                        Lip Sync: {Math.round((volume || 0) * 100)}%
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+            <div className="absolute inset-0 pointer-events-none">
             </div>
           </motion.div>
         </div>
