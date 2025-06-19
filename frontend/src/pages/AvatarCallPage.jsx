@@ -14,8 +14,6 @@ import {
   AlertTriangle,
   Maximize,
   Minimize,
-  Wifi,
-  WifiOff,
   User
 } from 'lucide-react';
 
@@ -23,12 +21,11 @@ const AvatarCallPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);  const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
-  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showHeader, setShowHeader] = useState(true);    const [connectionQuality, setConnectionQuality] = useState('excellent');
-  const [audioElement, setAudioElement] = useState(null);  
+  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  // const [isFullscreen, setIsFullscreen] = useState(false);
+  // const [showControls, setShowControls] = useState(true);
+  // const [showHeader, setShowHeader] = useState(true);
+  const [audioElement, setAudioElement] = useState(null);
   const [lastMessage, setLastMessage] = useState(''); // For expression system
   const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
@@ -90,10 +87,10 @@ const AvatarCallPage = () => {
   //     // setError("Could not connect to the avatar service. Please try again later.");
   //   }, 2500);
   //   return () => clearTimeout(timer);
-  // }, []);
-  // Removed greeting functionality - keeping it simple
+  // }, []);  // Removed greeting functionality - keeping it simple
 
-  // Memoize toggle functions to prevent unnecessary re-renders  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
+  // Memoize toggle functions to prevent unnecessary re-renders
+  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
   const selectVoice = useCallback((voice) => {
     setSelectedVoice(voice);
     setShowVoiceSelector(false);
@@ -236,10 +233,12 @@ const AvatarCallPage = () => {
   const hideVolumeSliderOnLeave = useCallback(() => {
     // Add a small delay to prevent flickering when moving mouse to slider
     volumeHoverTimeoutRef.current = setTimeout(() => {
-      setShowVolumeSlider(false);
-    }, 150); // 150ms delay
+      setShowVolumeSlider(false);    }, 150); // 150ms delay
   }, []);
-  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified with voice support and lip sync
+
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
+
+  // Memoize avatar props - simplified with voice support and lip sync
   const avatarProps = useMemo(() => ({
     lastMessage: lastMessage,
     voiceEnabled: voiceEnabled && avatarVolume > 0,
@@ -461,23 +460,14 @@ const AvatarCallPage = () => {
                 transition={{ duration: 0.3 }}
                 className="bg-black/50 backdrop-blur-sm border-b border-gray-700/50 h-full"
               >
-              <div className="flex items-center justify-between px-6 py-4 h-full">
+                <div className="flex items-center justify-between px-6 py-4 h-full">
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-sm font-medium">Seriva AI Companion</span>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      {connectionQuality === 'excellent' ? (
-                        <Wifi className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <WifiOff className="w-4 h-4 text-red-500" />
-                      )}
-                      <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
-                    </div>
+                    <div className="flex items-center space-x-4">
                     <button
                       onClick={toggleFullscreen}
                       className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -500,16 +490,7 @@ const AvatarCallPage = () => {
                 <span className="text-sm font-medium">Seriva AI Companion</span>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                {connectionQuality === 'excellent' ? (
-                  <Wifi className="w-4 h-4 text-green-500" />
-                ) : (
-                  <WifiOff className="w-4 h-4 text-red-500" />
-                )}
-                <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
-              </div>
+              <div className="flex items-center space-x-4">
               <button
                 onClick={toggleFullscreen}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -540,7 +521,8 @@ const AvatarCallPage = () => {
             </div>
           </motion.div>
         </div>
-      </div>{/* Bottom Controls - Always visible in windowed mode, hover in fullscreen */}
+      </div>
+      {/* Bottom Controls - Always visible in windowed mode, hover in fullscreen */}
       {isFullscreen ? (
         <div 
           className="absolute bottom-8 left-0 right-0 h-32 z-50 group"
@@ -556,8 +538,11 @@ const AvatarCallPage = () => {
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
-                transition={{ duration: 0.3 }}                className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
-              >                <div className="flex items-center justify-center h-full pb-4">                  <div className="flex items-center space-x-4">
+                transition={{ duration: 0.3 }}                
+                className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
+              >                
+              <div className="flex items-center justify-center h-full">
+                <div className="flex items-center justify-center h-full">
                     {/* Mute Button */}
                     <button 
                       onClick={toggleMute}
