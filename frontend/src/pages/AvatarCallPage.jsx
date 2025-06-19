@@ -12,19 +12,14 @@ import {
   Volume2,
   VolumeX,
   AlertTriangle,
-  Maximize,
-  Minimize,
   User
 } from 'lucide-react';
 
 const AvatarCallPage = () => {  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);  const [isMuted, setIsMuted] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  // const [isFullscreen, setIsFullscreen] = useState(false);
-  // const [showControls, setShowControls] = useState(true);
-  // const [showHeader, setShowHeader] = useState(true);
+  const [isListening, setIsListening] = useState(false);  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [audioElement, setAudioElement] = useState(null);
   const [lastMessage, setLastMessage] = useState(''); // For expression system
   const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
@@ -49,36 +44,8 @@ const AvatarCallPage = () => {
     stopVolumeAnalysis: stopLipSync 
   } = useVolumeLipSync();
   
-  // Removed greeting and expression management - keeping it simple
-  // Memoize format duration function to prevent re-creation// Auto-hide controls in fullscreen mode only
-  useEffect(() => {
-    let timer;
-    if (isFullscreen && showControls) {
-      timer = setTimeout(() => setShowControls(false), 3000);
-    }
-    return () => clearTimeout(timer);
-  }, [showControls, isFullscreen]);
+  // Removed greeting and expression management - keeping it simple  // Memoize format duration function to prevent re-creation
 
-  // Auto-hide header in fullscreen mode only
-  useEffect(() => {
-    let timer;
-    if (isFullscreen && showHeader) {
-      timer = setTimeout(() => setShowHeader(false), 3000);
-    }
-    return () => clearTimeout(timer);  }, [showHeader, isFullscreen]);
-  
-  // Handle fullscreen mode transitions
-  useEffect(() => {
-    if (isFullscreen) {
-      // Hide controls and header when entering fullscreen
-      setShowControls(false);
-      setShowHeader(false);
-    } else {
-      // Show controls and header when exiting fullscreen (windowed mode)
-      setShowControls(true);
-      setShowHeader(true);
-    }
-    }, [isFullscreen]);
   // useEffect(() => {
   //   // Simulate loading
   //   const timer = setTimeout(() => {
@@ -235,8 +202,6 @@ const AvatarCallPage = () => {
     volumeHoverTimeoutRef.current = setTimeout(() => {
       setShowVolumeSlider(false);    }, 150); // 150ms delay
   }, []);
-
-  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
 
   // Memoize avatar props - simplified with voice support and lip sync
   const avatarProps = useMemo(() => ({
@@ -435,73 +400,9 @@ const AvatarCallPage = () => {
           border: 2px solid #ffffff;
           cursor: pointer;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-      `}</style>
-    <div 
-      className={`${isFullscreen ? 'fixed inset-0 z-50' : ''} flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden`}
-    >
-      {/* Header Bar - Always visible in windowed mode, hover in fullscreen */}
-      {isFullscreen ? (
-        <div 
-          className="absolute top-0 left-0 right-0 h-24 z-50 group"
-          onMouseEnter={() => setShowHeader(true)}
-          onMouseLeave={() => setShowHeader(false)}
-          style={{ pointerEvents: 'auto' }}
-        >
-          {/* Subtle hover indicator */}
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-2 bg-white/20 rounded-b-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          <AnimatePresence>
-            {showHeader && (
-              <motion.div
-                initial={{ y: -100, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -100, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="bg-black/50 backdrop-blur-sm border-b border-gray-700/50 h-full"
-              >
-                <div className="flex items-center justify-between px-6 py-4 h-full">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium">Seriva AI Companion</span>
-                    </div>
-                  </div>
-                    <div className="flex items-center space-x-4">
-                    <button
-                      onClick={toggleFullscreen}
-                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                      <Minimize className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ) : (
-        // Always visible header in windowed mode
-        <div className="bg-black/30 backdrop-blur-sm border-b border-gray-700/50 z-40">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium">Seriva AI Companion</span>
-              </div>
-            </div>
-              <div className="flex items-center space-x-4">
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                title="Enter Fullscreen"
-              >
-                <Maximize className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}      {/* Main Video Area */}
+        }      `}</style>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
+      {/* Main Video Area */}
       <div className="flex-1 flex relative">
         {/* Video Area */}
         <div className="w-full relative bg-black/20">
@@ -521,157 +422,10 @@ const AvatarCallPage = () => {
             </div>
           </motion.div>
         </div>
-      </div>
-      {/* Bottom Controls - Always visible in windowed mode, hover in fullscreen */}
-      {isFullscreen ? (
-        <div 
-          className="absolute bottom-8 left-0 right-0 h-32 z-50 group"
-          onMouseEnter={() => setShowControls(true)}
-          onMouseLeave={() => setShowControls(false)}
-          style={{ pointerEvents: 'auto' }}
-        >
-          {/* Subtle hover indicator */}
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-24 h-2 bg-white/20 rounded-t-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <AnimatePresence>
-            {showControls && (
-              <motion.div
-                initial={{ y: 100, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 100, opacity: 0 }}
-                transition={{ duration: 0.3 }}                
-                className="bg-black/50 backdrop-blur-sm border-t border-gray-700/50 h-full"
-              >                
-              <div className="flex items-center justify-center h-full">
-                <div className="flex items-center justify-center h-full">
-                    {/* Mute Button */}
-                    <button 
-                      onClick={toggleMute}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                        isMuted 
-                          ? 'bg-red-600 shadow-lg shadow-red-500/30' 
-                          : 'bg-gray-700'
-                      }`}
-                      title={isMuted ? 'Unmute' : 'Mute'}                    >
-                      {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                    </button>                    {/* Select Voice Button */}
-                    <div className="relative voice-selector-container">
-                      <button 
-                        onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                        disabled={availableVoices.length === 0}
-                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                          voiceEnabled && availableVoices.length > 0
-                            ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30' 
-                            : 'bg-gray-700 opacity-50 cursor-not-allowed'
-                        }`}
-                        title={voiceEnabled ? 'Select Avatar Voice' : 'Enable voice first'}
-                      >
-                        <User className="w-6 h-6 text-white" />
-                        {selectedVoice && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full"></div>
-                        )}
-                      </button>
-
-                      {/* Voice Selector Dropdown */}
-                      {showVoiceSelector && voiceEnabled && availableVoices.length > 0 && (
-                        <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-80 max-h-60 overflow-y-auto z-50">
-                          <div className="text-white text-sm font-medium mb-2 px-2">Select Azure Neural Voice:</div>
-                          {availableVoices.map((voice, index) => (
-                            <button
-                              key={`${voice.name}-${index}`}
-                              onClick={() => selectVoice(voice)}
-                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                selectedVoice?.name === voice.name
-                                  ? 'bg-indigo-600 text-white'
-                                  : 'text-gray-300 hover:bg-gray-700'
-                              }`}
-                            >
-                              <div className="font-medium truncate">{voice.displayName}</div>
-                              <div className="text-xs text-gray-400">{voice.language} • Neural • Styles: {voice.styles.join(', ')}</div>
-                              <div className="text-xs text-gray-500 mt-1">{voice.characteristics}</div>
-                            </button>
-                          ))}
-                          {availableVoices.length === 0 && (
-                            <div className="text-gray-400 text-sm px-2 py-4 text-center">No Azure Neural voices available</div>
-                          )}
-                        </div>
-                      )}
-                    </div>                    {/* Volume Control Button */}
-                    <div 
-                      className="relative volume-control-container p-2 -m-2"
-                      onMouseEnter={showVolumeSliderOnHover}
-                      onMouseLeave={hideVolumeSliderOnLeave}
-                    >
-                      <button 
-                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                          avatarVolume === 0 
-                            ? 'bg-red-600 shadow-lg shadow-red-500/30' 
-                            : 'bg-gray-700 hover:bg-gray-600'
-                        }`}
-                        title={`Avatar Volume: ${Math.round(avatarVolume * 100)}%`}
-                      >
-                        {avatarVolume === 0 ? (
-                          <VolumeX className="w-6 h-6" />
-                        ) : avatarVolume < 0.5 ? (
-                          <Volume2 className="w-6 h-6" style={{ opacity: 0.6 }} />
-                        ) : (
-                          <Volume2 className="w-6 h-6" />
-                        )}
-                      </button>
-                      
-                      {/* Volume Slider */}
-                      {showVolumeSlider && (
-                        <div 
-                          className="absolute bottom-14 left-1/2 transform -translate-x-1/2 bg-gray-800 rounded-lg p-3 shadow-lg"
-                          onMouseEnter={showVolumeSliderOnHover}
-                          onMouseLeave={hideVolumeSliderOnLeave}
-                        >
-                          <div className="flex flex-col items-center space-y-2">
-                            <span className="text-xs text-gray-300">Volume</span>
-                            <input
-                              type="range"
-                              min="0"
-                              max="1"
-                              step="0.1"
-                              value={avatarVolume}
-                              onChange={(e) => setAvatarVolume(parseFloat(e.target.value))}
-                              className="w-20 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
-                            />
-                            <span className="text-xs text-gray-400">{Math.round(avatarVolume * 100)}%</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>{/* Voice Toggle Button */}
-                    <button 
-                      onClick={toggleVoiceEnabled}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                        voiceEnabled 
-                          ? 'bg-purple-600 shadow-lg shadow-purple-500/30' 
-                          : 'bg-gray-700'
-                      }`}
-                      title={voiceEnabled ? 'Disable Avatar Voice - Avatar will stop speaking and return to idle' : 'Enable Avatar Voice - Avatar will speak welcome message and switch to talking mode'}
-                    >
-                      <User className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
-                      {voiceEnabled && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>                      )}
-                    </button>
-
-                    {/* End Call Button */}
-                    <button 
-                      onClick={endCall}
-                      className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-200 hover:bg-red-700"
-                      title="End Call"
-                    >
-                      <PhoneOff className="w-7 h-7" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>      ) : (
-        // Always visible controls in windowed mode
-        <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
-          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Voice Tone Selector - Simplified */}
+      </div>      {/* Bottom Controls - Always visible */}
+      <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
+        <div className="flex items-center justify-center py-4 pb-20">
+          <div className="flex items-center space-x-4">{/* Voice Tone Selector - Simplified */}
               <div className="relative voice-selector-container">
                 <button 
                   onClick={() => setShowVoiceSelector(!showVoiceSelector)}
@@ -805,11 +559,9 @@ const AvatarCallPage = () => {
                 title="End Call"
               >
                 <PhoneOff className="w-7 h-7" />
-              </button>
-            </div>
+              </button>            </div>
           </div>
         </div>
-      )}
     </div>
     </>
   );
