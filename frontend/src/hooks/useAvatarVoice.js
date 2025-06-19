@@ -12,8 +12,16 @@ export const useAvatarVoice = (options = {}) => {
     pitch: '+5%',
     style: 'friendly'
   });
+  const [volume, setVolume] = useState(options.volume ?? 0.8); // Volume control
 
   const currentSpeechRef = useRef(null);
+  // Update volume when external option changes
+  useEffect(() => {
+    if (options.volume !== undefined) {
+      setVolume(options.volume);
+    }
+  }, [options.volume]);
+
   // Update selected voice when external voice changes
   useEffect(() => {
     if (options.selectedVoice) {
@@ -51,9 +59,9 @@ export const useAvatarVoice = (options = {}) => {
     try {
       console.log('🎵 Hook: Starting Azure TTS speech');
       setIsSpeaking(true);
-      
-      const speechOptions = {
+        const speechOptions = {
         voice: selectedVoice,
+        volume: volume, // Pass volume to voice service
         ...voiceSettings,
         ...customOptions,
         onStart: () => {
@@ -75,12 +83,11 @@ export const useAvatarVoice = (options = {}) => {
 
       currentSpeechRef.current = voiceService.speak(text, speechOptions);
       await currentSpeechRef.current;
-      
-    } catch (error) {
+        } catch (error) {
       setIsSpeaking(false);
       console.error('❌ Hook: Speech failed:', error);
     }
-  }, [isEnabled, isSpeaking, selectedVoice, voiceSettings]);
+  }, [isEnabled, isSpeaking, selectedVoice, voiceSettings, volume]);
 
   // Stop current speech
   const stopSpeaking = useCallback(() => {
@@ -160,7 +167,6 @@ export const useAvatarVoice = (options = {}) => {
       stopSpeaking();
     };
   }, [stopSpeaking]);
-
   return {
     // State
     isEnabled,
@@ -168,6 +174,7 @@ export const useAvatarVoice = (options = {}) => {
     availableVoices,
     selectedVoice,
     voiceSettings,
+    volume,
     
     // Methods
     speak,
@@ -180,6 +187,7 @@ export const useAvatarVoice = (options = {}) => {
     updateSettings,
     getRecommendedVoice,
     toggleVoice,
+    setVolume,
     
     // Voice service direct access
     voiceService

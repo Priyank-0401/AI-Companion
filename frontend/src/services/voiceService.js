@@ -281,10 +281,9 @@ class VoiceService {
         utterance.voice = femaleVoice;
         console.log('🔧 Using system voice:', femaleVoice.name);
       }
-      
-      utterance.rate = 0.9;
+        utterance.rate = 0.9;
       utterance.pitch = 1.1;
-      utterance.volume = 0.8;
+      utterance.volume = options.volume !== undefined ? options.volume : 0.8;
       
       utterance.onstart = () => {
         this.isSpeaking = true;
@@ -312,11 +311,14 @@ class VoiceService {
       
       speechSynthesis.speak(utterance);
     });
-  }
-  // Play audio blob with proper event handling
+  }  // Play audio blob with proper event handling
   async playAudioBlob(audioBlob, options = {}) {
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    
+    // Set volume from options, default to 0.8
+    audio.volume = options.volume !== undefined ? options.volume : 0.8;
+    
     this.currentAudio = audio;
 
     return new Promise((resolve, reject) => {

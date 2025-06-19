@@ -42,6 +42,7 @@ const AvatarModel = React.memo(({
   selectedVoice = null, 
   onVoiceEnd = null, 
   onError,
+  avatarVolume = 0.8, // New prop for volume
   volumeLipSyncRef = null // New prop for volume-based lip sync
 }) => {
   // Load models
@@ -70,10 +71,10 @@ const AvatarModel = React.memo(({
     isSpeaking,
     speak,
     stopSpeaking,
-    availableVoices
-  } = useAvatarVoice({
+    availableVoices  } = useAvatarVoice({
     enabled: voiceEnabled,
-    selectedVoice: selectedVoice
+    selectedVoice: selectedVoice,
+    volume: avatarVolume // Pass volume to the hook
   });
   // Prepare animations with clear naming
   const animations = React.useMemo(() => {

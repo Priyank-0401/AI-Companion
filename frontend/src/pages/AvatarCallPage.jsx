@@ -22,10 +22,10 @@ import {
 
 const AvatarCallPage = () => {  
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [error, setError] = useState(null);  const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showHeader, setShowHeader] = useState(true);  
@@ -35,8 +35,16 @@ const AvatarCallPage = () => {
   const [lastMessage, setLastMessage] = useState(''); // For expression system
   const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [availableVoices, setAvailableVoices] = useState([]);  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [selectedTone, setSelectedTone] = useState('empathetic'); // New tone selector state
+  
+  // Voice tone options
+  const voiceTones = [
+    { id: 'empathetic', name: 'Empathetic', description: 'Caring & supportive', voice: 'en-US-JennyNeural' },
+    { id: 'cheerful', name: 'Cheerful', description: 'Upbeat & energetic', voice: 'en-US-AriaNeural' },
+    { id: 'calm', name: 'Calm', description: 'Professional & measured', voice: 'en-US-MichelleNeural' },
+    { id: 'friendly', name: 'Friendly', description: 'Casual & warm', voice: 'en-US-MonicaNeural' }
+  ];
   // Volume lip sync integration
   const audioRef = useRef(null);
   const { 
@@ -192,6 +200,26 @@ const AvatarCallPage = () => {
       });
     }
   }, [voiceEnabled, selectedVoice, setupVolumeAnalysis, startLipSync, stopLipSync]);
+  
+  // Tone selection handler
+  const selectTone = useCallback((tone) => {
+    setSelectedTone(tone.id);
+    
+    // Find the corresponding voice from available voices
+    const toneVoice = availableVoices.find(v => v.name === tone.voice);
+    if (toneVoice && voiceEnabled) {
+      setSelectedVoice(toneVoice);
+      
+      // Test the selected tone with a sample phrase
+      import('../services/voiceService').then(({ default: voiceService }) => {
+        voiceService.setVoice(toneVoice);
+        const sampleMessage = `Hi! I'm Seriva in ${tone.name.toLowerCase()} mode. ${tone.description}.`;
+        voiceService.speak(sampleMessage).catch(error => {
+          console.error('❌ Tone test failed:', error);
+        });
+      });
+    }
+  }, [availableVoices, voiceEnabled]);
   // Callback for when voice ends - turns off voice button
   const handleVoiceEnd = useCallback(() => {
     setVoiceEnabled(false);
@@ -199,37 +227,54 @@ const AvatarCallPage = () => {
     stopLipSync(); // Stop lip sync when voice ends
     console.log('🔇 Voice ended - Avatar voice disabled, returning to idle, and lip sync stopped');
   }, [stopLipSync]);
-
   const toggleListening = useCallback(() => {
     setIsListening(prev => {
       const newValue = !prev;
       if (newValue) {
-        // Start voice recognition
-        console.log('🎤 Started listening for user input');
-        // TODO: Implement speech recognition here
+        // Start voice recognition - placeholder for future implementation
+        // TODO: Integrate with speech-to-text API (Web Speech API or Azure Speech)
       } else {
         // Stop voice recognition
-        console.log('🔇 Stopped listening for user input');
-        // TODO: Stop speech recognition here
+        // TODO: Stop speech recognition and cleanup
       }
       return newValue;
     });
   }, []);
+  // Volume control functions with optimized hover
+  const volumeHoverTimeoutRef = useRef(null);
   
-  const toggleSpeaker = useCallback(() => setIsSpeakerOn(prev => !prev), []);
+  const handleVolumeChange = useCallback((newVolume) => {
+    setAvatarVolume(newVolume);
+  }, []);
+
+  const showVolumeSliderOnHover = useCallback(() => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+      volumeHoverTimeoutRef.current = null;
+    }
+    setShowVolumeSlider(true);
+  }, []);
+
+  const hideVolumeSliderOnLeave = useCallback(() => {
+    // Add a small delay to prevent flickering when moving mouse to slider
+    volumeHoverTimeoutRef.current = setTimeout(() => {
+      setShowVolumeSlider(false);
+    }, 150); // 150ms delay
+  }, []);
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);  // Memoize avatar props - simplified with voice support and lip sync
   const avatarProps = useMemo(() => ({
     lastMessage: lastMessage,
-    voiceEnabled: voiceEnabled && isSpeakerOn,
+    voiceEnabled: voiceEnabled && avatarVolume > 0,
     selectedVoice: selectedVoice,
     onVoiceEnd: handleVoiceEnd,
+    avatarVolume: avatarVolume, // Pass volume to avatar
     volumeLipSyncRef: { 
       current: {
         getVolumeValue: () => volume || 0,
         isPlaying: () => lipSyncActive
       }
     } // Provide proper interface for lip sync
-  }), [lastMessage, voiceEnabled, isSpeakerOn, selectedVoice, handleVoiceEnd, volume, lipSyncActive]);
+  }), [lastMessage, voiceEnabled, avatarVolume, selectedVoice, handleVoiceEnd, volume, lipSyncActive]);
   
   const endCall = () => {
     // Handle ending the call
@@ -249,27 +294,26 @@ const AvatarCallPage = () => {
       "What would you like to talk about?",
       "You're doing great!",
       "I appreciate you sharing that with me."
-    ];
-
-    let messageIndex = 0;
+    ];    let messageIndex = 0;
     const messageInterval = setInterval(() => {
       setLastMessage(demoMessages[messageIndex]);
       messageIndex = (messageIndex + 1) % demoMessages.length;
-      
-      // Only update message for expression system, don't auto-start talking
-      console.log('� Demo message updated for expressions:', demoMessages[messageIndex - 1]);
-    }, 8000); // New message every 8 seconds    return () => clearInterval(messageInterval);
-  }, [isLoading, error]);  // Stop avatar speaking when voice is disabled
+    }, 8000); // New message every 8 seconds
+
+    return () => clearInterval(messageInterval);
+  }, [isLoading, error]);
+
+  // Stop avatar speaking when voice is disabled
   useEffect(() => {
     if (!voiceEnabled) {
       // Import and stop the voice service when voice is disabled
       stopLipSync(); // Stop lip sync when voice is disabled
       import('../services/voiceService').then(({ default: voiceService }) => {
         voiceService.stop();
-        console.log('🔇 Voice disabled - stopping any ongoing speech and lip sync');
       });
     }
   }, [voiceEnabled, stopLipSync]);
+
   // Load available Azure Neural voices
   useEffect(() => {
     const loadVoices = () => {
@@ -277,27 +321,20 @@ const AvatarCallPage = () => {
       import('../services/voiceService').then(({ AZURE_NEURAL_VOICES }) => {
         setAvailableVoices(AZURE_NEURAL_VOICES);
         
-        // Set default voice (Jenny Neural - friendly and warm)
+        // Set default voice based on selected tone (empathetic = Jenny)
         if (AZURE_NEURAL_VOICES.length > 0 && !selectedVoice) {
+          const defaultTone = voiceTones.find(t => t.id === selectedTone);
           const defaultVoice = AZURE_NEURAL_VOICES.find(v => 
-            v.name.includes('JennyNeural')
+            v.name === defaultTone?.voice
           ) || AZURE_NEURAL_VOICES[0];
           
           setSelectedVoice(defaultVoice);
         }
-        
-        console.log('🎵 Available Azure Neural voices:', AZURE_NEURAL_VOICES.map(v => ({ 
-          name: v.displayName, 
-          technical: v.name,
-          styles: v.styles 
-        })));
       });
     };
 
     loadVoices();
-  }, [selectedVoice]);
-
-  // Close voice selector when clicking outside
+  }, [selectedVoice, selectedTone]);  // Close voice selector when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showVoiceSelector && !event.target.closest('.voice-selector-container')) {
@@ -310,6 +347,15 @@ const AvatarCallPage = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showVoiceSelector]);
+
+  // Cleanup volume hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (volumeHoverTimeoutRef.current) {
+        clearTimeout(volumeHoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -364,6 +410,56 @@ const AvatarCallPage = () => {
       </div>
     );
   }  return (
+    <>
+      {/* Custom styles for volume slider */}
+      <style jsx>{`
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+          background: transparent;
+          cursor: pointer;
+        }
+        
+        input[type="range"]::-webkit-slider-track {
+          background: #4b5563;
+          height: 6px;
+          border-radius: 3px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          background: #3b82f6;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          border: 2px solid #ffffff;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+          background: #2563eb;
+          transform: scale(1.1);
+        }
+        
+        input[type="range"]::-moz-range-track {
+          background: #4b5563;
+          height: 6px;
+          border-radius: 3px;
+          border: none;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+          background: #3b82f6;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          border: 2px solid #ffffff;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+      `}</style>
     <div 
       className={`${isFullscreen ? 'fixed inset-0 z-50' : ''} flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden`}
     >
@@ -599,18 +695,52 @@ const AvatarCallPage = () => {
                           )}
                         </div>
                       )}
-                    </div>{/* Speaker Button */}
-                    <button 
-                      onClick={toggleSpeaker}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                        !isSpeakerOn 
-                          ? 'bg-red-600 shadow-lg shadow-red-500/30' 
-                          : 'bg-gray-700'
-                      }`}
-                      title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
+                    </div>                    {/* Volume Control Button */}
+                    <div 
+                      className="relative volume-control-container p-2 -m-2"
+                      onMouseEnter={showVolumeSliderOnHover}
+                      onMouseLeave={hideVolumeSliderOnLeave}
                     >
-                      {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-                    </button>                    {/* Voice Toggle Button */}
+                      <button 
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                          avatarVolume === 0 
+                            ? 'bg-red-600 shadow-lg shadow-red-500/30' 
+                            : 'bg-gray-700 hover:bg-gray-600'
+                        }`}
+                        title={`Avatar Volume: ${Math.round(avatarVolume * 100)}%`}
+                      >
+                        {avatarVolume === 0 ? (
+                          <VolumeX className="w-6 h-6" />
+                        ) : avatarVolume < 0.5 ? (
+                          <Volume2 className="w-6 h-6" style={{ opacity: 0.6 }} />
+                        ) : (
+                          <Volume2 className="w-6 h-6" />
+                        )}
+                      </button>
+                      
+                      {/* Volume Slider */}
+                      {showVolumeSlider && (
+                        <div 
+                          className="absolute bottom-14 left-1/2 transform -translate-x-1/2 bg-gray-800 rounded-lg p-3 shadow-lg"
+                          onMouseEnter={showVolumeSliderOnHover}
+                          onMouseLeave={hideVolumeSliderOnLeave}
+                        >
+                          <div className="flex flex-col items-center space-y-2">
+                            <span className="text-xs text-gray-300">Volume</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.1"
+                              value={avatarVolume}
+                              onChange={(e) => setAvatarVolume(parseFloat(e.target.value))}
+                              className="w-20 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                            />
+                            <span className="text-xs text-gray-400">{Math.round(avatarVolume * 100)}%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>{/* Voice Toggle Button */}
                     <button 
                       onClick={toggleVoiceEnabled}
                       className={`w-14 h-14 rounded-full flex items-center justify-center ${
@@ -642,89 +772,142 @@ const AvatarCallPage = () => {
         </div>
       ) : (        // Always visible controls in windowed mode
         <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
-          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Select Voice Button */}
+          <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Voice Tone Selector - Simplified */}
               <div className="relative voice-selector-container">
                 <button 
                   onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                  disabled={!voiceEnabled || availableVoices.length === 0}
+                  disabled={!voiceEnabled}
                   className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    voiceEnabled && availableVoices.length > 0
+                    voiceEnabled
                       ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30' 
                       : 'bg-gray-700 opacity-50 cursor-not-allowed'
                   }`}
-                  title={voiceEnabled ? 'Select Avatar Voice' : 'Enable voice first'}
+                  title={voiceEnabled ? 'Select Voice Tone' : 'Enable voice first'}
                 >
                   <User className="w-6 h-6 text-white" />
-                  {selectedVoice && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full"></div>
+                  {voiceEnabled && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full animate-pulse"></div>
                   )}
                 </button>
 
-                {/* Voice Selector Dropdown */}
-                {showVoiceSelector && voiceEnabled && availableVoices.length > 0 && (
-                  <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-80 max-h-60 overflow-y-auto z-50">
-                    <div className="text-white text-sm font-medium mb-2 px-2">Select Azure Neural Voice:</div>
-                    {availableVoices.map((voice, index) => (
+                {/* Voice Tone Selector Dropdown */}
+                {showVoiceSelector && voiceEnabled && (
+                  <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-60 z-50">
+                    <div className="text-white text-sm font-medium mb-2 px-2">Select Voice Tone:</div>
+                    {voiceTones.map((tone) => (
                       <button
-                        key={`${voice.name}-${index}`}
-                        onClick={() => selectVoice(voice)}
+                        key={tone.id}
+                        onClick={() => {
+                          selectTone(tone);
+                          setShowVoiceSelector(false);
+                        }}
                         className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          selectedVoice?.name === voice.name
+                          selectedTone === tone.id
                             ? 'bg-indigo-600 text-white'
                             : 'text-gray-300 hover:bg-gray-700'
                         }`}
                       >
-                        <div className="font-medium truncate">{voice.displayName}</div>
-                        <div className="text-xs text-gray-400">{voice.language} • Neural • Styles: {voice.styles.join(', ')}</div>
-                        <div className="text-xs text-gray-500 mt-1">{voice.characteristics}</div>
+                        <div className="font-medium">{tone.name}</div>
+                        <div className="text-xs text-gray-400">{tone.description}</div>
                       </button>
                     ))}
-                    {availableVoices.length === 0 && (
-                      <div className="text-gray-400 text-sm px-2 py-4 text-center">No Azure Neural voices available</div>
-                    )}
                   </div>
                 )}
               </div>
-              
-              {/* Voice Input Button */}
+                {/* Voice Input Button - Enhanced with better feedback */}
               <button 
                 onClick={toggleListening}
-                className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                   isListening 
-                    ? 'bg-green-600 shadow-lg shadow-green-500/30 animate-pulse' 
-                    : 'bg-gray-700'
+                    ? 'bg-green-600 shadow-lg shadow-green-500/50 animate-pulse scale-105' 
+                    : 'bg-gray-700 hover:bg-gray-600'
                 }`}
-                title={isListening ? 'Stop Listening' : 'Start Voice Input'}
+                title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
               >
-                {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-              </button>              {/* Voice Toggle Button */}
+                {isListening ? (
+                  <Mic className="w-6 h-6 text-white" />
+                ) : (
+                  <MicOff className="w-6 h-6 text-gray-300" />
+                )}
+                {/* Active listening indicator */}
+                {isListening && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+                )}
+              </button>              {/* Voice Enable/Test Button - Simplified */}
               <button 
                 onClick={toggleVoiceEnabled}
-                className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                   voiceEnabled 
-                    ? 'bg-purple-600 shadow-lg shadow-purple-500/30' 
-                    : 'bg-gray-700'
+                    ? 'bg-purple-600 shadow-lg shadow-purple-500/50' 
+                    : 'bg-gray-700 hover:bg-gray-600'
                 }`}
-                title={voiceEnabled ? 'Disable Avatar Voice - Avatar will stop speaking and return to idle' : 'Enable Avatar Voice - Avatar will speak messages and switch to talking mode'}
+                title={voiceEnabled ? 'Disable Avatar Voice' : 'Enable & Test Avatar Voice'}
               >
-                <User className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
+                <MessageSquare className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
                 {voiceEnabled && (
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
                 )}
-              </button>
-
-              {/* Speaker Button */}
-              <button 
-                onClick={toggleSpeaker}
-                className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                  !isSpeakerOn 
-                    ? 'bg-red-600 shadow-lg shadow-red-500/30' 
-                    : 'bg-gray-700'
-                }`}
-                title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
+              </button>              {/* Avatar Volume Control - Enhanced */}
+              <div 
+                className="relative volume-control-container"
+                onMouseEnter={showVolumeSliderOnHover}
+                onMouseLeave={hideVolumeSliderOnLeave}
               >
-                {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-              </button>              {/* End Call Button */}
+                <button 
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                    avatarVolume === 0 
+                      ? 'bg-red-600 shadow-lg shadow-red-500/50 scale-105' 
+                      : 'bg-gray-700 hover:bg-gray-600'
+                  }`}
+                  title={`Avatar Volume: ${Math.round(avatarVolume * 100)}%`}
+                >
+                  {avatarVolume === 0 ? (
+                    <VolumeX className="w-6 h-6 text-white" />
+                  ) : avatarVolume < 0.5 ? (
+                    <Volume2 className="w-6 h-6 text-gray-300" style={{ opacity: 0.7 }} />
+                  ) : (
+                    <Volume2 className="w-6 h-6 text-gray-300" />
+                  )}
+                  {/* Volume level indicator */}
+                  {avatarVolume > 0 && (
+                    <div 
+                      className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-blue-400"
+                      style={{ 
+                        opacity: avatarVolume,
+                        transform: `scale(${0.8 + (avatarVolume * 0.4)})` 
+                      }}
+                    ></div>
+                  )}
+                </button>
+                
+                {/* Volume Slider */}
+                {showVolumeSlider && (
+                  <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg p-4 shadow-xl z-50">
+                    <div className="flex flex-col items-center space-y-3">
+                      <span className="text-sm text-gray-200 font-medium">Avatar Volume</span>
+                      <div className="flex items-center space-x-3">
+                        <VolumeX className="w-4 h-4 text-gray-400" />
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={avatarVolume}
+                          onChange={(e) => setAvatarVolume(parseFloat(e.target.value))}
+                          className="w-24 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                          style={{
+                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${avatarVolume * 100}%, #4b5563 ${avatarVolume * 100}%, #4b5563 100%)`
+                          }}
+                        />
+                        <Volume2 className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <span className="text-sm text-blue-400 font-medium">{Math.round(avatarVolume * 100)}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* End Call Button */}
               <button 
                 onClick={endCall}
                 className="w-16 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30"
@@ -737,6 +920,7 @@ const AvatarCallPage = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 
