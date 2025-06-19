@@ -752,14 +752,13 @@ const AvatarCallPage = () => {
                     >
                       <User className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
                       {voiceEnabled && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
-                      )}
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>                      )}
                     </button>
 
                     {/* End Call Button */}
                     <button 
                       onClick={endCall}
-                      className="w-16 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30"
+                      className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-200 hover:bg-red-700"
                       title="End Call"
                     >
                       <PhoneOff className="w-7 h-7" />
@@ -769,8 +768,8 @@ const AvatarCallPage = () => {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      ) : (        // Always visible controls in windowed mode
+        </div>      ) : (
+        // Always visible controls in windowed mode
         <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
           <div className="flex items-center justify-center py-4 pb-20">            <div className="flex items-center space-x-4">              {/* Voice Tone Selector - Simplified */}
               <div className="relative voice-selector-container">
@@ -868,16 +867,6 @@ const AvatarCallPage = () => {
                   ) : (
                     <Volume2 className="w-6 h-6 text-gray-300" />
                   )}
-                  {/* Volume level indicator */}
-                  {avatarVolume > 0 && (
-                    <div 
-                      className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-blue-400"
-                      style={{ 
-                        opacity: avatarVolume,
-                        transform: `scale(${0.8 + (avatarVolume * 0.4)})` 
-                      }}
-                    ></div>
-                  )}
                 </button>
                 
                 {/* Volume Slider */}
@@ -909,12 +898,10 @@ const AvatarCallPage = () => {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* End Call Button */}
+              </div>              {/* End Call Button */}
               <button 
                 onClick={endCall}
-                className="w-16 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30"
+                className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-200 hover:bg-red-700"
                 title="End Call"
               >
                 <PhoneOff className="w-7 h-7" />

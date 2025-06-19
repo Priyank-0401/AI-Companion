@@ -174,10 +174,10 @@ const HomePage = () => {
           {currentUser ? (
             <>
               <Link
-                to="/chat"
+                to="/avatar-call"
                 className="btn-primary text-lg px-8 py-4 inline-flex items-center space-x-2 group"
               >
-                <span>Continue Chatting</span>
+                <span>Talk to Seriva</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>              <Link
                 to="/dashboard"
