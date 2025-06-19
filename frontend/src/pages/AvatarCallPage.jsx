@@ -849,7 +849,7 @@ const AvatarCallPage = () => {
                 )}
               </button>              {/* Avatar Volume Control - Enhanced */}
               <div 
-                className="relative volume-control-container"
+                className="relative volume-control-container p-2 -m-2"
                 onMouseEnter={showVolumeSliderOnHover}
                 onMouseLeave={hideVolumeSliderOnLeave}
               >
@@ -882,7 +882,11 @@ const AvatarCallPage = () => {
                 
                 {/* Volume Slider */}
                 {showVolumeSlider && (
-                  <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg p-4 shadow-xl z-50">
+                  <div 
+                    className="absolute bottom-14 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg p-4 shadow-xl z-50"
+                    onMouseEnter={showVolumeSliderOnHover}
+                    onMouseLeave={hideVolumeSliderOnLeave}
+                  >
                     <div className="flex flex-col items-center space-y-3">
                       <span className="text-sm text-gray-200 font-medium">Avatar Volume</span>
                       <div className="flex items-center space-x-3">
