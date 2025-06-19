@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 const AvatarCallPage = () => {  
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);  const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
@@ -104,15 +104,15 @@ const AvatarCallPage = () => {
       setShowHeader(true);
     }
     }, [isFullscreen]);
-
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // Simulate an error for demonstration if needed
-      // setError("Could not connect to the avatar service. Please try again later.");
-    }, 2500);    return () => clearTimeout(timer);
-  }, []);
+  // useEffect(() => {
+  //   // Simulate loading
+  //   const timer = setTimeout(() => {
+  //     setIsLoading(false);
+  //     // Simulate an error for demonstration if needed
+  //     // setError("Could not connect to the avatar service. Please try again later.");
+  //   }, 2500);
+  //   return () => clearTimeout(timer);
+  // }, []);
   // Removed greeting functionality - keeping it simple
 
   // Memoize toggle functions to prevent unnecessary re-renders  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
