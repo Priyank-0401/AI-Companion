@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Home, 
   MessageCircle, 
@@ -18,10 +18,23 @@ import { useAuth } from '../../hooks/useAuth'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser, logout, loading, isRedirecting } = useAuth()
   const isDashboardPage = location.pathname === '/dashboard'
+
+  // Handle scroll effect for navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      const isScrolled = window.scrollY > 10
+      if (isScrolled !== scrolled) {
+        setScrolled(isScrolled)
+      }
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [scrolled])
 
   const navItems = [    
     { path: '/', label: 'Home', icon: Home, public: true },
@@ -49,141 +62,202 @@ const Navbar = () => {
     ? navItems 
     : navItems.filter(item => item.public)
   return (
-    <nav className="bg-[#393E46] shadow-lg fixed top-0 left-0 right-0 z-50 border-b border-[#00ADB5]/20">
-      <div className="w-full px-4 lg:px-8">
-        <div className="flex justify-between items-center h-16">{/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">            <motion.div
-              whileHover={{ scale: 1.1 }}
-              transition={{ duration: 0.3 }}
-
+    <motion.nav 
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled 
+          ? 'bg-background-secondary/95 backdrop-blur-md border-b border-background-tertiary/50 shadow-lg' 
+          : 'bg-background-secondary/80 backdrop-blur-sm border-b border-background-tertiary/30'
+      }`}
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <Link to="/" className="flex items-center space-x-2 group">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+              className="relative"
             >
-              <img src="/logo.svg" alt="Seriva" className="w-20 h-20" />
+              <img 
+                src="/logo.svg" 
+                alt="Seriva" 
+                className="w-10 h-10 transition-transform duration-300 group-hover:rotate-6" 
+              />
+              <div className="absolute inset-0 rounded-full bg-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </motion.div>
-            <span className="text-xl font-bold text-[#00ADB5]">Seriva</span>
+            <motion.span 
+              className="text-xl font-bold bg-gradient-to-r from-accent to-indigo-400 bg-clip-text text-transparent"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              Seriva
+            </motion.span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {filteredNavItems.map((item) => {
-              const Icon = item.icon
-              return (                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                    isActive(item.path)
-                      ? 'bg-[#00ADB5] text-white'
-                      : 'text-[#EEEEEE] hover:bg-[#00ADB5]/20 hover:text-[#00ADB5]'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })}
+            <div className="flex items-center space-x-1 bg-background-tertiary/30 rounded-xl p-1">
+              {filteredNavItems.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.path)
+                
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      active
+                        ? 'bg-background-secondary text-text-primary shadow-md'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-background-tertiary/50'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
               {/* Authentication Buttons */}
             {!loading && (
-              <div className="flex items-center space-x-2 ml-4">
+              <div className="flex items-center space-x-2 ml-2">
                 {(currentUser && !isRedirecting) ? (
                   <button
                     onClick={handleLogout}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-lg text-[#EEEEEE] hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
+                    className="group flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-200"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
                     <span>Logout</span>
                   </button>
                 ) : !currentUser ? (
-                  <>
+                  <div className="flex items-center space-x-2 bg-background-tertiary/30 rounded-xl p-1">
                     <Link
                       to="/login"
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg text-[#EEEEEE] hover:bg-[#00ADB5]/20 hover:text-[#00ADB5] transition-all duration-200"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      <span>Login</span>
-                    </Link>
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg text-[#EEEEEE] hover:bg-[#00ADB5]/20 hover:text-[#00ADB5] transition-all duration-200"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      <span>Sign Up</span>
-                    </Link>
-                  </>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-[#00ADB5]/20 transition-colors"
-          >
-            {isOpen ? <X className="w-6 h-6 text-[#EEEEEE]" /> : <Menu className="w-6 h-6 text-[#EEEEEE]" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Navigation - Fixed positioned overlay */}
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}          className="md:hidden fixed top-16 left-0 right-0 bg-[#393E46] shadow-lg border-t border-[#00ADB5]/20 max-h-[calc(100vh-4rem)] overflow-y-auto"
-        >
-          <div className="w-full px-4 lg:px-8 py-4 space-y-2">
-            {filteredNavItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsOpen(false)}                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                    isActive(item.path)
-                      ? 'bg-[#00ADB5] text-white'
-                      : 'text-[#EEEEEE] hover:bg-[#00ADB5]/20 hover:text-[#00ADB5]'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })}            {/* Mobile Authentication Buttons */}
-            {!loading && (
-              <div className="pt-2 border-t border-[#00ADB5]/20 mt-2">
-                {(currentUser && !isRedirecting) ? (
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-[#EEEEEE] hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span>Logout</span>
-                  </button>
-                ) : !currentUser ? (
-                  <>
-                    <Link
-                      to="/login"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 px-4 py-3 rounded-lg text-[#EEEEEE] hover:bg-[#00ADB5]/20 hover:text-[#00ADB5] transition-all duration-200"
+                      className="flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-background-tertiary/50 transition-all duration-200"
                     >
                       <LogIn className="w-5 h-5" />
                       <span>Login</span>
                     </Link>
                     <Link
                       to="/signup"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 px-4 py-3 rounded-lg bg-[#00ADB5] text-white hover:bg-[#00ADB5]/80 transition-all duration-200"
+                      className="flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-accent to-indigo-500 hover:from-accent/90 hover:to-indigo-500/90 transition-all duration-200 shadow-md hover:shadow-lg"
                     >
                       <UserPlus className="w-5 h-5" />
                       <span>Sign Up</span>
                     </Link>
-                  </>
+                  </div>
                 ) : null}
               </div>
             )}
           </div>
-        </motion.div>
-      )}
-    </nav>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden p-2 rounded-lg hover:bg-background-tertiary/50 transition-colors group"
+            aria-label="Toggle menu"
+            aria-expanded={isOpen}
+          >
+            {isOpen ? (
+              <X className="w-6 h-6 text-text-primary group-hover:text-accent transition-colors" />
+            ) : (
+              <Menu className="w-6 h-6 text-text-primary group-hover:text-accent transition-colors" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Navigation - Fixed positioned overlay */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="md:hidden fixed top-16 left-0 right-0 bg-background-secondary/95 backdrop-blur-lg shadow-xl border-t border-background-tertiary/50 overflow-hidden z-40"
+          >
+            <div className="w-full px-4 py-3 space-y-1">
+              {filteredNavItems.map((item, index) => {
+                const Icon = item.icon
+                const active = isActive(item.path)
+                
+                return (
+                  <motion.div
+                    key={item.path}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Link
+                      to={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                        active
+                          ? 'bg-background-tertiary/50 text-text-primary'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-background-tertiary/30'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  </motion.div>
+                )
+              })}
+              
+              {/* Mobile Authentication Buttons */}
+              {!loading && (
+                <motion.div 
+                  className="pt-2 mt-2 border-t border-background-tertiary/30"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: filteredNavItems.length * 0.05 }}
+                >
+                  {(currentUser && !isRedirecting) ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: (filteredNavItems.length + 0.5) * 0.05 }}
+                    >
+                      <button
+                        onClick={() => {
+                          handleLogout()
+                          setIsOpen(false)
+                        }}
+                        className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors duration-200 text-sm font-medium"
+                      >
+                        <LogOut className="w-5 h-5 flex-shrink-0" />
+                        <span>Logout</span>
+                      </button>
+                    </motion.div>
+                  ) : !currentUser ? (
+                    <div className="space-y-2">
+                      <Link
+                        to="/login"
+                        onClick={() => setIsOpen(false)}
+                        className="block w-full text-center px-4 py-3 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-tertiary/30 transition-colors duration-200 text-sm font-medium"
+                      >
+                        <span>Login to your account</span>
+                      </Link>
+                      <Link
+                        to="/signup"
+                        onClick={() => setIsOpen(false)}
+                        className="block w-full text-center px-4 py-3 rounded-lg text-white bg-gradient-to-r from-accent to-indigo-500 hover:from-accent/90 hover:to-indigo-500/90 transition-all duration-200 text-sm font-medium shadow-md mt-2"
+                      >
+                        <span>Create an account</span>
+                      </Link>
+                    </div>
+                  ) : null}
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.nav>
   )
 }
 
