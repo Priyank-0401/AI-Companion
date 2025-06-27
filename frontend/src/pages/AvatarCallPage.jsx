@@ -969,28 +969,6 @@ const AvatarCallPage = () => {
               </div>
             </div>
 
-            {/* Voice Toggle */}
-            <div className="relative group">
-              <button 
-                onClick={toggleVoiceEnabled}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
-                  voiceEnabled 
-                    ? 'bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/30 scale-105' 
-                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md'
-                }`}
-                title={voiceEnabled ? 'Mute Avatar' : 'Unmute Avatar'}
-              >
-                {voiceEnabled ? (
-                  <Volume2 className="w-7 h-7 text-white" />
-                ) : (
-                  <VolumeX className="w-6 h-6 text-white/80" />
-                )}
-              </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
-                {voiceEnabled ? 'Avatar Voice On' : 'Avatar Voice Off'}
-              </div>
-            </div>
-
             {/* Voice Tone Selector */}
             <div className="relative group">
               <button 
