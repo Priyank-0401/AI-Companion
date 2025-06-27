@@ -153,40 +153,54 @@ const AvatarCallPage = () => {
 
   // Handle text-to-speech functionality
   const speakText = useCallback(async (text) => {
-    if (!text || !voiceEnabled) {
-      console.warn('Cannot speak: no text provided or voice is disabled');
-      return;
+    if (!text) {
+      console.error('Cannot speak: no text provided');
+      return false;
+    }
+    
+    if (!voiceEnabled) {
+      console.log('Voice was disabled, enabling now...');
+      setVoiceEnabled(true);
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    console.log('Starting to speak text:', text);
+    console.log('🔊 Starting to speak text:', text);
     setIsSpeaking(true);
 
     try {
+      // Set the selected voice if available
+      if (selectedVoice) {
+        console.log('🎙️ Setting voice to:', selectedVoice.displayName);
+        voiceService.setVoice(selectedVoice);
+      }
+      
       // Use the voiceService to speak the text
       await voiceService.speak(text, {
         onStart: () => {
-          console.log('Speech started');
+          console.log('🎤 Speech started');
           setIsSpeaking(true);
           // Set the last message for avatar animation
           setLastMessage(text);
         },
         onEnd: () => {
-          console.log('Speech ended');
+          console.log('✅ Speech ended');
           setIsSpeaking(false);
           setLastMessage(''); // Clear the last message when done speaking
         },
         onError: (error) => {
-          console.error('Error in speech synthesis:', error);
+          console.error('❌ Error in speech synthesis:', error);
           setIsSpeaking(false);
-          setError('Failed to speak the response. Please try again.');
+          setError('Failed to speak the response. Please check your audio settings.');
         }
       });
+      return true;
     } catch (error) {
-      console.error('Error in speakText:', error);
+      console.error('❌ Error in speakText:', error);
       setIsSpeaking(false);
-      setError('Failed to speak the response. Please try again.');
+      setError('Failed to speak the response. Please check your audio settings.');
+      return false;
     }
-  }, [voiceEnabled]);
+  }, [voiceEnabled, selectedVoice, setError]);
 
   // Volume lip sync integration
   const { 
@@ -544,10 +558,8 @@ const AvatarCallPage = () => {
     const processText = async () => {
       try {
         console.log('🔄 Adding message to conversation history...');
-        const updatedHistory = [
-          ...conversationHistory,
-          { role: 'user', content: recognizedText, timestamp: Date.now() }
-        ];
+        const userMessage = { role: 'user', content: recognizedText, timestamp: Date.now() };
+        const updatedHistory = [...conversationHistory, userMessage];
         
         setConversationHistory(updatedHistory);
         console.log('✅ Successfully updated conversation history');
@@ -555,9 +567,35 @@ const AvatarCallPage = () => {
         // Reset recognizedText to prevent reprocessing
         setRecognizedText('');
         
-        // Here you can add code to process the user's message and get a response
-        // For example:
-        // const response = await sendToOllama(recognizedText, updatedHistory, setConversationHistory, ...);
+        // Ensure voice is enabled before proceeding
+        let finalVoiceEnabled = voiceEnabled;
+        if (!finalVoiceEnabled) {
+          console.log('🔊 Voice was disabled, enabling now...');
+          setVoiceEnabled(true);
+          finalVoiceEnabled = true;
+          // Small delay to allow voice to initialize
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Call Ollama API to get response
+        console.log('📡 Sending to Ollama API...');
+        const response = await sendToOllama(
+          recognizedText,
+          updatedHistory,
+          setConversationHistory,
+          finalVoiceEnabled, // Use the local variable instead of state
+          setVoiceEnabled,
+          selectedVoice,
+          speakText,
+          setError,
+          setIsProcessing
+        );
+        
+        if (response) {
+          console.log('🤖 Ollama response received successfully');
+        } else {
+          console.warn('⚠️ No response received from Ollama');
+        }
         
       } catch (error) {
         console.error('❌ Error processing recognized text:', error);
@@ -566,7 +604,7 @@ const AvatarCallPage = () => {
     };
     
     processText();
-  }, [recognizedText, conversationHistory, setConversationHistory, setError]);
+  }, [recognizedText, conversationHistory, setConversationHistory, setError, voiceEnabled, selectedVoice, speakText]);
   
   // Handle starting/stopping recognition when isListening changes
   useEffect(() => {
