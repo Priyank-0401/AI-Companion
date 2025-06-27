@@ -24,8 +24,6 @@ import {
   FileText,
   Bookmark,
   Star,
-  Mic,
-  MicOff,
   Play,
   Pause,
   Plus,
@@ -60,26 +58,21 @@ const ChatPage = () => {
       timestamp: new Date()
     }
   ]);
-  
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationStyle, setConversationStyle] = useState('supportive');
   const [showOptions, setShowOptions] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
-  const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);  const [selectedModel, setSelectedModel] = useState('default');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
-  const [listeningTimeout, setListeningTimeout] = useState(null);
   const [activeChatDropdown, setActiveChatDropdown] = useState(null);
   const messagesEndRef = useRef(null);
   const initialLoadDoneRef = useRef(false);
   const chatScrollContainerRef = useRef(null);
-  const recognitionRef = useRef(null);
   const synthRef = useRef(null);
   const inputRef = useRef(null);
     const addMessage = (message) => {
@@ -287,121 +280,15 @@ const ChatPage = () => {
       }, 2000); // Auto-save after 2 seconds of inactivity
       
       return () => clearTimeout(timeoutId);
-    }
-  }, [messages, currentConversationId]);
+    }  }, [messages, currentConversationId]);
 
-  // Handle speech recognition and synthesis
+  // Handle speech synthesis only (removed speech recognition)
   useEffect(() => {
-    // Check for speech recognition support
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      console.log('Speech Recognition API is available in this browser')
-      setSpeechSupported(true)
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
-      console.log('Speech Recognition instance created successfully')
-      recognitionRef.current.continuous = true  // Keep listening
-      recognitionRef.current.interimResults = true  // Show interim results
-      recognitionRef.current.lang = 'en-US'
-      recognitionRef.current.maxAlternatives = 1      
-      recognitionRef.current.onstart = () => {
-        console.log('Speech recognition started')
-        setIsListening(true)
-      }      
-      recognitionRef.current.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-        
-        // Log the raw speech recognition results for debugging
-        console.log('Speech recognition results:', event.results)
-        
-        // Make sure we have results before processing
-        if (event.results && event.results.length > 0) {
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            // Add defensive check to ensure the result and first alternative exist
-            if (event.results[i] && event.results[i][0]) {
-              const transcript = event.results[i][0].transcript
-              console.log(`Transcript ${i}: "${transcript}" (confidence: ${event.results[i][0].confidence.toFixed(2)})`)
-              
-              if (event.results[i].isFinal) {
-                finalTranscript += transcript
-                console.log(`Adding to final: "${transcript}"`)
-              } else {
-                interimTranscript += transcript
-                console.log(`Adding to interim: "${transcript}"`)
-              }
-            } else {
-              console.warn(`Invalid speech result at index ${i}`)
-            }
-          }
-        } else {
-          console.warn('Speech recognition event had no results')
-        }
-        
-        // Update input with interim results
-        const currentTranscript = finalTranscript || interimTranscript
-        console.log(`Current transcript: "${currentTranscript}"`)
-        
-        if (currentTranscript.trim()) {
-          console.log(`Setting input to: "${currentTranscript.trim()}"`)
-          // Force update of React state with setTimeout to ensure state changes are processed
-          setTimeout(() => {
-            setInput(currentTranscript.trim())
-          }, 0)
-        }
-        
-        // If we have a final result with meaningful content, stop listening
-        // but only after a longer delay to ensure user is done speaking
-        if (finalTranscript.trim() && finalTranscript.trim().length > 2) {
-          console.log('Final transcript:', finalTranscript.trim())
-          setTimeout(() => {
-            if (recognitionRef.current && isListening) {
-              console.log('Stopping recognition after final transcript')
-              recognitionRef.current.stop()
-            }
-          }, 1500) // Increased delay to give user time to continue speaking
-        }
-      }
-
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error)
-        setIsListening(false)
-        
-        // Clear timeout on error
-        if (listeningTimeout) {
-          clearTimeout(listeningTimeout)
-          setListeningTimeout(null)
-        }
-        
-        // Handle specific errors with user-friendly messages
-        if (event.error === 'not-allowed') {
-          alert('Microphone access denied. Please allow microphone access in your browser settings and try again.')        } else if (event.error === 'no-speech') {
-          console.log('No speech detected - you can try again')
-          // Don't show error for no-speech, it's normal
-        } else if (event.error === 'audio-capture') {
-          alert('No microphone found. Please check that your microphone is connected and try again.')
-        } else if (event.error === 'network') {
-          console.log('Network error during speech recognition')
-        } else {
-          console.log('Speech recognition error:', event.error)
-        }
-      }
-
-      recognitionRef.current.onend = () => {
-        console.log('Speech recognition ended')
-        setIsListening(false)
-        
-        // Clear timeout when recognition ends
-        if (listeningTimeout) {
-          clearTimeout(listeningTimeout)
-          setListeningTimeout(null)
-        }
-      }
-    }
-
     // Check for speech synthesis support
     if ('speechSynthesis' in window) {
       synthRef.current = window.speechSynthesis;
-        // Load available voices
+
+      // Load available voices
       const loadVoices = () => {
         const voices = synthRef.current.getVoices();
         if (voices.length > 0) {
@@ -488,29 +375,13 @@ const ChatPage = () => {
       loadVoices();
     }
 
-    // Cleanup for speech recognition and synthesis
+    // Cleanup for speech synthesis only
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        // Nullify handlers to help prevent potential memory leaks
-        recognitionRef.current.onstart = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-      }
       if (synthRef.current) {
         synthRef.current.cancel();
       }
     };
-  }, []); // End of speech/synth initialization useEffect
-
-  // Effect to clean up listeningTimeout if it's active when the component unmounts or listeningTimeout changes
-  useEffect(() => {
-    return () => {
-      if (listeningTimeout) {
-        clearTimeout(listeningTimeout);
-      }
-    };  }, [listeningTimeout]);
+  }, []); // End of speech synthesis initialization useEffect
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -533,61 +404,8 @@ const ChatPage = () => {
       if (lastMessage.type === 'bot' && lastMessage.id !== 1) {
         speakMessage(lastMessage.content)
       }
-    }
-  }, [messages, voiceEnabled])
+    }  }, [messages, voiceEnabled])
 
-  const startListening = () => {
-    if (recognitionRef.current && speechSupported && !isListening) {
-      try {
-        // Clear any existing input and timeout
-        setInput('')
-        if (listeningTimeout) {
-          clearTimeout(listeningTimeout)
-          setListeningTimeout(null)
-        }
-        
-        console.log('Starting speech recognition...')
-        recognitionRef.current.start()
-          // Set a timeout to stop listening after 20 seconds of no speech
-        const timeout = setTimeout(() => {
-          if (recognitionRef.current && isListening) {
-            console.log('Speech recognition timeout - no speech detected for 20 seconds')
-            recognitionRef.current.stop()
-          }
-        }, 20000) // Increased to 20 seconds for better user experience
-        setListeningTimeout(timeout)
-        
-      } catch (error) {
-        console.error('Error starting speech recognition:', error)
-        setIsListening(false)
-        
-        // If already running, stop and restart
-        if (error.message.includes('already started')) {
-          recognitionRef.current.stop()
-          setTimeout(() => {
-            try {
-              recognitionRef.current.start()
-            } catch (retryError) {
-              console.error('Retry error:', retryError)
-            }
-          }, 100)
-        }
-      }
-    }
-  }
-
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      console.log('Stopping speech recognition...')
-      recognitionRef.current.stop()
-    }
-    
-    // Clear timeout
-    if (listeningTimeout) {
-      clearTimeout(listeningTimeout)
-      setListeningTimeout(null)
-    }
-  }
   const speakMessage = (text) => {
     if (synthRef.current && voiceEnabled && selectedVoice) {
       // Cancel any ongoing speech
@@ -760,7 +578,7 @@ const ChatPage = () => {
     return acc;
   }, {});
   return (
-    <div className="flex h-screen pt-20 bg-[#222831]">
+    <div className="flex h-screen bg-[#222831]">
       {/* Mobile Sidebar Toggle Button */}
       <div className="md:hidden fixed bottom-4 left-4 z-50">
         <motion.button
@@ -1312,40 +1130,7 @@ const ChatPage = () => {
                 placeholder="Share your thoughts... I'm here to listen with empathy and understanding."
                 className="w-full py-3 px-4 pr-24 bg-[#393E46]/80 border border-[#00ADB5]/20 rounded-xl text-[#EEEEEE] placeholder-[#EEEEEE]/40 focus:outline-none focus:ring-2 focus:ring-[#00ADB5]/50 focus:border-[#00ADB5]"
               />
-              
-              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-                {/* Speech Recognition Button */}
-                {speechSupported && (
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => isListening ? stopListening() : startListening()}
-                    className={`p-2 rounded-lg transition-all ${
-                      isListening 
-                        ? 'bg-red-500/30 hover:bg-red-500/40 text-red-400' 
-                        : 'bg-[#393E46] hover:bg-[#00ADB5]/20 text-[#EEEEEE]/70 hover:text-[#00ADB5]'
-                    }`}
-                  >
-                    {isListening ? (
-                      <motion.div
-                        animate={{ 
-                          scale: [1, 1.2, 1],
-                        }}
-                        transition={{ 
-                          duration: 1.5, 
-                          repeat: Infinity,
-                          ease: "easeOut"
-                        }}
-                      >
-                        <MicOff className="w-5 h-5" />
-                      </motion.div>
-                    ) : (
-                      <Mic className="w-5 h-5" />
-                    )}
-                  </motion.button>
-                )}
-                
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
                 {/* Send Button */}
                 <motion.button
                   type="submit"
@@ -1360,36 +1145,13 @@ const ChatPage = () => {
                 >
                   <Send className="w-5 h-5" />
                 </motion.button>
-              </div>
-            </form>
+              </div>            </form>
             
-            {/* Voice and Style Status */}
+            {/* Chat Status */}
             <div className="flex items-center justify-center mt-2 space-x-2">
-              <AnimatePresence>
-                {isListening && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="flex items-center space-x-2"
-                  >
-                    <motion.div
-                      animate={{ scale: [1, 1.1, 1] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="w-2 h-2 bg-red-400 rounded-full"
-                    />
-                    <span className="text-xs text-red-400 font-medium">
-                      Listening... Speak clearly or click mic to stop
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
-              {!isListening && (
-                <span className="text-xs text-[#EEEEEE]/40">
-                  {selectedModel === 'default' ? 'Seriva is ready to chat' : `Using ${modelOptions.find(m => m.id === selectedModel)?.name}`}
-                </span>
-              )}
+              <span className="text-xs text-[#EEEEEE]/40">
+                {selectedModel === 'default' ? 'Seriva is ready to chat' : `Using ${modelOptions.find(m => m.id === selectedModel)?.name}`}
+              </span>
             </div>
           </div>
         </div>

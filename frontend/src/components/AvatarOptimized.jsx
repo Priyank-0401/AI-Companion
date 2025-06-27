@@ -5,10 +5,11 @@ import { AVATAR_CONFIG } from '../config/avatarConfig';
 import { useAvatarExpressions } from '../hooks/useAvatarExpressions';
 import { useAvatarVoice } from '../hooks/useAvatarVoice';
 
-// Preload all model files for better performance
+// Preload all model files for better performance - INCLUDING GREET
 useGLTF.preload(AVATAR_CONFIG.MODELS.AVATAR);
 useGLTF.preload(AVATAR_CONFIG.MODELS.IDLE);
 useGLTF.preload(AVATAR_CONFIG.MODELS.TALKING);
+useGLTF.preload(AVATAR_CONFIG.MODELS.GREET); // NEW: Preload greeting animation
 
 // Loading fallback component
 function LoadingFallback() {
@@ -34,7 +35,7 @@ function ErrorFallback({ error }) {
   );
 }
 
-// Main Avatar Model Component - Clean and focused with voice integration
+// Enhanced Avatar Model Component with Greeting Support
 const AvatarModel = React.memo(({ 
   isTalking = false, 
   lastMessage = '', 
@@ -42,20 +43,34 @@ const AvatarModel = React.memo(({
   selectedVoice = null, 
   onVoiceEnd = null, 
   onError,
-  avatarVolume = 0.8, // New prop for volume
-  volumeLipSyncRef = null // New prop for volume-based lip sync
+  avatarVolume = 0.8,
+  volumeLipSyncRef = null,
+  // NEW: Greeting props
+  enableGreeting = true,
+  onGreetingComplete = null
 }) => {
-  // Load models
+  // Load models - INCLUDING GREET
   const avatarModel = useGLTF(AVATAR_CONFIG.MODELS.AVATAR);
   const idleFile = useGLTF(AVATAR_CONFIG.MODELS.IDLE);
   const talkingFile = useGLTF(AVATAR_CONFIG.MODELS.TALKING);
+  const greetFile = useGLTF(AVATAR_CONFIG.MODELS.GREET); // NEW: Load greet model
+
   // Refs
   const groupRef = useRef();
   const lastAnimationRef = useRef(null);
   const morphTargetRefs = useRef({});
   const animationBufferRef = useRef(null);
   const loopTimeoutRef = useRef(null);
-  // Expression system - handles blinking and facial expressions
+
+  // NEW: Greeting state management
+  const [greetingState, setGreetingState] = useState({
+    hasShownGreeting: false,        // Track if greeting has been shown
+    isGreeting: false,              // Currently playing greeting animation
+    greetingComplete: false,        // Greeting animation finished
+    shouldSmile: false,             // Should show smile expression
+  });
+
+  // Enhanced expression system with greeting support
   const { currentExpression, isBlinking } = useAvatarExpressions(
     isTalking, 
     lastMessage, 
@@ -64,22 +79,36 @@ const AvatarModel = React.memo(({
       enableBlinking: AVATAR_CONFIG.EXPRESSIONS.ENABLE_BLINKING,
       expressionDuration: AVATAR_CONFIG.EXPRESSIONS.EXPRESSION_DURATION,
       blinkInterval: AVATAR_CONFIG.EXPRESSIONS.BLINK_INTERVAL,
+      // NEW: Override expression during greeting
+      forceExpression: greetingState.shouldSmile ? 'smile' : null,
     }
   );
-  // Voice system - handles speech synthesis for avatar responses
+
+  // Voice system
   const {
     isSpeaking,
     speak,
     stopSpeaking,
-    availableVoices  } = useAvatarVoice({
+    availableVoices  
+  } = useAvatarVoice({
     enabled: voiceEnabled,
     selectedVoice: selectedVoice,
-    volume: avatarVolume // Pass volume to the hook
+    volume: avatarVolume
   });
-  // Prepare animations with clear naming
+
+  // Enhanced animations preparation - INCLUDING GREET
   const animations = React.useMemo(() => {
     const allAnimations = [];
     
+    // Process greeting animations - FIRST PRIORITY
+    if (greetFile?.animations && greetFile.animations.length > 0) {
+      greetFile.animations.forEach((clip, index) => {
+        const namedClip = clip.clone();
+        namedClip.name = `${AVATAR_CONFIG.ANIMATIONS.NAMES.GREET}_${index}`;
+        allAnimations.push(namedClip);
+      });
+    }
+
     // Process idle animations
     if (idleFile?.animations && idleFile.animations.length > 0) {
       idleFile.animations.forEach((clip, index) => {
@@ -99,11 +128,22 @@ const AvatarModel = React.memo(({
     }
 
     return allAnimations;
-  }, [idleFile, talkingFile]);
+  }, [greetFile, idleFile, talkingFile]); // NEW: Include greetFile dependency
 
-  // Animation system - ONLY use animations, ignore Mixamo geometry
-  const { actions, mixer } = useAnimations(animations, avatarModel.scene);  // Hide all Mixamo geometry to prevent conflicts + Verify head mesh visibility
+  // Animation system
+  const { actions, mixer } = useAnimations(animations, avatarModel.scene);
+
+  // Hide all animation model geometries - INCLUDING GREET
   useEffect(() => {
+    // Hide greeting file geometry
+    if (greetFile?.scene) {
+      greetFile.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.visible = false;
+        }
+      });
+    }
+
     // Hide idle file geometry
     if (idleFile?.scene) {
       idleFile.scene.traverse((child) => {
@@ -122,50 +162,89 @@ const AvatarModel = React.memo(({
       });
     }
 
-    // ✅ Step 2: Verify head mesh exists and is visible
+    // Ensure avatar head is visible
     if (avatarModel?.scene) {
       avatarModel.scene.traverse((child) => {
         if (child.isMesh && child.name.toLowerCase().includes('head')) {
-          // Ensure head is visible
           child.visible = true;
           if (child.material) {
             child.material.visible = true;
             child.material.transparent = false;
             child.material.opacity = 1;
           }
-        }      });    }
+        }
+      });
+    }
+  }, [greetFile, idleFile, talkingFile, avatarModel]); // NEW: Include greetFile
 
-  }, [idleFile, talkingFile, avatarModel]);  // Setup morph targets for expressions and blinking
+  // Setup morph targets
   useEffect(() => {
     if (!avatarModel?.scene) return;
 
     const morphTargets = {};
     
-    // Find meshes with morph targets (typically head/face meshes)
     avatarModel.scene.traverse((child) => {
       if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
-        console.log(`🎭 Found mesh with morph targets: ${child.name}`);
-        console.log(`🎭 Available morph targets:`, Object.keys(child.morphTargetDictionary));
-        
-        // Store reference to morph target influences
         morphTargets[child.name] = {
           dictionary: child.morphTargetDictionary,
           influences: child.morphTargetInfluences
         };
-        
-        // Check specifically for mouth targets
-        const mouthTargets = Object.keys(child.morphTargetDictionary).filter(key => 
-          key.toLowerCase().includes('mouth') || key.toLowerCase().includes('jaw')
-        );
-        if (mouthTargets.length > 0) {
-          console.log(`👄 Found mouth-related morph targets:`, mouthTargets);
-        }
       }
     });
 
     morphTargetRefs.current = morphTargets;
-    console.log(`🎭 Total meshes with morph targets: ${Object.keys(morphTargets).length}`);
-  }, [avatarModel]);// Apply blinking and expressions via morph targets
+  }, [avatarModel]);
+
+  // NEW: Greeting initialization - Auto-trigger on mount
+  useEffect(() => {
+    if (!enableGreeting || !AVATAR_CONFIG.GREETING.ENABLED) return;
+    if (greetingState.hasShownGreeting) return;
+
+    console.log('🎉 Initializing greeting sequence...');
+
+    const startGreeting = () => {
+      setGreetingState(prev => ({
+        ...prev,
+        hasShownGreeting: true,
+        isGreeting: true,
+        shouldSmile: AVATAR_CONFIG.EXPRESSIONS.ENABLE_GREETING_SMILE,
+      }));
+
+      console.log('👋 Starting greeting animation with smile');
+    };
+
+    // Delay greeting start
+    const greetingTimeout = setTimeout(startGreeting, AVATAR_CONFIG.GREETING.DELAY);
+
+    return () => clearTimeout(greetingTimeout);
+  }, [enableGreeting, greetingState.hasShownGreeting]);
+
+  // NEW: Greeting completion handler
+  useEffect(() => {
+    if (!greetingState.isGreeting) return;
+
+    const greetingDuration = AVATAR_CONFIG.GREETING.DURATION;
+    
+    const completeGreeting = () => {
+      console.log('✅ Greeting animation complete, transitioning to idle');
+      
+      setGreetingState(prev => ({
+        ...prev,
+        isGreeting: false,
+        greetingComplete: true,
+        shouldSmile: false, // Stop smiling after greeting
+      }));
+
+      // Callback to parent component
+      onGreetingComplete?.();
+    };
+
+    const completionTimeout = setTimeout(completeGreeting, greetingDuration);
+
+    return () => clearTimeout(completionTimeout);
+  }, [greetingState.isGreeting, onGreetingComplete]);
+
+  // Enhanced expression application with greeting smile
   useEffect(() => {
     const morphTargets = morphTargetRefs.current;
     
@@ -173,10 +252,7 @@ const AvatarModel = React.memo(({
       const { dictionary, influences } = morphTargets[meshName];
       
       // Handle blinking
-      if (isBlinking || currentExpression === 'blink') {
-        console.log(`👁️ Applying blink to mesh: ${meshName}`);
-        
-        // Try different possible eye blink morph target names
+      if (isBlinking && !greetingState.shouldSmile) { // Don't blink during greeting smile
         const blinkTargets = [
           AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.EYE_BLINK_LEFT,
           AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.EYE_BLINK_RIGHT,
@@ -184,21 +260,14 @@ const AvatarModel = React.memo(({
           'eyeBlinkLeft', 'eyeBlinkRight', 'eyesClosed', 'blink'
         ];
         
-        let blinkApplied = false;
         blinkTargets.forEach(targetName => {
           if (dictionary[targetName] !== undefined) {
             const targetIndex = dictionary[targetName];
-            influences[targetIndex] = 1.0; // Fully close eyes
-            console.log(`👁️ Applied blink to target: ${targetName} (index: ${targetIndex})`);
-            blinkApplied = true;
+            influences[targetIndex] = 1.0;
           }
         });
-        
-        if (!blinkApplied) {
-          console.warn('👁️ No blink morph targets found in dictionary:', Object.keys(dictionary));
-        }
       } else {
-        // Reset eye blink targets
+        // Reset blink targets
         const blinkTargets = [
           AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.EYE_BLINK_LEFT,
           AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.EYE_BLINK_RIGHT,
@@ -209,45 +278,50 @@ const AvatarModel = React.memo(({
         blinkTargets.forEach(targetName => {
           if (dictionary[targetName] !== undefined) {
             const targetIndex = dictionary[targetName];
-            influences[targetIndex] = 0.0; // Open eyes
+            influences[targetIndex] = 0.0;
           }
         });
-      }      // Handle other expressions
-      if (currentExpression === 'smile') {
+      }
+
+      // Handle expressions - PRIORITIZE GREETING SMILE
+      if (greetingState.shouldSmile) {
+        // Apply greeting smile
+        if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE] !== undefined) {
+          const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE];
+          influences[targetIndex] = AVATAR_CONFIG.GREETING.SMILE_INTENSITY;
+          console.log(`😊 Applying greeting smile with intensity: ${AVATAR_CONFIG.GREETING.SMILE_INTENSITY}`);
+        }
+      } else if (currentExpression === 'smile') {
         if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE] !== undefined) {
           const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE];
           influences[targetIndex] = 0.7;
-          console.log('😊 Applied smile expression');
         }
       } else if (currentExpression === 'frown') {
         if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_FROWN] !== undefined) {
           const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_FROWN];
           influences[targetIndex] = 0.7;
         }
-      } else if (currentExpression === 'neutral' && !isBlinking) {
+      } else if (currentExpression === 'neutral' && !isBlinking && !greetingState.shouldSmile) {
         // Reset all expression morph targets to neutral
         Object.keys(dictionary).forEach(morphName => {
           if (!morphName.toLowerCase().includes('blink') && !morphName.toLowerCase().includes('eye')) {
             const targetIndex = dictionary[morphName];
             influences[targetIndex] = 0.0;
-          }        });
+          }
+        });
       }
     });
-  }, [isBlinking, currentExpression]);
-  // Auto-speak new messages
+  }, [isBlinking, currentExpression, greetingState.shouldSmile]);
+
+  // Auto-speak new messages (unchanged)
   useEffect(() => {
     if (voiceEnabled && lastMessage && lastMessage.trim() && !isTalking) {
-      // Delay speaking slightly to allow for visual transition
       const speakTimeout = setTimeout(() => {
         speak(lastMessage, {
-          onStart: () => {
-            // Avatar starts talking animation when voice starts
-          },
+          onStart: () => {},
           onEnd: () => {
-            // Avatar returns to idle when voice ends
-            // If this is a demo message (not the welcome message), turn off voice
             if (!lastMessage.includes('Seriva') || !lastMessage.includes('companion')) {
-              onVoiceEnd?.(); // Call callback to disable voice
+              onVoiceEnd?.();
             }
           }
         });
@@ -255,93 +329,99 @@ const AvatarModel = React.memo(({
 
       return () => clearTimeout(speakTimeout);
     }
-  }, [lastMessage, voiceEnabled, speak, isTalking, onVoiceEnd]);// Animation switching logic with continuous looping
+  }, [lastMessage, voiceEnabled, speak, isTalking, onVoiceEnd]);
+
+  // ENHANCED: Animation switching logic with greeting priority
   useEffect(() => {
-    if (!actions || !mixer) {
-      return;
-    }
+    if (!actions || !mixer) return;
 
     const availableActions = Object.keys(actions);
+    if (availableActions.length === 0) return;
 
-    if (availableActions.length === 0) {
-      return;
-    }
-
-    // Clear any existing loop timeout
+    // Clear existing loop timeout
     if (loopTimeoutRef.current) {
       clearTimeout(loopTimeoutRef.current);
       loopTimeoutRef.current = null;
     }
 
-    // Determine if avatar should be talking (manual isTalking or voice speaking)
-    const shouldBeTalking = isTalking || isSpeaking;
+    // DETERMINE TARGET ANIMATION WITH PRIORITY SYSTEM
+    let targetAnimation;
+    let shouldLoop = true;
 
-    // Determine target animation - use first animation of each type
-    const targetAnimation = shouldBeTalking 
-      ? `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`
-      : `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;    // Only switch if different from current
+    if (greetingState.isGreeting && !greetingState.greetingComplete) {
+      // HIGHEST PRIORITY: Greeting animation
+      targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.GREET}_0`;
+      shouldLoop = false; // Greeting plays once only
+      console.log('🎬 Switching to greeting animation');
+    } else if (isTalking || isSpeaking) {
+      // MEDIUM PRIORITY: Talking animation
+      targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`;
+      console.log('🗣️ Switching to talking animation');
+    } else {
+      // LOWEST PRIORITY: Idle animation
+      targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;
+      console.log('😌 Switching to idle animation');
+    }
+
+    // Only switch if different from current
     if (lastAnimationRef.current !== targetAnimation) {
       // Stop current animation smoothly
       if (lastAnimationRef.current && actions[lastAnimationRef.current]) {
         actions[lastAnimationRef.current].fadeOut(AVATAR_CONFIG.ANIMATIONS.FADE_DURATION);
       }
 
-      // Start new animation with continuous looping
+      // Start new animation
       if (actions[targetAnimation]) {
         const startAnimation = () => {
           const action = actions[targetAnimation];
           action.reset();
           
-          // Set to loop only once for buffering control
-          action.setLoop(false);
+          // Set loop mode based on animation type
+          action.setLoop(shouldLoop);
           
-          // Set animation speed based on type
-          const animationSpeed = shouldBeTalking 
-            ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.TALKING 
-            : AVATAR_CONFIG.ANIMATIONS.SPEEDS.IDLE;
-            action.setEffectiveTimeScale(animationSpeed);
-          
+          // Set animation speed
+          const animationSpeed = greetingState.isGreeting 
+            ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.GREET
+            : (isTalking || isSpeaking) 
+              ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.TALKING 
+              : AVATAR_CONFIG.ANIMATIONS.SPEEDS.IDLE;
+              
+          action.setEffectiveTimeScale(animationSpeed);
           action.fadeIn(AVATAR_CONFIG.ANIMATIONS.FADE_DURATION);
           action.play();
           
-          // Setup continuous looping with buffer
-          if (AVATAR_CONFIG.ANIMATIONS.LOOP_SETTINGS.CONTINUOUS) {
+          // Setup looping for non-greeting animations
+          if (shouldLoop && AVATAR_CONFIG.ANIMATIONS.LOOP_SETTINGS.CONTINUOUS) {
             const setupNextLoop = () => {
-              // Only continue looping if we're still in the same animation state
               if (lastAnimationRef.current === targetAnimation) {
                 loopTimeoutRef.current = setTimeout(() => {
                   if (lastAnimationRef.current === targetAnimation && actions[targetAnimation]) {
-                    startAnimation(); // Recursively restart the animation
+                    startAnimation();
                   }
                 }, (action.getClip().duration / animationSpeed * 1000) + (AVATAR_CONFIG.ANIMATIONS.LOOP_SETTINGS.BUFFER_TIME * 1000));
               }
             };
-            
             setupNextLoop();
           }
         };
         
         startAnimation();
         lastAnimationRef.current = targetAnimation;
-      } else {
-        // Fallback to first available
-        const fallback = availableActions[0];
-        if (fallback) {
-          actions[fallback].reset().play();
-          lastAnimationRef.current = fallback;
-        }
       }
     }
 
-    // Cleanup function
     return () => {
       if (loopTimeoutRef.current) {
         clearTimeout(loopTimeoutRef.current);
-        loopTimeoutRef.current = null;      }    };
-  }, [isTalking, isSpeaking, actions, mixer]);  // Animation frame updates with volume-based lip sync
+        loopTimeoutRef.current = null;
+      }
+    };
+  }, [greetingState.isGreeting, greetingState.greetingComplete, isTalking, isSpeaking, actions, mixer]);
+
+  // Animation frame updates with volume-based lip sync (unchanged)
   useFrame(() => {
     if (mixer) {
-      mixer.update(0.016); // ~60fps
+      mixer.update(0.016);
     }
     
     // Volume-based lip sync integration
@@ -351,35 +431,28 @@ const AvatarModel = React.memo(({
       
       if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_OPEN] !== undefined) {
         const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_OPEN];
-          // Use volume-based lip sync if available
+        
         if (volumeLipSyncRef?.current?.getVolumeValue && volumeLipSyncRef.current.isPlaying()) {
           const volumeValue = volumeLipSyncRef.current.getVolumeValue();
-          
           if (volumeValue > 0) {
-            // Apply volume directly to mouth opening (0-1 range)
             influences[targetIndex] = Math.max(0, Math.min(1, volumeValue));
-            
-            // Debug logging
-            if (Math.random() < 0.02) { // 2% chance
-              console.log(`🎵 Avatar mouth opening: ${volumeValue.toFixed(3)} -> morph target: ${influences[targetIndex].toFixed(3)}`);
-            }
           } else {
             influences[targetIndex] = 0;
           }
         } else {
-          // Fallback to simple oscillation for manual talking
-          const shouldMoveMouth = isTalking || isSpeaking;
+          const shouldMoveMouth = (isTalking || isSpeaking) && !greetingState.isGreeting;
           if (shouldMoveMouth) {
             const jawMovement = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
             influences[targetIndex] = jawMovement;
           } else {
-            influences[targetIndex] = 0; // Close mouth when not talking
+            influences[targetIndex] = 0;
           }
         }
       }
     });
   });
-  // Error handling
+
+  // Error handling (unchanged)
   useEffect(() => {
     if (!avatarModel?.scene) {
       const error = new Error('Failed to load avatar model');
@@ -388,14 +461,15 @@ const AvatarModel = React.memo(({
     }
   }, [avatarModel, onError]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount (unchanged)
   useEffect(() => {
     return () => {
       if (loopTimeoutRef.current) {
         clearTimeout(loopTimeoutRef.current);
       }
     };
-  }, []);// ✅ Best Practice: Keep model upright, adjust camera instead of rotating avatar
+  }, []);
+
   return (
     <group
       ref={groupRef}
@@ -403,21 +477,12 @@ const AvatarModel = React.memo(({
       scale={AVATAR_CONFIG.AVATAR.SCALE}
       rotation={AVATAR_CONFIG.AVATAR.ROTATION}
     >
-      {/* Keep avatar upright - no destructive X-axis rotation */}
       <primitive object={avatarModel.scene} />
-      {/* 
-        ✅ IMPORTANT: 
-        - avatarModel.scene = ReadyPlayerMe appearance kept upright
-        - No rotation to avoid distorting skinned mesh
-        - Camera positioned to look at head level instead
-        - idleFile.scene & talkingFile.scene = NEVER rendered (hidden above)
-        - Only animations from Mixamo files are applied to ReadyPlayerMe geometry
-      */}
     </group>
   );
 });
 
-// Main Avatar Scene Component
+// Enhanced Avatar Scene Component with Greeting Support
 const AvatarScene = React.memo(({ 
   isTalking, 
   lastMessage = '', 
@@ -425,7 +490,10 @@ const AvatarScene = React.memo(({
   selectedVoice = null, 
   onVoiceEnd = null, 
   className = "w-full h-full",
-  volumeLipSyncRef = null // Pass through volume lip sync ref
+  volumeLipSyncRef = null,
+  // NEW: Greeting props
+  enableGreeting = true,
+  onGreetingComplete = null
 }) => {
   const [error, setError] = useState(null);
 
@@ -445,7 +513,7 @@ const AvatarScene = React.memo(({
         dpr={[1, 2]}
         frameloop="always"
         gl={{ antialias: true, alpha: false }}
-      >        {/* Camera positioned at eye level looking at head */}
+      >
         <PerspectiveCamera 
           makeDefault
           position={AVATAR_CONFIG.CAMERA.POSITION}
@@ -453,12 +521,11 @@ const AvatarScene = React.memo(({
           near={AVATAR_CONFIG.CAMERA.NEAR}
           far={AVATAR_CONFIG.CAMERA.FAR}
           onUpdate={(camera) => {
-            // Make camera look at head level
             camera.lookAt(...AVATAR_CONFIG.CAMERA.LOOK_AT);
           }}
         />
 
-        {/* Lighting setup for optimal face visibility */}
+        {/* Enhanced lighting setup */}
         <ambientLight 
           intensity={AVATAR_CONFIG.LIGHTING.AMBIENT.INTENSITY}
           color={AVATAR_CONFIG.LIGHTING.AMBIENT.COLOR}
@@ -474,12 +541,13 @@ const AvatarScene = React.memo(({
           intensity={AVATAR_CONFIG.LIGHTING.POINT.INTENSITY}
           color={AVATAR_CONFIG.LIGHTING.POINT.COLOR}
         />
-        {/* Additional face lighting */}
         <pointLight 
           position={AVATAR_CONFIG.LIGHTING.FACE_LIGHT.POSITION}
           intensity={AVATAR_CONFIG.LIGHTING.FACE_LIGHT.INTENSITY}
           color={AVATAR_CONFIG.LIGHTING.FACE_LIGHT.COLOR}
-        />        {/* Avatar Model */}
+        />
+
+        {/* Enhanced Avatar Model with Greeting */}
         <Suspense fallback={null}>
           <AvatarModel
             isTalking={isTalking}
@@ -489,6 +557,8 @@ const AvatarScene = React.memo(({
             onVoiceEnd={onVoiceEnd}
             onError={handleError}
             volumeLipSyncRef={volumeLipSyncRef}
+            enableGreeting={enableGreeting}
+            onGreetingComplete={onGreetingComplete}
           />
         </Suspense>
       </Canvas>
@@ -496,7 +566,7 @@ const AvatarScene = React.memo(({
   );
 });
 
-// Main Export Component - Simple interface with voice support
+// Enhanced Main Export Component with Greeting Support
 const Avatar = React.memo(({ 
   isTalking = false,
   lastMessage = '',
@@ -504,7 +574,10 @@ const Avatar = React.memo(({
   selectedVoice = null,
   onVoiceEnd = null,
   className = "w-full h-full",
-  volumeLipSyncRef = null // Pass through volume lip sync ref
+  volumeLipSyncRef = null,
+  // NEW: Greeting props
+  enableGreeting = true,
+  onGreetingComplete = null
 }) => {
   return (
     <AvatarScene
@@ -515,6 +588,8 @@ const Avatar = React.memo(({
       onVoiceEnd={onVoiceEnd}
       className={className}
       volumeLipSyncRef={volumeLipSyncRef}
+      enableGreeting={enableGreeting}
+      onGreetingComplete={onGreetingComplete}
     />
   );
 });

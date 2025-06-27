@@ -54,7 +54,6 @@ export const useVolumeLipSync = () => {
    */
   const setupVolumeAnalysis = useCallback((audio) => {
     try {
-      console.log('🎵 Setting up volume-based lip sync');
       
       // Create audio context
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -73,7 +72,6 @@ export const useVolumeLipSync = () => {
       // Create data array for frequency data
       dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
       
-      console.log('✅ Volume analysis setup complete');
       return true;
     } catch (error) {
       console.error('❌ Failed to setup volume analysis:', error);
@@ -87,8 +85,6 @@ export const useVolumeLipSync = () => {
       console.error('❌ No analyser available for volume analysis');
       return;
     }
-
-    console.log('🎵 Starting volume analysis loop');
     isAnalyzingRef.current = true;
     setIsAnalyzing(true);
     
@@ -101,24 +97,17 @@ export const useVolumeLipSync = () => {
       currentVolumeRef.current = volume;
       setCurrentVolume(volume);
         // Debug logging (reduced frequency for faster movement)
-      if (volume > 0.03) {
-        if (Math.random() < 0.05) { // 5% chance for debug output
-          console.log(`🎵 Volume detected: ${volume.toFixed(3)}`);
-        }
-      }
       
       // Continue analysis loop
       animationFrameRef.current = requestAnimationFrame(analyze);
     };
 
     analyze();
-    console.log('🎵 Volume analysis loop started');
   }, [calculateVolume]);
   /**
    * Stop volume analysis
    */
   const stopVolumeAnalysis = useCallback(() => {
-    console.log('🔇 Stopping volume analysis');
     
     isAnalyzingRef.current = false;
     setIsAnalyzing(false);
@@ -142,7 +131,6 @@ export const useVolumeLipSync = () => {
     sourceRef.current = null;
     dataArrayRef.current = null;
     
-    console.log('🔇 Volume analysis stopped');
   }, []);
 
   /**

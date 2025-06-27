@@ -1,10 +1,11 @@
-// Clean Avatar Configuration - Focus on model appearance and basic animations
+// Enhanced Avatar Configuration with Greeting Support
 export const AVATAR_CONFIG = {
   // Model paths - Clear separation of concerns
   MODELS: {
     AVATAR: '/models/avatar.glb',      // ReadyPlayerMe appearance ONLY
     IDLE: '/models/Idle.glb',          // Animation data ONLY
     TALKING: '/models/Talking.glb',    // Animation data ONLY
+    GREET: '/models/Greet.glb',        // Greeting animation data ONLY
   },
 
   // Camera settings - Position at eye level and look at head
@@ -18,26 +19,19 @@ export const AVATAR_CONFIG = {
 
   // Avatar positioning - Keep upright, no rotation
   AVATAR: {
-    POSITION: [0, 0.2, 0],              // Lower to bring head into view
+    POSITION: [0, 0.1, 0],              // Lower to bring head into view
     SCALE: [1.5, 1.5, 1.5],            // Good size
     ROTATION: [0, 0, 0],               // Keep upright - no destructive rotation
   },
 
-  // Animation Settings
-  ANIMATION: {
-    FADE_DURATION: 0.3,      // Quick but smooth transitions
-    LOOP: true                // Loop animations
-  },
-  // Performance Settings
-
   // Enhanced lighting for face visibility
   LIGHTING: {
     AMBIENT: {
-      INTENSITY: 1.0,
+      INTENSITY: 1.5,
       COLOR: 0xffffff,
     },
     DIRECTIONAL: {
-      INTENSITY: 1.2,
+      INTENSITY: 1.8,
       POSITION: [5, 10, 5],
       COLOR: 0xffffff,
     },
@@ -47,47 +41,71 @@ export const AVATAR_CONFIG = {
       COLOR: 0xffffff,
     },
     FACE_LIGHT: {
-      INTENSITY: 0.6,
+      INTENSITY: 1.0,
       POSITION: [0, 0, 4],              // Direct face lighting
       COLOR: 0xffffff,
     },
-  },  // Animation settings - Simple and clean
+  },
+
+  // Animation settings - Enhanced with greeting support
   ANIMATIONS: {
     FADE_DURATION: 0.3,                // Smooth transitions
     DEFAULT: 'idle',
     NAMES: {
+      GREET: 'greet',                  // NEW: Greeting animation
       IDLE: 'idle',
       TALKING: 'talking',
     },
     SPEEDS: {
+      GREET: 1.0,                      // NEW: Normal speed for greeting
       IDLE: 1.0,                       // Normal speed for idle
-      TALKING: 0.3,                    // Slower speed for talking (60% of original)
+      TALKING: 0.3,                    // Slower speed for talking
     },
     LOOP_SETTINGS: {
       CONTINUOUS: true,                // Keep looping until manually stopped
-      BUFFER_TIME: 0.1,               // Brief pause between animation loops (in seconds)
+      BUFFER_TIME: 0.1,               // Brief pause between animation loops
       SMOOTH_TRANSITIONS: true,        // Enable smooth transitions between loops
+      GREET_ONCE: true,               // NEW: Greeting plays only once
+    },
+    // NEW: Animation priorities (higher number = higher priority)
+    PRIORITIES: {
+      GREET: 3,                       // Highest priority
+      TALKING: 2,                     // Medium priority
+      IDLE: 1,                        // Lowest priority
     },
   },
-  // Blinking and Expression Settings
+
+  // Enhanced Expression Settings with Greeting
   EXPRESSIONS: {
-    ENABLE_BLINKING: false,            // Disabled - no blink morph targets in current model
+    ENABLE_BLINKING: false,            // Disabled - no blink morph targets
     ENABLE_AUTO_EXPRESSIONS: true,
+    ENABLE_GREETING_SMILE: true,       // NEW: Enable smile during greeting
     BLINK_INTERVAL: [2000, 5000],      // Min and max blink interval (ms)
     BLINK_DURATION: 150,               // How long a blink lasts (ms)
     EXPRESSION_DURATION: 3000,         // How long expressions last (ms)
+    GREETING_EXPRESSION_DURATION: 4000, // NEW: How long greeting smile lasts
     BLINK_PROBABILITY: 0.7,            // Probability of blinking when scheduled
     MORPH_TARGETS: {
       // Eye blinking morph targets (NOT AVAILABLE in current model)
       EYE_BLINK_LEFT: 'eyeBlinkLeft',
       EYE_BLINK_RIGHT: 'eyeBlinkRight',
       EYE_BLINK: 'eyesClosed',         // Fallback if separate targets don't exist
-      // Additional expression targets (AVAILABLE)
-      MOUTH_SMILE: 'mouthSmile',       // ✅ Available
-      MOUTH_OPEN: 'mouthOpen',         // ✅ Available - can be used for talking
+      // Expression targets
+      MOUTH_SMILE: 'mouthSmile',       // ✅ Available - used for greeting
+      MOUTH_OPEN: 'mouthOpen',         // ✅ Available - used for talking
       MOUTH_FROWN: 'mouthFrown',       // Not available
       EYEBROW_UP: 'browInnerUp',       // Not available
     },
+  },
+
+  // NEW: Greeting Configuration
+  GREETING: {
+    ENABLED: true,                     // Enable greeting on mount
+    AUTO_TRIGGER: true,                // Auto-trigger on component mount
+    DELAY: 500,                        // Delay before greeting starts (ms)
+    DURATION: 3000,                    // Expected greeting animation duration (ms)
+    SMILE_INTENSITY: 0.8,              // Smile strength during greeting (0-1)
+    PLAY_ONCE_PER_SESSION: true,       // Only play once per page load
   },
 
   // Performance settings

@@ -8,13 +8,18 @@ import { analyzeTextForExpression, ExpressionManager } from '../utils/expression
  * @param {object} options - Configuration options
  * @returns {object} - Expression state and controls
  */
-export const useAvatarExpressions = (isTalking, lastMessage, options = {}) => {
+export const useAvatarExpressions = (
+  isTalking = false,
+  lastMessage = '',
+  options = {}
+) => {
   const {
     enableAutoExpression = true,
     enableBlinking = true,
     expressionDuration = 3000,
     blinkInterval = [2000, 5000], // Min and max blink interval
-    lipSyncEnabled = false
+    lipSyncEnabled = false,
+    forceExpression = null, // ADD THIS LINE - for greeting smile override
   } = options;
 
   const [currentExpression, setCurrentExpression] = useState('neutral');
@@ -23,6 +28,23 @@ export const useAvatarExpressions = (isTalking, lastMessage, options = {}) => {
   const blinkTimer = useRef(null);
   const expressionTimer = useRef(null);
 
+  // NEW: Handle forced expressions (like greeting smile)
+  useEffect(() => {
+    if (forceExpression) {
+      console.log(`🎭 Forcing expression: ${forceExpression}`);
+      setCurrentExpression(forceExpression);
+      
+      // Clear any existing expression timers when forcing
+      if (expressionTimer.current) {
+        clearTimeout(expressionTimer.current);
+        expressionTimer.current = null;
+      }
+      
+      // Don't allow auto-expressions while forced
+      return;
+    }
+  }, [forceExpression]);
+
   // Analyze message for expression
   const analyzeMessage = useCallback((message) => {
     if (!enableAutoExpression || !message) return 'neutral';
@@ -30,8 +52,11 @@ export const useAvatarExpressions = (isTalking, lastMessage, options = {}) => {
     return analyzeTextForExpression(message);
   }, [enableAutoExpression]);
 
-  // Handle new messages
+  // Handle new messages - MODIFIED to respect forced expressions
   useEffect(() => {
+    // Don't run auto expressions if we're forcing an expression
+    if (!enableAutoExpression || forceExpression) return;
+    
     if (lastMessage && enableAutoExpression) {
       const detectedExpression = analyzeMessage(lastMessage);
       
@@ -57,9 +82,12 @@ export const useAvatarExpressions = (isTalking, lastMessage, options = {}) => {
         }, expressionDuration);
       }
     }
-  }, [lastMessage, analyzeMessage, expressionDuration, enableAutoExpression]);  // Automatic blinking system
+  }, [lastMessage, analyzeMessage, expressionDuration, enableAutoExpression, forceExpression]);
+
+  // Automatic blinking system - MODIFIED to respect forced expressions
   useEffect(() => {
-    if (!enableBlinking) {
+    // Don't blink during forced expressions (like greeting smile)
+    if (!enableBlinking || forceExpression === 'smile') {
       return; // Silently disabled
     }
 
@@ -92,14 +120,24 @@ export const useAvatarExpressions = (isTalking, lastMessage, options = {}) => {
         // Schedule next blink
         scheduleBlink();
       }, interval);
-    };    scheduleBlink();
+    };
+
+    scheduleBlink();
 
     return () => {
       if (blinkTimer.current) {
         clearTimeout(blinkTimer.current);
       }
     };
-  }, [enableBlinking, blinkInterval, currentExpression]);
+  }, [enableBlinking, blinkInterval, currentExpression, forceExpression]);
+
+  // NEW: Reset to neutral when forced expression is removed
+  useEffect(() => {
+    if (forceExpression === null && currentExpression !== 'neutral' && !isTalking) {
+      console.log('🔄 Resetting to neutral expression after forced expression');
+      setCurrentExpression('neutral');
+    }
+  }, [forceExpression, currentExpression, isTalking]);
 
   // Manual expression control
   const setExpression = useCallback((expression, duration = expressionDuration) => {

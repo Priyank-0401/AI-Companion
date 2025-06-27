@@ -18,7 +18,10 @@ import {
 const AvatarCallPage = () => {  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);  const [isMuted, setIsMuted] = useState(false);
-  const [isListening, setIsListening] = useState(false);  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
+  const [isListening, setIsListening] = useState(false);
+  const [recognizedText, setRecognizedText] = useState('');
+  const recognitionRef = useRef(null);
+  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [audioElement, setAudioElement] = useState(null);
   const [lastMessage, setLastMessage] = useState(''); // For expression system
@@ -169,19 +172,165 @@ const AvatarCallPage = () => {
     stopLipSync(); // Stop lip sync when voice ends
     console.log('🔇 Voice ended - Avatar voice disabled, returning to idle, and lip sync stopped');
   }, [stopLipSync]);
-  const toggleListening = useCallback(() => {
-    setIsListening(prev => {
-      const newValue = !prev;
-      if (newValue) {
-        // Start voice recognition - placeholder for future implementation
-        // TODO: Integrate with speech-to-text API (Web Speech API or Azure Speech)
-      } else {
-        // Stop voice recognition
-        // TODO: Stop speech recognition and cleanup
+  
+  // Initialize speech recognition on component mount
+  useEffect(() => {
+    // Only initialize if not already done and if the API is available
+    if (recognitionRef.current) return;
+    
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.warn('Speech recognition not supported in this browser');
+      // Don't show error for unsupported browsers, just disable the feature
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    let isStarting = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+
+    const startRecognition = () => {
+      if (isStarting || retryCount >= MAX_RETRIES) return;
+      isStarting = true;
+      
+      console.log('Starting speech recognition, attempt', retryCount + 1);
+      
+      recognition.start().then(() => {
+        console.log('Speech recognition started successfully');
+        retryCount = 0; // Reset retry count on success
+        setError(null); // Clear any previous errors
+      }).catch(error => {
+        console.error('Failed to start speech recognition:', error);
+        retryCount++;
+        
+        if (retryCount < MAX_RETRIES) {
+          console.log(`Retrying in 1 second... (${retryCount}/${MAX_RETRIES})`);
+          setTimeout(() => {
+            if (isListening) startRecognition();
+          }, 1000);
+        } else {
+          console.error('Max retries reached, giving up');
+          setIsListening(false);
+          // Don't show error to user, just disable the feature
+        }
+      }).finally(() => {
+        isStarting = false;
+      });
+    };
+
+    recognition.onresult = (event) => {
+      try {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+        
+        setRecognizedText(transcript);
+        console.log('Recognized text:', transcript);
+        
+        if (event.results[0].isFinal) {
+          console.log('Final recognized text:', transcript);
+        }
+      } catch (error) {
+        console.error('Error processing speech recognition result:', error);
       }
-      return newValue;
-    });
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      
+      // Don't show errors to the user, just log them
+      switch(event.error) {
+        case 'not-allowed':
+          console.warn('Microphone access was denied');
+          break;
+        case 'network':
+          console.warn('Network error occurred with speech recognition');
+          break;
+        case 'no-speech':
+          console.log('No speech detected');
+          break;
+        default:
+          console.warn('Speech recognition error:', event.error);
+      }
+      
+      // Don't set error state, just stop listening
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      if (isListening) {
+        // Small delay before restarting to prevent rapid retries
+        setTimeout(() => {
+          if (isListening) {
+            startRecognition();
+          }
+        }, 100);
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    // Cleanup function
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error('Error stopping recognition during cleanup:', e);
+        }
+        recognitionRef.current = null;
+      }
+    };
   }, []);
+
+  // Handle starting/stopping recognition when isListening changes
+  useEffect(() => {
+    if (!recognitionRef.current) {
+      console.warn('Speech recognition not available');
+      return;
+    }
+
+    let timeoutId;
+    
+    const startListening = async () => {
+      try {
+        console.log('Attempting to start voice recognition...');
+        await recognitionRef.current.start();
+        console.log('Voice recognition started successfully');
+        setRecognizedText('');
+      } catch (error) {
+        console.error('Error starting voice recognition:', error);
+        // Don't show error to user, just stop listening
+        setIsListening(false);
+      }
+    };
+
+    if (isListening) {
+      startListening();
+    } else {
+      try {
+        recognitionRef.current.stop();
+        console.log('Voice recognition stopped');
+      } catch (error) {
+        console.warn('Error stopping voice recognition:', error);
+      }
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isListening]);
+
+  const toggleListening = useCallback(() => {
+    setIsListening(prev => !prev);
+  }, []);
+
   // Volume control functions with optimized hover
   const volumeHoverTimeoutRef = useRef(null);
   
@@ -299,7 +448,10 @@ const AvatarCallPage = () => {
     };
   }, []);
 
-  if (isLoading) {
+  // Don't show error state for speech recognition issues
+  const displayError = error && !error.includes('speech recognition');
+
+  if (isLoading && !displayError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
         <motion.div
@@ -331,7 +483,7 @@ const AvatarCallPage = () => {
       </div>
     );
   }
-  if (error) {
+  if (displayError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
         <motion.div
@@ -351,10 +503,12 @@ const AvatarCallPage = () => {
         </motion.div>
       </div>
     );
-  }  return (
+  }
+  
+  return (
     <>
       {/* Custom styles for volume slider */}
-      <style jsx>{`
+      <style jsx="true">{`
         input[type="range"] {
           -webkit-appearance: none;
           appearance: none;
@@ -423,9 +577,9 @@ const AvatarCallPage = () => {
           </motion.div>
         </div>
       </div>      {/* Bottom Controls - Always visible */}
-      <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40">
-        <div className="flex items-center justify-center py-4 pb-20">
-          <div className="flex items-center space-x-4">{/* Voice Tone Selector - Simplified */}
+      <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40 w-full">
+        <div className="flex flex-col items-center justify-center py-4 pb-20 w-full">
+          <div className="flex items-center justify-center space-x-4 w-full max-w-2xl mx-auto">{/* Voice Tone Selector - Simplified */}
               <div className="relative voice-selector-container">
                 <button 
                   onClick={() => setShowVoiceSelector(!showVoiceSelector)}
@@ -494,7 +648,7 @@ const AvatarCallPage = () => {
                     ? 'bg-purple-600 shadow-lg shadow-purple-500/50' 
                     : 'bg-gray-700 hover:bg-gray-600'
                 }`}
-                title={voiceEnabled ? 'Disable Avatar Voice' : 'Enable & Test Avatar Voice'}
+                title={voiceEnabled ? 'Disable Avatar Voice' : 'Enable Avatar Voice'}
               >
                 <MessageSquare className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
                 {voiceEnabled && (

@@ -74,8 +74,6 @@ class VoiceService {
     this.init();
   }
   init() {
-    console.log('🎵 Azure Neural TTS Voice Service initialized');
-    console.log('Available voices:', this.availableVoices.map(v => v.displayName));
     
     // Pre-cache common welcome messages for instant playback
     this.preCacheWelcomeMessages();
@@ -86,7 +84,6 @@ class VoiceService {
       "Hey! I am Seriva, your AI companion. I'm ready to talk with you!"
     ];
 
-    console.log('🚀 Pre-caching welcome message for instant playback...');
     
     // Only cache for the default voice to avoid rate limiting
     const defaultVoice = this.availableVoices[0];
@@ -99,14 +96,12 @@ class VoiceService {
         await new Promise(resolve => setTimeout(resolve, 1000));
         const audioBlob = await this.fetchAzureTTS(message, { voice: defaultVoice });
         this.audioCache.set(cacheKey, audioBlob);
-        console.log(`✅ Cached welcome message for ${defaultVoice.displayName}`);
       }
     } catch (error) {
       console.warn(`⚠️ Failed to cache welcome message:`, error);
       // Don't throw error, just log it - the app should still work without pre-caching
     }
     
-    console.log('🎉 Welcome message pre-caching completed!');
   }  // Fetch Azure Neural TTS Audio with rate limiting and retry logic
   async fetchAzureTTS(text, options = {}) {
     if (!text || text.trim().length === 0) {
@@ -132,9 +127,6 @@ class VoiceService {
 
     while (retryCount < maxRetries) {
       try {
-        console.log('🎵 Fetching Azure TTS for:', text.substring(0, 50) + '...');
-        console.log('🔧 Using voice:', voiceName);
-        console.log('🔧 Using style:', style);
         
         const response = await fetch(AZURE_CONFIG.endpoint, {
           method: 'POST',
@@ -172,7 +164,6 @@ class VoiceService {
         }
 
         const audioBlob = await response.blob();
-        console.log('✅ Azure TTS audio received, size:', audioBlob.size, 'bytes');
         
         return audioBlob;
       } catch (error) {
@@ -206,7 +197,6 @@ class VoiceService {
       // Stop any current audio
       this.stop();
 
-      console.log('🎵 Starting speech synthesis:', text.substring(0, 50) + '...');
       this.isSpeaking = true;
 
       // Check cache first for instant response
@@ -214,7 +204,6 @@ class VoiceService {
       let audioBlob = this.audioCache.get(cacheKey);
       
       if (audioBlob) {
-        console.log('🚀 Using cached audio for instant playback');
         return this.playAudioBlob(audioBlob, options);
       }
 
@@ -248,7 +237,6 @@ class VoiceService {
       
       // Last resort: try Web Speech API
       try {
-        console.log('🔄 Attempting Web Speech API as last resort...');
         return this.playWebSpeechFallback(text, options);
       } catch (fallbackError) {
         console.error('❌ All speech synthesis methods failed:', fallbackError);
@@ -262,8 +250,6 @@ class VoiceService {
       console.warn('⚠️ Web Speech API not available');
       throw new Error('Web Speech API not supported');
     }
-
-    console.log('⚡ Using Web Speech API for speech synthesis');
     
     return new Promise((resolve, reject) => {
       const utterance = new SpeechSynthesisUtterance(text);
@@ -279,7 +265,6 @@ class VoiceService {
       
       if (femaleVoice) {
         utterance.voice = femaleVoice;
-        console.log('🔧 Using system voice:', femaleVoice.name);
       }
         utterance.rate = 0.9;
       utterance.pitch = 1.1;
@@ -289,14 +274,12 @@ class VoiceService {
         this.isSpeaking = true;
         // Create a dummy audio element for consistency with Azure TTS
         this.currentAudio = new Audio();
-        console.log('🎵 Web Speech synthesis started');
         options.onStart?.();
       };
       
       utterance.onend = () => {
         this.isSpeaking = false;
         this.currentAudio = null;
-        console.log('🎵 Web Speech synthesis ended');
         options.onEnd?.();
         resolve();
       };
@@ -324,22 +307,16 @@ class VoiceService {
     return new Promise((resolve, reject) => {
       // Event handlers
       audio.onloadstart = () => {
-        console.log('🎵 Audio loading started');
         options.onStart?.();
       };
 
-      audio.oncanplaythrough = () => {
-        console.log('🎵 Audio ready to play');
-      };
 
       audio.onplay = () => {
-        console.log('🎵 Audio playback started');
         this.isSpeaking = true;
         options.onStart?.();
       };
 
       audio.onended = () => {
-        console.log('🎵 Audio playback ended');
         this.isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
@@ -357,12 +334,10 @@ class VoiceService {
       };
 
       audio.onpause = () => {
-        console.log('⏸️ Audio paused');
         options.onPause?.();
       };
 
       audio.onabort = () => {
-        console.log('⏹️ Audio aborted');
         this.isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
@@ -384,13 +359,11 @@ class VoiceService {
       this.currentAudio = null;
     }
     this.isSpeaking = false;
-    console.log('⏹️ Speech stopped');
   }
 
   pause() {
     if (this.currentAudio && !this.currentAudio.paused) {
       this.currentAudio.pause();
-      console.log('⏸️ Speech paused');
     }
   }
 
@@ -399,14 +372,12 @@ class VoiceService {
       this.currentAudio.play().catch(error => {
         console.error('❌ Failed to resume audio:', error);
       });
-      console.log('▶️ Speech resumed');
     }
   }
 
   setVoice(voice) {
     if (voice && this.availableVoices.includes(voice)) {
       this.selectedVoice = voice;
-      console.log('🎵 Voice changed to:', voice.displayName);
       return true;
     }
     return false;
@@ -420,7 +391,6 @@ class VoiceService {
     
     if (voice) {
       this.selectedVoice = voice;
-      console.log('🎵 Voice changed to:', voice.displayName);
       return true;
     }
     return false;
@@ -428,7 +398,6 @@ class VoiceService {
 
   adjustSettings(settings) {
     this.voiceSettings = { ...this.voiceSettings, ...settings };
-    console.log('⚙️ Voice settings updated:', this.voiceSettings);
   }
 
   // Get voice recommendations based on context
