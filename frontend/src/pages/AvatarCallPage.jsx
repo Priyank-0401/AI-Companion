@@ -85,28 +85,24 @@ const sendToOllama = async (message, conversationHistory, setConversationHistory
     if (data.message.content) {
       console.log('Preparing to speak response...');
       
-      // Ensure voice is enabled
+      // Ensure voice is enabled (no artificial delay)
       if (!voiceEnabled) {
         console.log('Voice was disabled, enabling now...');
         setVoiceEnabled(true);
-        // Small delay to allow voice to initialize
-        await new Promise(resolve => setTimeout(resolve, 300));
       }
       
-      // Set the selected voice
+      // Set the selected voice if needed
       if (selectedVoice) {
         console.log('Setting voice to:', selectedVoice);
-        const voiceSet = voiceService.setVoice(selectedVoice);
-        if (!voiceSet) {
-          console.warn('Failed to set voice, using default');
-        }
-      } else {
-        console.warn('No voice selected, using default');
+        voiceService.setVoice(selectedVoice);
       }
       
-      // Speak the response
-      console.log('Calling speakText with response content');
-      await speakText(data.message.content);
+      // Speak the response without waiting for the voice to be fully ready
+      // The voice service will handle any necessary buffering
+      console.log('Initiating speech synthesis...');
+      speakText(data.message.content).catch(error => {
+        console.error('Error in speech synthesis:', error);
+      });
     }
     
     return data.message.content;

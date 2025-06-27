@@ -61,22 +61,55 @@ export const AZURE_NEURAL_VOICES = [
 class VoiceService {
   constructor() {
     this.availableVoices = AZURE_NEURAL_VOICES;
-    this.selectedVoice = AZURE_NEURAL_VOICES[0]; // Default to Jenny
-    this._isSpeaking = false; // Use _isSpeaking for the instance variable
+    this.selectedVoice = AZURE_NEURAL_VOICES[0];
+    this._isSpeaking = false;
     this.currentAudio = null;
-    this.audioCache = new Map(); // Add audio caching
+    this.audioCache = new Map();
+    this.isInitialized = false;
+    this.initializationPromise = null;
     this.voiceSettings = {
-      rate: '0.9',      // Slightly slower for clarity
-      pitch: '+5%',     // Slightly higher for femininity
-      style: 'friendly' // Default emotional style
+      rate: '0.9',
+      pitch: '+5%',
+      style: 'friendly'
     };
     
-    this.init();
+    // Start initialization immediately but don't wait for it
+    this.initialize();
   }
-  init() {
-    
-    // Pre-cache common welcome messages for instant playback
-    this.preCacheWelcomeMessages();
+
+  async initialize() {
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = (async () => {
+      try {
+        // Warm up the speech synthesis with a silent audio
+        await this.warmUp();
+        // Pre-cache welcome messages
+        await this.preCacheWelcomeMessages();
+        this.isInitialized = true;
+        console.log('Voice service initialized and warmed up');
+      } catch (error) {
+        console.warn('Voice service initialization warning:', error);
+      }
+      return this;
+    })();
+
+    return this.initializationPromise;
+  }
+
+  // Warm up the speech synthesis with a silent audio
+  async warmUp() {
+    try {
+      // Use a very short silent audio to warm up the speech synthesis
+      const silentAudio = new Audio();
+      silentAudio.volume = 0;
+      silentAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+      await silentAudio.play().catch(() => {});
+    } catch (error) {
+      console.warn('Voice warm-up warning:', error);
+    }
   }
   // Pre-cache welcome messages for instant response (with rate limiting)
   async preCacheWelcomeMessages() {
@@ -84,24 +117,32 @@ class VoiceService {
       "Hey! I am Seriva, your AI companion. I'm ready to talk with you!"
     ];
 
-    
     // Only cache for the default voice to avoid rate limiting
     const defaultVoice = this.availableVoices[0];
     
     try {
       const message = welcomeMessages[0];
       const cacheKey = `${message}-${defaultVoice.name}`;
-      if (!this.audioCache.has(cacheKey)) {
-        // Add delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const audioBlob = await this.fetchAzureTTS(message, { voice: defaultVoice });
-        this.audioCache.set(cacheKey, audioBlob);
-      }
+      
+      // Don't wait for this to complete - let it happen in the background
+      this.fetchAndCacheMessage(message, defaultVoice, cacheKey);
     } catch (error) {
-      console.warn(`⚠️ Failed to cache welcome message:`, error);
-      // Don't throw error, just log it - the app should still work without pre-caching
+      console.warn(`⚠️ Failed to start welcome message caching:`, error);
     }
+  }
+
+  // Helper method to fetch and cache a single message
+  async fetchAndCacheMessage(message, voice, cacheKey) {
+    if (this.audioCache.has(cacheKey)) return;
     
+    try {
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const audioBlob = await this.fetchAzureTTS(message, { voice });
+      this.audioCache.set(cacheKey, audioBlob);
+    } catch (error) {
+      console.warn(`⚠️ Failed to cache message:`, error);
+    }
   }  // Fetch Azure Neural TTS Audio with rate limiting and retry logic
   async fetchAzureTTS(text, options = {}) {
     if (!text || text.trim().length === 0) {
