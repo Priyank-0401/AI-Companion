@@ -62,7 +62,7 @@ class VoiceService {
   constructor() {
     this.availableVoices = AZURE_NEURAL_VOICES;
     this.selectedVoice = AZURE_NEURAL_VOICES[0]; // Default to Jenny
-    this.isSpeaking = false;
+    this._isSpeaking = false; // Use _isSpeaking for the instance variable
     this.currentAudio = null;
     this.audioCache = new Map(); // Add audio caching
     this.voiceSettings = {
@@ -189,7 +189,7 @@ class VoiceService {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
   }  async speak(text, options = {}) {
-    if (!text || this.isSpeaking) {
+    if (!text || this._isSpeaking) {
       return Promise.reject('Cannot speak: empty text or already speaking');
     }
 
@@ -197,7 +197,7 @@ class VoiceService {
       // Stop any current audio
       this.stop();
 
-      this.isSpeaking = true;
+      this._isSpeaking = true;
 
       // Check cache first for instant response
       const cacheKey = `${text}-${this.selectedVoice?.name}`;
@@ -232,7 +232,7 @@ class VoiceService {
 
     } catch (error) {
       console.error('❌ Speech synthesis failed:', error);
-      this.isSpeaking = false;
+      this._isSpeaking = false;
       this.currentAudio = null;
       
       // Last resort: try Web Speech API
@@ -271,21 +271,21 @@ class VoiceService {
       utterance.volume = options.volume !== undefined ? options.volume : 0.8;
       
       utterance.onstart = () => {
-        this.isSpeaking = true;
+        this._isSpeaking = true;
         // Create a dummy audio element for consistency with Azure TTS
         this.currentAudio = new Audio();
         options.onStart?.();
       };
       
       utterance.onend = () => {
-        this.isSpeaking = false;
+        this._isSpeaking = false;
         this.currentAudio = null;
         options.onEnd?.();
         resolve();
       };
       
       utterance.onerror = (error) => {
-        this.isSpeaking = false;
+        this._isSpeaking = false;
         this.currentAudio = null;
         console.error('❌ Web Speech synthesis error:', error);
         options.onError?.(error);
@@ -312,12 +312,12 @@ class VoiceService {
 
 
       audio.onplay = () => {
-        this.isSpeaking = true;
+        this._isSpeaking = true;
         options.onStart?.();
       };
 
       audio.onended = () => {
-        this.isSpeaking = false;
+        this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
         options.onEnd?.();
@@ -326,7 +326,7 @@ class VoiceService {
 
       audio.onerror = (error) => {
         console.error('❌ Audio playback error:', error);
-        this.isSpeaking = false;
+        this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
         options.onError?.(error);
@@ -338,13 +338,13 @@ class VoiceService {
       };
 
       audio.onabort = () => {
-        this.isSpeaking = false;
+        this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
       };      // Start playback
       audio.play().catch(error => {
         console.error('❌ Failed to play audio:', error);
-        this.isSpeaking = false;
+        this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
         reject(error);
@@ -355,10 +355,14 @@ class VoiceService {
   stop() {
     if (this.currentAudio) {
       this.currentAudio.pause();
-      this.currentAudio.currentTime = 0;
       this.currentAudio = null;
+      this._isSpeaking = false;
     }
-    this.isSpeaking = false;
+  }
+  
+  // Check if currently speaking
+  isSpeaking() {
+    return this._isSpeaking;
   }
 
   pause() {
@@ -455,7 +459,7 @@ class VoiceService {
   // Get current voice status
   getStatus() {
     return {
-      isSpeaking: this.isSpeaking,
+      isSpeaking: this._isSpeaking,
       selectedVoice: this.selectedVoice,
       availableVoices: this.availableVoices.length,
       settings: this.voiceSettings

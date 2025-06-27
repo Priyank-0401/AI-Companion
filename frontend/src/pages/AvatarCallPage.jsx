@@ -4,30 +4,143 @@ import Avatar from '../components/AvatarOptimized'; // Import the optimized Avat
 import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volume lip sync hook
 // Removed expression hook import - keeping it simple
 import { 
-  Loader2, 
-  PhoneOff, 
   Mic, 
   MicOff, 
   MessageSquare,
   Volume2,
   VolumeX,
-  AlertTriangle,
-  User
+  X,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  Loader2, 
+  PhoneOff,
+  User,
+  AlertTriangle
 } from 'lucide-react';
 
+import voiceService from '../services/voiceService';
+
+// Send message to Ollama and get response
+const sendToOllama = async (message, conversationHistory, setConversationHistory, voiceEnabled, setVoiceEnabled, selectedVoice, speakText, setError, setIsProcessing) => {
+  if (!message || !message.trim()) {
+    console.warn('Empty message provided to sendToOllama');
+    return null;
+  }
+  
+  console.log('Sending to Ollama:', { message, conversationHistory });
+  setIsProcessing(true);
+  
+  const abortController = new AbortController();
+  
+  try {
+    const requestBody = {
+      model: 'llama3',
+      messages: [
+        ...conversationHistory,
+        { role: 'user', content: message }
+      ],
+      stream: false,
+    };
+
+    console.log('Ollama Request:', JSON.stringify(requestBody, null, 2));
+    
+    const startTime = Date.now();
+    const response = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+      signal: abortController.signal,
+    });
+    
+    const responseTime = Date.now() - startTime;
+    console.log(`Ollama response received in ${responseTime}ms`, { status: response.status });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Ollama API error:', { status: response.status, errorText });
+      throw new Error(`Ollama API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Ollama response data:', data);
+    
+    if (!data.message?.content) {
+      throw new Error('No content in Ollama response');
+    }
+    
+    // Update conversation history
+    const updatedHistory = [
+      ...conversationHistory,
+      { role: 'user', content: message },
+      { role: 'assistant', content: data.message.content }
+    ];
+    
+    setConversationHistory(updatedHistory);
+    
+    // Convert response to speech with proper voice
+    if (data.message.content) {
+      console.log('Preparing to speak response...');
+      
+      // Ensure voice is enabled
+      if (!voiceEnabled) {
+        console.log('Voice was disabled, enabling now...');
+        setVoiceEnabled(true);
+        // Small delay to allow voice to initialize
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      // Set the selected voice
+      if (selectedVoice) {
+        console.log('Setting voice to:', selectedVoice);
+        const voiceSet = voiceService.setVoice(selectedVoice);
+        if (!voiceSet) {
+          console.warn('Failed to set voice, using default');
+        }
+      } else {
+        console.warn('No voice selected, using default');
+      }
+      
+      // Speak the response
+      console.log('Calling speakText with response content');
+      await speakText(data.message.content);
+    }
+    
+    return data.message.content;
+  } catch (error) {
+    console.error('Error in sendToOllama:', error);
+    setError('Failed to get response from the AI. Please try again.');
+    return null;
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
 const AvatarCallPage = () => {  
+  const recognitionRef = useRef(null);
+  const audioRef = useRef(null);
+  const audioContextRef = useRef(null);
+  
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);  const [isMuted, setIsMuted] = useState(false);
+  const [error, setError] = useState(null);  
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
-  const recognitionRef = useRef(null);
-  const [avatarVolume, setAvatarVolume] = useState(0.8); // Volume from 0.0 to 1.0
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [systemVolume, setSystemVolume] = useState(80);
+  const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState([]);
   const [audioElement, setAudioElement] = useState(null);
   const [lastMessage, setLastMessage] = useState(''); // For expression system
   const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState([]);  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [availableVoices, setAvailableVoices] = useState([]);  
+  const [selectedVoice, setSelectedVoice] = useState(null);
   const [selectedTone, setSelectedTone] = useState('empathetic'); // New tone selector state
   
   // Voice tone options
@@ -37,10 +150,47 @@ const AvatarCallPage = () => {
     { id: 'calm', name: 'Calm', description: 'Professional & measured', voice: 'en-US-MichelleNeural' },
     { id: 'friendly', name: 'Friendly', description: 'Casual & warm', voice: 'en-US-MonicaNeural' }
   ];
+
+  // Handle text-to-speech functionality
+  const speakText = useCallback(async (text) => {
+    if (!text || !voiceEnabled) {
+      console.warn('Cannot speak: no text provided or voice is disabled');
+      return;
+    }
+
+    console.log('Starting to speak text:', text);
+    setIsSpeaking(true);
+
+    try {
+      // Use the voiceService to speak the text
+      await voiceService.speak(text, {
+        onStart: () => {
+          console.log('Speech started');
+          setIsSpeaking(true);
+          // Set the last message for avatar animation
+          setLastMessage(text);
+        },
+        onEnd: () => {
+          console.log('Speech ended');
+          setIsSpeaking(false);
+          setLastMessage(''); // Clear the last message when done speaking
+        },
+        onError: (error) => {
+          console.error('Error in speech synthesis:', error);
+          setIsSpeaking(false);
+          setError('Failed to speak the response. Please try again.');
+        }
+      });
+    } catch (error) {
+      console.error('Error in speakText:', error);
+      setIsSpeaking(false);
+      setError('Failed to speak the response. Please try again.');
+    }
+  }, [voiceEnabled]);
+
   // Volume lip sync integration
-  const audioRef = useRef(null);
   const { 
-    currentVolume: volume, 
+    currentVolume: lipSyncVolume, 
     isAnalyzing: lipSyncActive, 
     setupVolumeAnalysis,
     startVolumeAnalysis: startLipSync, 
@@ -60,7 +210,14 @@ const AvatarCallPage = () => {
   // }, []);  // Removed greeting functionality - keeping it simple
 
   // Memoize toggle functions to prevent unnecessary re-renders
-  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
+  const toggleMute = useCallback(() => {
+    setIsMuted(prev => !prev);
+    // Update the actual volume in the audio context if needed
+    if (audioContextRef.current && audioContextRef.current.gain) {
+      audioContextRef.current.gain.gain.value = isMuted ? systemVolume / 100 : 0;
+    }
+  }, [isMuted, systemVolume]);
+
   const selectVoice = useCallback((voice) => {
     setSelectedVoice(voice);
     setShowVoiceSelector(false);
@@ -175,24 +332,31 @@ const AvatarCallPage = () => {
   
   // Initialize speech recognition on component mount
   useEffect(() => {
-    // Only initialize if not already done and if the API is available
-    if (recognitionRef.current) return;
-    
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      console.warn('Speech recognition not supported in this browser');
-      // Don't show error for unsupported browsers, just disable the feature
+    // Initialize speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      const errorMsg = 'Speech recognition not supported in this browser';
+      console.error(errorMsg);
+      setError('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    console.log('Initializing speech recognition...');
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
+    
+    console.log('Speech recognition settings:', {
+      continuous: recognition.continuous,
+      interimResults: recognition.interimResults,
+      lang: recognition.lang
+    });
 
     let isStarting = false;
     let retryCount = 0;
     const MAX_RETRIES = 3;
+    let recognitionCleanup = null;
 
     const startRecognition = () => {
       if (isStarting || retryCount >= MAX_RETRIES) return;
@@ -216,135 +380,300 @@ const AvatarCallPage = () => {
         } else {
           console.error('Max retries reached, giving up');
           setIsListening(false);
-          // Don't show error to user, just disable the feature
         }
       }).finally(() => {
         isStarting = false;
       });
     };
 
+    // Set up audio element for lip sync
+    try {
+      const audioElement = voiceService.getAudioElement();
+      if (audioElement && audioRef.current !== audioElement) {
+        audioRef.current = audioElement;
+      }
+    } catch (error) {
+      console.error('Error processing speech recognition result:', error);
+    }
+
+    // Handle recognition results
     recognition.onresult = (event) => {
-      try {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
+      console.log('🎤 Speech recognition result received');
+      
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      // Process all results
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0]?.transcript || '';
         
-        setRecognizedText(transcript);
-        console.log('Recognized text:', transcript);
-        
-        if (event.results[0].isFinal) {
-          console.log('Final recognized text:', transcript);
+        if (result.isFinal) {
+          finalTranscript += transcript;
+          console.log('✅ Final transcript:', finalTranscript);
+          
+          // Update the recognized text state
+          setRecognizedText(prev => {
+            // Only update if the text is different to avoid unnecessary re-renders
+            const newText = finalTranscript.trim();
+            return prev !== newText ? newText : prev;
+          });
+          
+        } else {
+          interimTranscript += transcript;
+          console.log('⏳ Interim transcript:', interimTranscript);
         }
-      } catch (error) {
-        console.error('Error processing speech recognition result:', error);
       }
     };
 
+    // Handle when recognition ends
+    recognition.onend = () => {
+      console.log('🔴 Speech recognition ended');
+      if (isListening) {
+        console.log('🔄 Restarting speech recognition...');
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('❌ Error restarting recognition:', error);
+          setIsListening(false);
+        }
+      }
+    };
+
+    // Handle recognition errors
     recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
+      console.error('Speech recognition error:', {
+        error: event.error,
+        message: event.message || 'No error message',
+        time: new Date().toISOString()
+      });
       
-      // Don't show errors to the user, just log them
+      let errorMessage = 'Error with speech recognition';
+      
       switch(event.error) {
         case 'not-allowed':
-          console.warn('Microphone access was denied');
+          errorMessage = 'Microphone access was denied. Please allow microphone access in your browser settings to use voice commands.';
+          console.warn('Microphone access was denied or blocked');
           break;
         case 'network':
+          errorMessage = 'Network error occurred with speech recognition. Please check your connection.';
           console.warn('Network error occurred with speech recognition');
           break;
         case 'no-speech':
+          errorMessage = 'No speech was detected. Please try speaking again.';
           console.log('No speech detected');
+          break;
+        case 'audio-capture':
+          errorMessage = 'No microphone was found. Please ensure a microphone is connected.';
+          console.error('No microphone found');
           break;
         default:
           console.warn('Speech recognition error:', event.error);
       }
       
-      // Don't set error state, just stop listening
+      setError(errorMessage);
       setIsListening(false);
+      
+      // Additional debug information
+      if (navigator.mediaDevices) {
+        navigator.mediaDevices.enumerateDevices()
+          .then(devices => {
+            console.log('Available devices:', devices);
+            const audioInputs = devices.filter(device => device.kind === 'audioinput');
+            console.log('Audio input devices:', audioInputs);
+          })
+          .catch(err => console.error('Error enumerating devices:', err));
+      }
+      setIsProcessing(false);
     };
 
+    // When recognition ends, check if we should restart
     recognition.onend = () => {
       if (isListening) {
-        // Small delay before restarting to prevent rapid retries
-        setTimeout(() => {
-          if (isListening) {
-            startRecognition();
-          }
-        }, 100);
+        console.log('Speech recognition ended, restarting...');
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('Error restarting recognition:', error);
+          setIsListening(false);
+        }
       }
     };
 
     recognitionRef.current = recognition;
 
+    // Store recognition in ref for cleanup
+    recognitionRef.current = recognition;
+    
     // Cleanup function
     return () => {
+      console.log('Cleaning up speech recognition...');
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
+          console.log('Speech recognition stopped during cleanup');
         } catch (e) {
           console.error('Error stopping recognition during cleanup:', e);
+        } finally {
+          recognitionRef.current = null;
         }
-        recognitionRef.current = null;
       }
+      
+      // Clean up any ongoing speech synthesis
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        console.log('Cancelled any ongoing speech synthesis');
+      }
+      
+      // Clean up any ongoing processing
+      setIsProcessing(false);
+      setIsListening(false);
     };
   }, []);
 
+  // Handle recognized text and update conversation
+  useEffect(() => {
+    if (!recognizedText || recognizedText.trim() === '') return;
+    
+    // Check if this is a duplicate message to prevent infinite loops
+    const lastMessage = conversationHistory[conversationHistory.length - 1]?.content;
+    if (lastMessage === recognizedText) return;
+    
+    console.log('🎤 Processing recognized text:', recognizedText);
+    
+    const processText = async () => {
+      try {
+        console.log('🔄 Adding message to conversation history...');
+        const updatedHistory = [
+          ...conversationHistory,
+          { role: 'user', content: recognizedText, timestamp: Date.now() }
+        ];
+        
+        setConversationHistory(updatedHistory);
+        console.log('✅ Successfully updated conversation history');
+        
+        // Reset recognizedText to prevent reprocessing
+        setRecognizedText('');
+        
+        // Here you can add code to process the user's message and get a response
+        // For example:
+        // const response = await sendToOllama(recognizedText, updatedHistory, setConversationHistory, ...);
+        
+      } catch (error) {
+        console.error('❌ Error processing recognized text:', error);
+        setError('Failed to process the message. Please try again.');
+      }
+    };
+    
+    processText();
+  }, [recognizedText, conversationHistory, setConversationHistory, setError]);
+  
   // Handle starting/stopping recognition when isListening changes
   useEffect(() => {
-    if (!recognitionRef.current) {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
       console.warn('Speech recognition not available');
       return;
     }
-
-    let timeoutId;
     
-    const startListening = async () => {
+    let isMounted = true;
+    
+    const startRecognition = async () => {
+      if (!isListening || !isMounted) return;
+      
       try {
-        console.log('Attempting to start voice recognition...');
-        await recognitionRef.current.start();
-        console.log('Voice recognition started successfully');
-        setRecognizedText('');
+        console.log('🎤 Starting speech recognition...');
+        recognition.start();
       } catch (error) {
-        console.error('Error starting voice recognition:', error);
-        // Don't show error to user, just stop listening
-        setIsListening(false);
+        console.error('❌ Failed to start speech recognition:', error);
+        if (isMounted) {
+          setIsListening(false);
+          setError('Failed to start speech recognition. Please check your microphone settings.');
+        }
       }
     };
-
+    
+    const stopRecognition = () => {
+      try {
+        console.log('🛑 Stopping speech recognition...');
+        recognition.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+    };
+    
     if (isListening) {
-      startListening();
+      startRecognition();
     } else {
-      try {
-        recognitionRef.current.stop();
-        console.log('Voice recognition stopped');
-      } catch (error) {
-        console.warn('Error stopping voice recognition:', error);
-      }
+      stopRecognition();
     }
-
+    
+    // Cleanup function
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
+      isMounted = false;
+      stopRecognition();
     };
-  }, [isListening]);
-
+  }, [isListening, setError]);
+  
+  // Toggle voice recognition
   const toggleListening = useCallback(() => {
+    if (isProcessing) {
+      // If currently processing, cancel the current request
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setIsProcessing(false);
+      setIsListening(false);
+      return;
+    }
+    
     setIsListening(prev => !prev);
-  }, []);
+  }, [isProcessing]);
 
   // Volume control functions with optimized hover
   const volumeHoverTimeoutRef = useRef(null);
   
-  const handleVolumeChange = useCallback((newVolume) => {
-    setAvatarVolume(newVolume);
-  }, []);
+  const handleVolumeChange = useCallback((e) => {
+    const newVolume = parseInt(e.target.value, 10);
+    setSystemVolume(newVolume);
+    
+    // If unmuting, update the mute state
+    if (isMuted && newVolume > 0) {
+      setIsMuted(false);
+    } else if (newVolume === 0) {
+      setIsMuted(true);
+    }
+    
+    // Update the actual volume in the audio context if needed
+    if (audioContextRef.current && audioContextRef.current.gain) {
+      audioContextRef.current.gain.gain.value = isMuted ? 0 : newVolume / 100;
+    }
+  }, [isMuted]);
 
   const showVolumeSliderOnHover = useCallback(() => {
     if (volumeHoverTimeoutRef.current) {
       clearTimeout(volumeHoverTimeoutRef.current);
-      volumeHoverTimeoutRef.current = null;
     }
     setShowVolumeSlider(true);
   }, []);
+
+  const hideVolumeSliderAfterDelay = useCallback(() => {
+    volumeHoverTimeoutRef.current = setTimeout(() => {
+      setShowVolumeSlider(false);
+    }, 1000);
+  }, []);
+
+  const getVolumeIcon = useCallback(() => {
+    if (isMuted || systemVolume === 0) {
+      return <VolumeX className="w-5 h-5" />;
+    } else if (systemVolume < 33) {
+      return <Volume1 className="w-5 h-5" />;
+    } else if (systemVolume < 66) {
+      return <Volume2 className="w-5 h-5" />;
+    } else {
+      return <Volume2 className="w-5 h-5" />;
+    }
+  }, [isMuted, systemVolume]);
 
   const hideVolumeSliderOnLeave = useCallback(() => {
     // Add a small delay to prevent flickering when moving mouse to slider
@@ -355,17 +684,17 @@ const AvatarCallPage = () => {
   // Memoize avatar props - simplified with voice support and lip sync
   const avatarProps = useMemo(() => ({
     lastMessage: lastMessage,
-    voiceEnabled: voiceEnabled && avatarVolume > 0,
+    voiceEnabled: voiceEnabled && systemVolume > 0,
     selectedVoice: selectedVoice,
     onVoiceEnd: handleVoiceEnd,
-    avatarVolume: avatarVolume, // Pass volume to avatar
+    avatarVolume: systemVolume, // Pass volume to avatar
     volumeLipSyncRef: { 
       current: {
-        getVolumeValue: () => volume || 0,
+        getVolumeValue: () => lipSyncVolume || 0,
         isPlaying: () => lipSyncActive
       }
     } // Provide proper interface for lip sync
-  }), [lastMessage, voiceEnabled, avatarVolume, selectedVoice, handleVoiceEnd, volume, lipSyncActive]);
+  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive]);
   
   const endCall = () => {
     // Handle ending the call
@@ -658,65 +987,61 @@ const AvatarCallPage = () => {
               <div 
                 className="relative volume-control-container p-2 -m-2"
                 onMouseEnter={showVolumeSliderOnHover}
-                onMouseLeave={hideVolumeSliderOnLeave}
+                onMouseLeave={hideVolumeSliderAfterDelay}
               >
                 <button 
+                  onClick={toggleMute}
                   className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    avatarVolume === 0 
+                    isMuted || systemVolume === 0
                       ? 'bg-red-600 shadow-lg shadow-red-500/50 scale-105' 
                       : 'bg-gray-700 hover:bg-gray-600'
                   }`}
-                  title={`Avatar Volume: ${Math.round(avatarVolume * 100)}%`}
+                  title={isMuted ? 'Unmute' : `Volume: ${systemVolume}%`}
                 >
-                  {avatarVolume === 0 ? (
-                    <VolumeX className="w-6 h-6 text-white" />
-                  ) : avatarVolume < 0.5 ? (
-                    <Volume2 className="w-6 h-6 text-gray-300" style={{ opacity: 0.7 }} />
-                  ) : (
-                    <Volume2 className="w-6 h-6 text-gray-300" />
-                  )}
+                  {getVolumeIcon()}
                 </button>
-                
-                {/* Volume Slider */}
-                {showVolumeSlider && (
-                  <div 
-                    className="absolute bottom-14 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg p-4 shadow-xl z-50"
-                    onMouseEnter={showVolumeSliderOnHover}
-                    onMouseLeave={hideVolumeSliderOnLeave}
-                  >
-                    <div className="flex flex-col items-center space-y-3">
-                      <span className="text-sm text-gray-200 font-medium">Avatar Volume</span>
-                      <div className="flex items-center space-x-3">
-                        <VolumeX className="w-4 h-4 text-gray-400" />
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={avatarVolume}
-                          onChange={(e) => setAvatarVolume(parseFloat(e.target.value))}
-                          className="w-24 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-                          style={{
-                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${avatarVolume * 100}%, #4b5563 ${avatarVolume * 100}%, #4b5563 100%)`
-                          }}
+
+                {/* Volume Slider - Show on hover */}
+                <AnimatePresence>
+                  {showVolumeSlider && (
+                    <motion.div 
+                      className="absolute bottom-16 left-1/2 transform -translate-x-1/2 bg-gray-800 rounded-lg p-3 shadow-xl z-50"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      transition={{ duration: 0.2 }}
+                      onMouseEnter={showVolumeSliderOnHover}
+                      onMouseLeave={hideVolumeSliderAfterDelay}
+                    >
+                      <div className="w-40 h-32 flex items-center justify-center">
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100" 
+                          step="1"
+                          value={systemVolume}
+                          onChange={handleVolumeChange}
+                          className="volume-slider w-32 h-2 bg-gray-700 rounded-full appearance-none cursor-pointer transform -rotate-90"
                         />
-                        <Volume2 className="w-4 h-4 text-gray-400" />
                       </div>
-                      <span className="text-sm text-blue-400 font-medium">{Math.round(avatarVolume * 100)}%</span>
-                    </div>
-                  </div>
-                )}
-              </div>              {/* End Call Button */}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              {/* End Volume Control */}
+              
+              {/* End Call Button */}
               <button 
                 onClick={endCall}
                 className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-200 hover:bg-red-700"
                 title="End Call"
               >
                 <PhoneOff className="w-7 h-7" />
-              </button>            </div>
+              </button>
+            </div>
           </div>
         </div>
-    </div>
+      </div>
     </>
   );
 };
