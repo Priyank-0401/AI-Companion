@@ -16,8 +16,24 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: #222831;
-    color: #EEEEEE;
+    background-color: var(--background-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  :root {
+    /* Light mode variables */
+    --background-primary: #0f172a;
+    --background-secondary: #1e293b;
+    --background-tertiary: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --accent: #8b5cf6;
+    --accent-hover: #7c3aed;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
   }
 
   /* Global scrollbar hiding for better control */
@@ -38,29 +54,33 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-accent hover:bg-accent/80 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 ease-in-out transform hover:scale-105;
+    @apply bg-accent hover:bg-accent/90 text-white font-medium py-2.5 px-6 rounded-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] shadow-md hover:shadow-lg;
   }
 
   .btn-secondary {
-    @apply bg-mediumDark hover:bg-mediumDark/80 text-lightText font-medium py-2 px-4 rounded-lg transition-all duration-200 ease-in-out;
+    @apply bg-background-secondary hover:bg-background-tertiary text-text-primary font-medium py-2.5 px-6 rounded-lg transition-all duration-200 ease-in-out border border-background-tertiary hover:border-accent/30;
+  }
+  
+  .btn-outline {
+    @apply bg-transparent border border-text-secondary text-text-primary hover:bg-background-tertiary font-medium py-2.5 px-6 rounded-lg transition-all duration-200 ease-in-out hover:border-accent hover:text-accent;
   }
   .control-btn {
-    @apply p-3 rounded-full text-white flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-105 shadow-lg;
+    @apply p-3 rounded-full bg-background-secondary text-text-primary hover:text-accent flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-105 shadow-md hover:shadow-lg border border-background-tertiary hover:border-accent/30;
   }
 
   .control-btn-large {
-    @apply p-4 rounded-full text-white flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-110 shadow-xl min-w-[60px] min-h-[60px];
+    @apply p-4 rounded-full bg-background-secondary text-text-primary hover:text-accent flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-110 shadow-lg hover:shadow-xl min-w-[64px] min-h-[64px] border border-background-tertiary hover:border-accent/30;
   }
 
   .card {
-    @apply bg-mediumDark rounded-xl p-6 shadow-lg;
+    @apply bg-background-secondary rounded-xl p-6 shadow-lg border border-background-tertiary/50 hover:border-accent/30 transition-all duration-200;
   }
 
   .input-field {
-    @apply bg-mediumDark border border-mediumDark/50 text-lightText rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200;
+    @apply bg-background-secondary border border-background-tertiary/50 text-text-primary rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all duration-200 placeholder-text-tertiary/70;
   }
   .gradient-text {
-    @apply bg-gradient-to-r from-accent to-blue-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-accent to-indigo-400 bg-clip-text text-transparent font-semibold;
   }
   /* Hide scrollbar for chat messages */
   .chat-scroll-container::-webkit-scrollbar {
