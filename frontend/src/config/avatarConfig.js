@@ -19,8 +19,8 @@ export const AVATAR_CONFIG = {
 
   // Avatar positioning - Keep upright, no rotation
   AVATAR: {
-    POSITION: [0, 0.1, 0],              // Lower to bring head into view
-    SCALE: [1.5, 1.5, 1.5],            // Good size
+    POSITION: [0, 0.5, 0],              // Lower to bring head into view
+    SCALE: [1.3, 1.3, 1.3],            // Good size
     ROTATION: [0, 0, 0],               // Keep upright - no destructive rotation
   },
 

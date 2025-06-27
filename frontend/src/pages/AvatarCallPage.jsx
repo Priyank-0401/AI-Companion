@@ -869,7 +869,7 @@ const AvatarCallPage = () => {
   }
   
   return (
-    <>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
       {/* Custom styles for volume slider */}
       <style jsx="true">{`
         input[type="range"] {
@@ -917,8 +917,8 @@ const AvatarCallPage = () => {
           border: 2px solid #ffffff;
           cursor: pointer;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }      `}</style>
-    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
+        }
+      `}</style>
       {/* Main Video Area */}
       <div className="flex-1 flex relative">
         {/* Video Area */}
@@ -939,144 +939,190 @@ const AvatarCallPage = () => {
             </div>
           </motion.div>
         </div>
-      </div>      {/* Bottom Controls - Always visible */}
-      <div className="bg-black/30 backdrop-blur-sm border-t border-gray-700/50 z-40 w-full">
-        <div className="flex flex-col items-center justify-center py-4 pb-20 w-full">
-          <div className="flex items-center justify-center space-x-4 w-full max-w-2xl mx-auto">{/* Voice Tone Selector - Simplified */}
-              <div className="relative voice-selector-container">
-                <button 
-                  onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                  disabled={!voiceEnabled}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    voiceEnabled
-                      ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30' 
-                      : 'bg-gray-700 opacity-50 cursor-not-allowed'
-                  }`}
-                  title={voiceEnabled ? 'Select Voice Tone' : 'Enable voice first'}
-                >
-                  <User className="w-6 h-6 text-white" />
-                  {voiceEnabled && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full animate-pulse"></div>
-                  )}
-                </button>
-
-                {/* Voice Tone Selector Dropdown */}
-                {showVoiceSelector && voiceEnabled && (
-                  <div className="absolute bottom-16 left-0 bg-gray-800 rounded-lg shadow-lg p-2 min-w-60 z-50">
-                    <div className="text-white text-sm font-medium mb-2 px-2">Select Voice Tone:</div>
-                    {voiceTones.map((tone) => (
-                      <button
-                        key={tone.id}
-                        onClick={() => {
-                          selectTone(tone);
-                          setShowVoiceSelector(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          selectedTone === tone.id
-                            ? 'bg-indigo-600 text-white'
-                            : 'text-gray-300 hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="font-medium">{tone.name}</div>
-                        <div className="text-xs text-gray-400">{tone.description}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-                {/* Voice Input Button - Enhanced with better feedback */}
+      </div>      
+      {/* Enhanced Bottom Controls */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent backdrop-blur-sm z-40">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-center space-x-2 md:space-x-4">
+            {/* Voice Input Button */}
+            <div className="relative group">
               <button 
                 onClick={toggleListening}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   isListening 
-                    ? 'bg-green-600 shadow-lg shadow-green-500/50 animate-pulse scale-105' 
-                    : 'bg-gray-700 hover:bg-gray-600'
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 scale-110' 
+                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md'
                 }`}
                 title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
               >
                 {isListening ? (
-                  <Mic className="w-6 h-6 text-white" />
+                  <Mic className="w-7 h-7 text-white" />
                 ) : (
-                  <MicOff className="w-6 h-6 text-gray-300" />
+                  <MicOff className="w-6 h-6 text-white/80" />
                 )}
-                {/* Active listening indicator */}
-                {isListening && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
-                )}
-              </button>              {/* Voice Enable/Test Button - Simplified */}
+              </button>
+              {isListening && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping"></div>
+              )}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+                {isListening ? 'Listening...' : 'Voice Input'}
+              </div>
+            </div>
+
+            {/* Voice Toggle */}
+            <div className="relative group">
               <button 
                 onClick={toggleVoiceEnabled}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   voiceEnabled 
-                    ? 'bg-purple-600 shadow-lg shadow-purple-500/50' 
-                    : 'bg-gray-700 hover:bg-gray-600'
+                    ? 'bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/30 scale-105' 
+                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md'
                 }`}
-                title={voiceEnabled ? 'Disable Avatar Voice' : 'Enable Avatar Voice'}
+                title={voiceEnabled ? 'Mute Avatar' : 'Unmute Avatar'}
               >
-                <MessageSquare className={`w-6 h-6 ${voiceEnabled ? 'text-white' : 'text-gray-400'}`} />
-                {voiceEnabled && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
+                {voiceEnabled ? (
+                  <Volume2 className="w-7 h-7 text-white" />
+                ) : (
+                  <VolumeX className="w-6 h-6 text-white/80" />
                 )}
-              </button>              {/* Avatar Volume Control - Enhanced */}
-              <div 
-                className="relative volume-control-container p-2 -m-2"
-                onMouseEnter={showVolumeSliderOnHover}
-                onMouseLeave={hideVolumeSliderAfterDelay}
-              >
-                <button 
-                  onClick={toggleMute}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    isMuted || systemVolume === 0
-                      ? 'bg-red-600 shadow-lg shadow-red-500/50 scale-105' 
-                      : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
-                  title={isMuted ? 'Unmute' : `Volume: ${systemVolume}%`}
-                >
-                  {getVolumeIcon()}
-                </button>
-
-                {/* Volume Slider - Show on hover */}
-                <AnimatePresence>
-                  {showVolumeSlider && (
-                    <motion.div 
-                      className="absolute bottom-16 left-1/2 transform -translate-x-1/2 bg-gray-800 rounded-lg p-3 shadow-xl z-50"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 20 }}
-                      transition={{ duration: 0.2 }}
-                      onMouseEnter={showVolumeSliderOnHover}
-                      onMouseLeave={hideVolumeSliderAfterDelay}
-                    >
-                      <div className="w-40 h-32 flex items-center justify-center">
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max="100" 
-                          step="1"
-                          value={systemVolume}
-                          onChange={handleVolumeChange}
-                          className="volume-slider w-32 h-2 bg-gray-700 rounded-full appearance-none cursor-pointer transform -rotate-90"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+                {voiceEnabled ? 'Avatar Voice On' : 'Avatar Voice Off'}
               </div>
-              {/* End Volume Control */}
-              
-              {/* End Call Button */}
+            </div>
+
+            {/* Voice Tone Selector */}
+            <div className="relative group">
+              <button 
+                onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+                disabled={!voiceEnabled}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
+                  voiceEnabled
+                    ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/30 hover:scale-105' 
+                    : 'bg-white/10 opacity-50 cursor-not-allowed'
+                }`}
+                title={voiceEnabled ? 'Change Voice Tone' : 'Enable voice first'}
+              >
+                <User className="w-6 h-6 text-white" />
+                {voiceEnabled && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
+                )}
+              </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+                Voice Tone
+              </div>
+
+              {/* Voice Tone Dropdown */}
+              <AnimatePresence>
+                {showVoiceSelector && voiceEnabled && (
+                  <motion.div 
+                    className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800/95 backdrop-blur-lg rounded-xl shadow-2xl p-2 min-w-64 z-50 border border-gray-700/50"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                  >
+                    <div className="text-white text-sm font-medium mb-2 px-2">Select Voice Tone</div>
+                    <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                      {voiceTones.map((tone) => (
+                        <button
+                          key={tone.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectTone(tone);
+                            setShowVoiceSelector(false);
+                          }}
+                          className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center ${
+                            selectedTone === tone.id
+                              ? 'bg-gradient-to-r from-blue-600/80 to-blue-700/80 text-white shadow-md'
+                              : 'text-gray-200 hover:bg-gray-700/80'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">{tone.name}</div>
+                            <div className="text-xs text-gray-400">{tone.description}</div>
+                          </div>
+                          {selectedTone === tone.id && (
+                            <Check className="w-4 h-4 text-blue-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Volume Control */}
+            <div 
+              className="relative group"
+              onMouseEnter={showVolumeSliderOnHover}
+              onMouseLeave={hideVolumeSliderAfterDelay}
+            >
+              <button 
+                onClick={toggleMute}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
+                  isMuted || systemVolume === 0
+                    ? 'bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/30 scale-105' 
+                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md hover:scale-105'
+                }`}
+                title={isMuted ? 'Unmute' : `Volume: ${systemVolume}%`}
+              >
+                {getVolumeIcon()}
+              </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+                {isMuted ? 'Unmute' : 'Volume'}
+              </div>
+
+              {/* Volume Slider */}
+              <AnimatePresence>
+                {showVolumeSlider && (
+                  <motion.div 
+                    className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800/95 backdrop-blur-lg rounded-xl p-4 shadow-2xl z-50 border border-gray-700/50"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    onMouseEnter={showVolumeSliderOnHover}
+                    onMouseLeave={hideVolumeSliderAfterDelay}
+                  >
+                    <div className="w-8 h-32 flex items-center justify-center">
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="1"
+                        value={systemVolume}
+                        onChange={handleVolumeChange}
+                        className="volume-slider w-32 h-2 bg-gray-700 rounded-full appearance-none cursor-pointer transform -rotate-90"
+                        style={{
+                          background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${systemVolume}%, #4b5563 ${systemVolume}%, #4b5563 100%)`
+                        }}
+                      />
+                    </div>
+                    <div className="text-center text-xs text-gray-300 mt-2">{systemVolume}%</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* End Call Button */}
+            <div className="relative group">
               <button 
                 onClick={endCall}
-                className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-200 hover:bg-red-700"
+                className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-300 transform hover:scale-110 hover:shadow-red-500/50"
                 title="End Call"
               >
-                <PhoneOff className="w-7 h-7" />
+                <PhoneOff className="w-7 h-7 text-white" />
               </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+                End Call
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
