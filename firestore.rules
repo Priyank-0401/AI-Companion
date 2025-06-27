@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write their own mood entries
+    match /moodEntries/{entryId} {
+      allow read, create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+      
+      // Users can only update their own entries
+      allow update: if request.auth.uid == resource.data.userId &&
+        request.resource.data.userId == resource.data.userId;
+      
+      // Users can only delete their own entries
+      allow delete: if request.auth.uid == resource.data.userId;
+    }
+    
+    // Default deny all other operations
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
