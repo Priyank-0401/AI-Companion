@@ -1,57 +1,64 @@
-# Seriva - AI Companion
+# Seriva - Your AI Companion for Mental Wellness
 
-Seriva is a full-stack wellness application that combines journaling, mood tracking, and AI-powered conversations to support users' mental health and personal growth.
+<img src="frontend/public/logo.svg" alt="Seriva Logo" width="180">
 
-<img src="frontend/public/logo.svg" alt="AI Companion Logo" width="180">
+Seriva is your personal AI companion designed to support your mental wellness journey through meaningful conversations and self-reflection. Whether you need someone to talk to, want to track your mood, or just need a space to organize your thoughts, Seriva is here for you.
 
+## ✨ Key Features
 
-## Features
+### 🤖 Intelligent Conversations
+- Engage in natural, flowing conversations with an AI that understands and responds to your emotions
+- Multiple conversation styles to match your needs - from supportive to creative
+- Context-aware responses that remember your previous interactions
 
-- **3D Avatar Interface**: Interact with an engaging 3D avatar for a more personal experience
-- **Wellness Tracking**: Monitor your mood patterns and emotional well-being
-- **Smart Journaling**: Document your thoughts with AI-assisted insights
-- **Chat Support**: Have meaningful conversations with an AI companion
-- **Data Privacy**: Your personal information stays secure with Firebase authentication
+### 📔 Smart Journaling
+- Beautiful, distraction-free writing experience
+- AI-powered insights and reflections on your entries
+- Mood tracking with visual analytics
+- Tag and organize your thoughts for easy reference
 
-## Tech Stack
+### 🌟 Personal Growth
+- Daily check-ins to help build positive habits
+- Personalized suggestions based on your mood and journal entries
+- Progress tracking and achievements
 
-### Frontend
-- React 19 with Vite for fast development
-- Tailwind CSS for responsive design
-- React Three Fiber for 3D avatar rendering
-- Framer Motion for smooth animations
-- Firebase authentication
+### 🔒 Your Privacy Matters
+- End-to-end encryption for all your conversations and journal entries
+- Full control over your data
+- No ads, no data selling - your thoughts stay private
 
-### Backend
-- Node.js server
-- Ollama integration for AI model inference
-- RESTful API architecture
+## 🚀 Getting Started with Seriva
 
-## Getting Started
+1. **Create Your Account**
+   - Sign up with email or social login
+   - Set up your profile and preferences
 
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- Ollama installed locally (for development)
+2. **Start a Conversation**
+   - Chat with Seriva about anything on your mind
+   - Try different conversation styles to find your perfect match
 
-### Installation
+3. **Begin Journaling**
+   - Write freely or use guided prompts
+   - Track your mood over time
+   - Review your personal insights
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/ai-companion.git
-cd ai-companion
-```
+## 📱 Available On
+- Web (Chrome, Firefox, Safari, Edge)
+- Mobile Web (iOS & Android)
+- Native mobile apps coming soon!
 
-2. Install dependencies:
-```bash
-npm install
-```
+## 💡 Why Choose Seriva?
 
-3. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+- **Always Available**: 24/7 support whenever you need it
+- **Non-judgmental Space**: Share freely without fear of judgment
+- **Personalized Experience**: Adapts to your communication style and needs
+- **Science-Backed**: Built using evidence-based therapeutic techniques
+
+## 📞 Need Help?
+Visit our [Help Center](https://help.seriva.app) or email support@seriva.app
+
+---
+*Seriva is not a substitute for professional mental health care. If you're in crisis, please contact emergency services or a licensed mental health professional in your area.*
 
 ### Running the Application
 
