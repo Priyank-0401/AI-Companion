@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, MessageSquare, Brain, Heart, User, Smile, Coffee, 
-  Trash2, Volume2, VolumeX, MoreVertical, ChevronRight, ChevronDown,
-  Download, Play, Pause, Settings, LogOut, Sun, Moon, Clock, Search
+  Trash2, MoreVertical, ChevronRight, ChevronDown,
+  Download, Settings, LogOut, Sun, Moon, Clock, Search
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -24,15 +24,7 @@ const Sidebar = ({
   setConversationStyle,
   showOptions,
   setShowOptions,
-  voiceEnabled,
-  setVoiceEnabled,
-  availableVoices,
-  selectedVoice,
-  setSelectedVoice,
-  showVoiceDropdown,
-  setShowVoiceDropdown,
-  isSpeaking,
-  stopSpeaking,
+  // Voice functionality removed as per user request
   activeChatDropdown,
   setActiveChatDropdown,
   groupedChatHistory = {},
@@ -211,123 +203,7 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* Voice Options */}
-      <div className="px-4 mb-4">
-        <div className="mb-2">
-          <h3 className="text-xs uppercase font-semibold text-[#EEEEEE]/50 tracking-wider px-1">Voice Options</h3>
-        </div>
-        
-        {/* Voice Toggle */}
-        <div className="flex items-center justify-between p-3 bg-[#222831] rounded-lg mb-2">
-          <div className="flex items-center gap-2">
-            {voiceEnabled ? (
-              <Volume2 className="w-4 h-4 text-[#00ADB5]" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-[#EEEEEE]/50" />
-            )}
-            <span className="text-sm font-medium text-[#EEEEEE]">Voice Enabled</span>
-          </div>
-          <button 
-            onClick={() => setVoiceEnabled(!voiceEnabled)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${voiceEnabled ? 'bg-[#00ADB5]' : 'bg-[#393E46]'}`}
-          >
-            <motion.div 
-              className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white"
-              animate={{ x: voiceEnabled ? '1.25rem' : 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            />
-          </button>
-        </div>
-        
-        {/* Voice Selection */}
-        {voiceEnabled && (
-          <div className="relative">
-            <button 
-              onClick={() => setShowVoiceDropdown(!showVoiceDropdown)}
-              disabled={!voiceEnabled || availableVoices.length === 0}
-              className={`flex items-center justify-between w-full p-3 bg-[#222831] hover:bg-[#222831]/80 rounded-lg transition-colors ${!voiceEnabled || availableVoices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-[#00ADB5]" />
-                <span className="text-sm font-medium text-[#EEEEEE] truncate max-w-[150px]">
-                  {availableVoices.length === 0 ? 'Loading voices...' : 
-                    selectedVoice ? selectedVoice.name.replace('Google ', '') : 'Select Voice'}
-                </span>
-              </div>
-              {(voiceEnabled && availableVoices.length > 0) && (
-                <ChevronRight className={`w-4 h-4 text-[#EEEEEE]/70 transition-transform ${showVoiceDropdown ? 'rotate-90' : ''}`} />
-              )}
-            </button>
-
-            {/* Voice Dropdown */}
-            <AnimatePresence>
-              {showVoiceDropdown && voiceEnabled && availableVoices.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute left-0 right-0 mt-2 bg-[#222831] border border-[#00ADB5]/20 rounded-lg shadow-lg z-10 overflow-y-auto max-h-60"
-                >
-                  {availableVoices.map((voice, index) => (
-                    <button
-                      key={`${voice.name}-${index}`}
-                      className={`flex flex-col w-full text-left p-3 hover:bg-[#00ADB5]/10 transition-colors ${selectedVoice && voice.name === selectedVoice.name ? 'bg-[#00ADB5]/20' : ''}`}
-                      onClick={() => {
-                        setSelectedVoice(voice);
-                        setShowVoiceDropdown(false);
-                        
-                        // Say a short sample
-                        if (window.speechSynthesis) {
-                          window.speechSynthesis.cancel();
-                          const utterance = new SpeechSynthesisUtterance("Hello, I'm Seriva.");
-                          utterance.voice = voice;
-                          utterance.volume = 0.8;
-                          window.speechSynthesis.speak(utterance);
-                        }
-                      }}
-                    >
-                      <span className="font-medium text-sm text-[#EEEEEE] truncate">{voice.name.replace('Google ', '')}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#EEEEEE]/60">{voice.lang}</span>
-                        {voice.name.includes('Google') && (
-                          <span className="text-[7px] uppercase bg-[#00ADB5]/30 text-[#00ADB5] px-1 rounded">Google</span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-        
-        {/* Voice Status */}
-        {voiceEnabled && (
-          <div className="mt-2 px-1">
-            {isSpeaking && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[#00ADB5] flex items-center gap-1">
-                  <motion.span
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                  >⬤</motion.span>
-                  Speaking...
-                </span>
-                <button
-                  onClick={stopSpeaking}
-                  className="text-xs text-red-400 hover:text-red-500"
-                >
-                  Stop
-                </button>
-              </div>
-            )}
-            
-            {availableVoices.length === 0 && (
-              <span className="text-xs text-yellow-400">Loading available voices...</span>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Voice options removed as per user request */}
 
       {/* Chat History */}
       <div className="flex-1 overflow-y-auto px-2">
@@ -353,8 +229,11 @@ const Sidebar = ({
                   <div className="flex-1 overflow-hidden">
                     <h4 className="text-sm font-medium text-[#EEEEEE] truncate">{chat.title}</h4>
                     <p className="text-xs text-[#EEEEEE]/60 truncate">
-                      {chat.lastActivity ? chat.lastActivity.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
-                       chat.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {chat.lastActivity 
+                        ? new Date(chat.lastActivity).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                        : chat.date 
+                          ? new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : ''}
                     </p>
                   </div>
                 </motion.button>

@@ -65,7 +65,6 @@ const ChatInput = ({
   selectedModel = 'default',
   modelOptions = MODEL_OPTIONS,
   inputRef,
-  setSelectedModel = () => {}
 }) => {
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -221,91 +220,11 @@ const ChatInput = ({
 
   return (
     <motion.div 
-      className="w-full px-4 pb-3 max-w-4xl"
+      className="w-full px-4 py-3 max-w-4xl"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
-      {/* Model Selector */}
-      <motion.div 
-        className="flex justify-center mb-2"
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-      >
-        <div className="relative">
-          <motion.button
-            ref={modelButtonRef}
-            type="button"
-            onClick={toggleModelSelector}
-            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
-            disabled={isLoading}
-            whileHover={{ backgroundColor: 'rgba(55, 65, 81, 0.8)' }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <motion.span className="flex items-center">
-              {React.cloneElement(currentModel.icon, { className: 'w-3.5 h-3.5 mr-1.5' })}
-              {currentModel.name}
-            </motion.span>
-            <motion.span
-              animate={{ rotate: isModelSelectorOpen ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
-            </motion.span>
-          </motion.button>
-          
-          <AnimatePresence>
-            {isModelSelectorOpen && (
-              <motion.div 
-                className="absolute bottom-full left-0 mb-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20"
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              >
-                <div className="p-2">
-                  <h3 className="px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    Chat Model
-                  </h3>
-                  <div className="space-y-1">
-                    {modelOptions.map((model, index) => (
-                      <motion.button
-                        key={model.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          setIsModelSelectorOpen(false);
-                        }}
-                        className={`w-full flex items-center px-3 py-2 text-sm rounded-lg text-left ${
-                          selectedModel === model.id
-                            ? 'bg-indigo-500/10 text-indigo-400'
-                            : 'text-gray-300 hover:bg-gray-700/50'
-                        } transition-colors`}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.03 }}
-                        whileHover={{ backgroundColor: 'rgba(79, 70, 229, 0.1)' }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <span className="flex items-center">
-                          {React.cloneElement(model.icon, {
-                            className: 'w-4 h-4 mr-2.5 flex-shrink-0',
-                          })}
-                          <span>
-                            <span className="block font-medium">{model.name}</span>
-                            <span className="text-xs text-gray-400">{model.description}</span>
-                          </span>
-                        </span>
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.div>
-
       {/* Input Area */}
       <motion.div 
         ref={containerRef}

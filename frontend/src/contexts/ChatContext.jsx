@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const ChatContext = createContext();
 
@@ -18,17 +18,23 @@ export const ChatProvider = ({ children }) => {
   const [currentChatTitle, setCurrentChatTitle] = useState(null);
   const [selectedModel, setSelectedModel] = useState('default');
   const [conversationStyle, setConversationStyle] = useState('supportive');
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  // UI State
   const [activeChatDropdown, setActiveChatDropdown] = useState(null);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  
+  const [conversationId, setConversationId] = useState(() => {
+    try {
+      const storedConversationId = localStorage.getItem('chatConversationId');
+      return storedConversationId ? JSON.parse(storedConversationId) : null;
+    } catch (error) {
+      console.error("Error loading conversationId from localStorage:", error);
+      return null;
+    }
+  });
+
   const [messages, setMessages] = useState(() => {
     try {
       const storedMessages = localStorage.getItem('chatMessages');
@@ -49,19 +55,6 @@ export const ChatProvider = ({ children }) => {
     return [getInitialBotMessage()];
   });
 
-  const [conversationId, setConversationId] = useState(() => {
-    try {
-      const storedConversationId = localStorage.getItem('chatConversationId');
-      return storedConversationId ? JSON.parse(storedConversationId) : null;
-    } catch (error) {
-      console.error("Error loading conversationId from localStorage:", error);
-      return null;
-    }
-  });
-
-  // We can also move conversationStyle here if it needs to be persisted globally
-  // const [conversationStyle, setConversationStyle] = useState('supportive'); 
-
   // Load chat history from localStorage on mount
   useEffect(() => {
     try {
@@ -69,24 +62,83 @@ export const ChatProvider = ({ children }) => {
       const processedChats = savedChats.map(chat => ({
         ...chat,
         date: new Date(chat.date),
-        lastActivity: new Date(chat.lastActivity || chat.timestamp)
+        lastActivity: new Date(chat.lastActivity || chat.timestamp),
+        messages: chat.messages ? chat.messages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })) : []
       }));
       setChatHistory(processedChats);
+
+      // If we have a current conversation ID, load its messages
+      const currentId = localStorage.getItem('currentConversationId');
+      if (currentId) {
+        const currentChat = processedChats.find(chat => chat.id === currentId);
+        if (currentChat && currentChat.messages) {
+          setMessages(currentChat.messages);
+          setConversationId(currentId);
+          setCurrentChatTitle(currentChat.title || 'New Chat');
+          return;
+        }
+      }
     } catch (error) {
       console.error('Error loading chat history from localStorage:', error);
     }
   }, []);
   
-  // Save chat history to localStorage when it changes
+  // Save current chat to history when messages change
   useEffect(() => {
-    if (chatHistory.length > 0) {
+    if (messages.length === 0) return;
+
+    const saveChat = () => {
       try {
-        localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+        const chatId = conversationId || Date.now().toString();
+        const chatTitle = currentChatTitle || `Chat ${new Date().toLocaleString()}`;
+        
+        const chat = {
+          id: chatId,
+          title: chatTitle,
+          messages: messages.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp.toISOString()
+          })),
+          lastActivity: new Date().toISOString(),
+          date: new Date().toISOString()
+        };
+
+        setChatHistory(prevHistory => {
+          const existingChatIndex = prevHistory.findIndex(c => c.id === chatId);
+          let updatedHistory;
+          
+          if (existingChatIndex >= 0) {
+            updatedHistory = [...prevHistory];
+            updatedHistory[existingChatIndex] = chat;
+          } else {
+            updatedHistory = [chat, ...prevHistory];
+          }
+
+          // Save to localStorage
+          localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+          localStorage.setItem('currentConversationId', JSON.stringify(chatId));
+          
+          return updatedHistory;
+        });
+
+        if (!conversationId) {
+          setConversationId(chatId);
+        }
+        if (!currentChatTitle) {
+          setCurrentChatTitle(chatTitle);
+        }
       } catch (error) {
-        console.error('Error saving chat history to localStorage:', error);
+        console.error('Error saving chat to history:', error);
       }
-    }
-  }, [chatHistory]);
+    };
+
+    // Debounce the save to prevent too many writes
+    const timer = setTimeout(saveChat, 500);
+    return () => clearTimeout(timer);
+  }, [messages, conversationId, currentChatTitle]);
 
   // Effect to save messages to localStorage
   useEffect(() => {
@@ -126,10 +178,65 @@ export const ChatProvider = ({ children }) => {
   };
 
   const resetChat = () => {
-    // Use the helper function to ensure a fresh Date object for the timestamp
+    // Save current chat before resetting
+    if (messages.length > 1) { // Don't save if it's just the welcome message
+      const chatId = conversationId || Date.now().toString();
+      const chatTitle = currentChatTitle || `Chat ${new Date().toLocaleString()}`;
+      
+      const chat = {
+        id: chatId,
+        title: chatTitle,
+        messages: messages.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp.toISOString()
+        })),
+        lastActivity: new Date().toISOString(),
+        date: new Date().toISOString()
+      };
+
+      setChatHistory(prevHistory => {
+        const existingChatIndex = prevHistory.findIndex(c => c.id === chatId);
+        let updatedHistory;
+        
+        if (existingChatIndex >= 0) {
+          updatedHistory = [...prevHistory];
+          updatedHistory[existingChatIndex] = chat;
+        } else {
+          updatedHistory = [chat, ...prevHistory];
+        }
+
+        localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+        return updatedHistory;
+      });
+    }
+
+    // Reset to initial state
     setMessages([getInitialBotMessage()]);
     setConversationId(null);
+    setCurrentChatTitle(null);
+    localStorage.removeItem('currentConversationId');
   };
+
+  // Function to load chat history from localStorage
+  const loadChatHistory = useCallback(() => {
+    try {
+      const savedChats = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+      const processedChats = savedChats.map(chat => ({
+        ...chat,
+        date: new Date(chat.date),
+        lastActivity: new Date(chat.lastActivity || chat.timestamp),
+        messages: chat.messages ? chat.messages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })) : []
+      }));
+      setChatHistory(processedChats);
+      return processedChats;
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      return [];
+    }
+  }, [setChatHistory]);
 
   const value = {
     // Messages
@@ -145,22 +252,15 @@ export const ChatProvider = ({ children }) => {
     // Chat History
     chatHistory,
     setChatHistory,
+    loadChatHistory,
     currentChatTitle,
     setCurrentChatTitle,
     
-    // Model and Voice
+    // Model
     selectedModel,
     setSelectedModel,
     conversationStyle,
     setConversationStyle,
-    voiceEnabled,
-    setVoiceEnabled,
-    availableVoices,
-    selectedVoice,
-    setSelectedVoice,
-    isSpeaking,
-    setIsSpeaking,
-    
     // UI State
     activeChatDropdown,
     setActiveChatDropdown,
@@ -168,8 +268,6 @@ export const ChatProvider = ({ children }) => {
     setShowModelDropdown,
     showOptions,
     setShowOptions,
-    showVoiceDropdown,
-    setShowVoiceDropdown,
     isLoading,
     setIsLoading,
     isSending,

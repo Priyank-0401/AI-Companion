@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ChatWrapper from '../components/chat/ChatWrapper';
@@ -13,9 +13,9 @@ const ChatPage = () => {
   const { 
     messages, 
     setMessages, 
-    currentConversationId, 
-    setCurrentConversationId,
-    chatHistory,
+    conversationId,
+    setConversationId,
+    chatHistory = [],
     setChatHistory,
     currentChatTitle,
     setCurrentChatTitle,
@@ -23,30 +23,20 @@ const ChatPage = () => {
     setSelectedModel,
     conversationStyle,
     setConversationStyle,
-    voiceEnabled,
-    setVoiceEnabled,
-    availableVoices,
-    selectedVoice,
-    setSelectedVoice,
-    isSpeaking,
-    stopSpeaking,
-    activeChatDropdown,
-    setActiveChatDropdown,
-    showModelDropdown,
-    setShowModelDropdown,
-    showOptions,
-    setShowOptions,
-    showVoiceDropdown,
-    setShowVoiceDropdown,
-    isLoading,
-    isSending
+    isLoading = false,
+    isSending = false,
+    resetChat,
+    loadChatHistory,
+    showModelDropdown = false,
+    setShowModelDropdown = () => {},
+    showOptions = false,
+    setShowOptions = () => {},
+    activeChatDropdown = null,
+    setActiveChatDropdown = () => {}
   } = useChat();
 
-  // Initialize chatHistory as an empty array if undefined
-  const safeChatHistory = chatHistory || [];
-  
   // Group chat history by date
-  const groupedChatHistory = safeChatHistory.reduce((groups, chat) => {
+  const groupedChatHistory = (chatHistory || []).reduce((groups, chat) => {
     if (chat && chat.lastActivity) {
       const date = new Date(chat.lastActivity).toDateString();
       if (!groups[date]) {
@@ -57,47 +47,30 @@ const ChatPage = () => {
     return groups;
   }, {});
 
-  // Load chat history
-  const loadChatHistory = useCallback(async () => {
-    try {
-      const response = await chatApi.getConversations();
-      setChatHistory(response.data || []);
-    } catch (error) {
-      console.error('Failed to load chat history:', error);
-    }
-  }, [setChatHistory]);
-
   // Load a specific chat
-  const loadChat = useCallback(async (conversationId) => {
-    try {
-      const response = await chatApi.getConversation(conversationId);
-      setMessages(response.data.messages || []);
-      setCurrentConversationId(conversationId);
-      setCurrentChatTitle(response.data.title || 'Untitled Chat');
+  const loadChat = useCallback((chatId) => {
+    const chat = chatHistory.find(c => c.id === chatId);
+    if (chat) {
+      setMessages(chat.messages);
+      setConversationId(chatId);
+      setCurrentChatTitle(chat.title);
       setMobileSidebarOpen(false);
-    } catch (error) {
-      console.error('Failed to load chat:', error);
     }
-  }, [setMessages, setCurrentConversationId, setCurrentChatTitle]);
+  }, [chatHistory, setMessages, setConversationId, setCurrentChatTitle]);
 
   // Start a new chat
   const startNewChat = useCallback(() => {
-    setMessages([{
-      id: uuid(),
-      type: 'bot',
-      content: "Welcome! It's wonderful to see you. I'm Seriva, a friendly presence here to listen without judgment, offer support, and explore any thoughts or feelings you'd like to share. How can I help you feel more supported today?",
-      timestamp: new Date(),
-      status: 'delivered'
-    }]);
-    setCurrentConversationId(null);
-    setCurrentChatTitle(null);
-  }, [setMessages, setCurrentConversationId, setCurrentChatTitle]);
+    resetChat();
+    setMobileSidebarOpen(false);
+  }, [resetChat]);
 
   // Export chat
-  const exportChat = useCallback(() => {
-    const chat = currentConversationId 
-      ? chatHistory.find(c => c.id === currentConversationId) 
-      : { messages, title: currentChatTitle || 'Untitled Chat' };
+  const exportChat = useCallback((chatId = null) => {
+    const chat = chatId 
+      ? chatHistory.find(c => c.id === chatId)
+      : conversationId
+        ? chatHistory.find(c => c.id === conversationId)
+        : { messages, title: currentChatTitle || 'Untitled Chat' };
     
     if (!chat) return;
     
@@ -117,24 +90,36 @@ const ChatPage = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [currentConversationId, currentChatTitle, chatHistory, messages]);
+  }, [conversationId, currentChatTitle, chatHistory, messages]);
 
   // Delete chat from history
-  const deleteChatFromHistory = useCallback(async (conversationId) => {
+  const deleteChatFromHistory = useCallback(async (chatId) => {
     try {
-      await chatApi.deleteConversation(conversationId);
-      setChatHistory(prev => prev.filter(chat => chat.id !== conversationId));
-      if (currentConversationId === conversationId) {
-        startNewChat();
+      // Remove from local storage
+      const updatedHistory = chatHistory.filter(chat => chat.id !== chatId);
+      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+      
+      // Update state
+      setChatHistory(updatedHistory);
+      
+      // If we're currently viewing the deleted chat, start a new one
+      if (conversationId === chatId) {
+        resetChat();
+      }
+      
+      // Remove from localStorage if it's the current conversation
+      const currentId = localStorage.getItem('currentConversationId');
+      if (currentId === chatId) {
+        localStorage.removeItem('currentConversationId');
       }
     } catch (error) {
       console.error('Failed to delete chat:', error);
     }
-  }, [currentConversationId, startNewChat, setChatHistory]);
+  }, [chatHistory, conversationId, resetChat, setChatHistory]);
 
   // Save chat as text
-  const saveChatAsTxt = useCallback((conversationId) => {
-    exportChat();
+  const saveChatAsTxt = useCallback((chatId) => {
+    exportChat(chatId);
   }, [exportChat]);
 
   // Reset chat handler
@@ -144,8 +129,9 @@ const ChatPage = () => {
 
   // Initial load
   useEffect(() => {
-    loadChatHistory();
-  }, [loadChatHistory]);
+    // Load any initial data if needed
+    // Chat history is already loaded in the ChatProvider
+  }, []);
 
   // Model options
   const modelOptions = [
@@ -185,7 +171,7 @@ const ChatPage = () => {
           mobileSidebarOpen={mobileSidebarOpen}
           setMobileSidebarOpen={setMobileSidebarOpen}
           chatHistory={chatHistory}
-          currentConversationId={currentConversationId}
+          currentConversationId={conversationId}
           loadChat={loadChat}
           startNewChat={startNewChat}
           exportChat={exportChat}
@@ -199,15 +185,6 @@ const ChatPage = () => {
           setConversationStyle={setConversationStyle}
           showOptions={showOptions}
           setShowOptions={setShowOptions}
-          voiceEnabled={voiceEnabled}
-          setVoiceEnabled={setVoiceEnabled}
-          availableVoices={availableVoices}
-          selectedVoice={selectedVoice}
-          setSelectedVoice={setSelectedVoice}
-          showVoiceDropdown={showVoiceDropdown}
-          setShowVoiceDropdown={setShowVoiceDropdown}
-          isSpeaking={isSpeaking}
-          stopSpeaking={stopSpeaking}
           activeChatDropdown={activeChatDropdown}
           setActiveChatDropdown={setActiveChatDropdown}
           groupedChatHistory={groupedChatHistory}
