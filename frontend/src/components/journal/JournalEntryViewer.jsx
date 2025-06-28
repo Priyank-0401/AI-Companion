@@ -1,4 +1,5 @@
-import { X, Edit, Clock } from 'lucide-react';
+import { X, Edit, Clock, Play, Mic, Video as VideoIcon } from 'lucide-react';
+import { MediaAttachment } from './MediaAttachment';
 
 export const JournalEntryViewer = ({ entry, moods, onEdit, onClose }) => {
   if (!entry) return null;
@@ -63,9 +64,23 @@ export const JournalEntryViewer = ({ entry, moods, onEdit, onClose }) => {
               </span>
             </div>
             
-            <div className="prose prose-invert max-w-none text-text-primary text-base leading-relaxed whitespace-pre-line">
+            <div className="prose prose-invert max-w-none text-text-primary text-base leading-relaxed whitespace-pre-line mb-6">
               {entry.content}
             </div>
+
+            {/* Media Attachments */}
+            {entry.media?.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-medium text-text-secondary mb-3">Media</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {entry.media.map((mediaItem, index) => (
+                    <div key={index} className="bg-background-tertiary/50 rounded-xl overflow-hidden">
+                      <MediaAttachment media={mediaItem} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             {entry.tags?.length > 0 && (
               <div className="mt-8 pt-6 border-t border-background-tertiary">

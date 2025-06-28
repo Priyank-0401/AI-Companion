@@ -5,7 +5,11 @@ import {
   Meh, 
   Frown, 
   Heart, 
-  Sparkles 
+  Sparkles,
+  FileText,
+  Mic,
+  Video,
+  X
 } from 'lucide-react';
 import { JournalHeader } from '../components/journal/JournalHeader';
 import { JournalFilters } from '../components/journal/JournalFilters';
@@ -13,6 +17,8 @@ import { JournalEntryList } from '../components/journal/JournalEntryList';
 import { JournalEditor } from '../components/journal/JournalEditor';
 import { JournalEntryViewer } from '../components/journal/JournalEntryViewer';
 import { Notification } from '../components/journal/Notification';
+import { EntryTypeSelector } from '../components/journal/EntryTypeSelector';
+import { MediaRecorderComponent } from '../components/journal/MediaRecorder';
 
 // Mood configuration
 const MOODS = {
@@ -90,6 +96,8 @@ const getInitialEntries = () => {
 const JournalPage = () => {
   // State management
   const [entries, setEntries] = useState(getInitialEntries);
+  const [entryType, setEntryType] = useState(null); // 'text', 'audio', 'video'
+  const [showEntrySelector, setShowEntrySelector] = useState(false);
   const [isWriting, setIsWriting] = useState(false);
   const [viewEntry, setViewEntry] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -97,6 +105,7 @@ const JournalPage = () => {
   const [selectedMoodFilter, setSelectedMoodFilter] = useState('all');
   const [notification, setNotification] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [mediaBlob, setMediaBlob] = useState(null);
 
   // Save entries to localStorage whenever they change
   useEffect(() => {
@@ -128,16 +137,26 @@ const JournalPage = () => {
     // Simulate API call with timeout
     setTimeout(() => {
       try {
+        const entryToSave = {
+          ...entryData,
+          type: entryType || 'text',
+          ...(mediaBlob && { media: [mediaBlob] })
+        };
+
         if (entryData.id) {
           // Update existing entry
           setEntries(prev => prev.map(entry => 
-            entry.id === entryData.id ? { ...entryData, date: new Date().toISOString() } : entry
+            entry.id === entryData.id ? { 
+              ...entry, 
+              ...entryToSave,
+              date: new Date().toISOString() 
+            } : entry
           ));
           showNotification('Entry updated successfully', 'success');
         } else {
           // Create new entry
           const newEntry = {
-            ...entryData,
+            ...entryToSave,
             id: Date.now(),
             date: new Date().toISOString()
           };
@@ -145,9 +164,11 @@ const JournalPage = () => {
           showNotification('New entry created', 'success');
         }
         
-        // Close the editor
+        // Reset states
         setIsWriting(false);
         setEditingEntry(null);
+        setEntryType(null);
+        setMediaBlob(null);
       } catch (error) {
         console.error('Error saving entry:', error);
         showNotification('Failed to save entry', 'error');
@@ -155,6 +176,13 @@ const JournalPage = () => {
         setIsSaving(false);
       }
     }, 500);
+  };
+
+  // Handle media recording completion
+  const handleMediaRecorded = (mediaData) => {
+    setMediaBlob(mediaData);
+    setEntryType(mediaData.type);
+    setIsWriting(true);
   };
 
   // Handle deleting an entry
@@ -172,6 +200,8 @@ const JournalPage = () => {
   const handleEditEntry = (entry) => {
     setEditingEntry(entry);
     setViewEntry(null);
+    setEntryType(entry.type || 'text');
+    setMediaBlob(entry.media?.[0] || null);
     setIsWriting(true);
   };
 
@@ -181,20 +211,52 @@ const JournalPage = () => {
     setSelectedMoodFilter('all');
   };
 
+  // Handle new entry button click
+  const handleNewEntryClick = () => {
+    setShowEntrySelector(true);
+  };
+
+  // Handle entry type selection
+  const handleEntryTypeSelect = (type) => {
+    setEntryType(type);
+    setShowEntrySelector(false);
+    
+    if (type === 'text') {
+      setIsWriting(true);
+    }
+    // For audio/video, we'll show the recorder first
+  };
+
+  // Handle canceling entry creation
+  const handleCancelEntry = () => {
+    setEntryType(null);
+    setMediaBlob(null);
+    setIsWriting(false);
+    setEditingEntry(null);
+  };
+
   return (
-    <div className="min-h-screen bg-background-primary overflow-y-auto pt-20 pb-20">
+    <div className="min-h-screen bg-background-primary overflow-y-auto pt-4 pb-20">
       {/* Notification */}
       <Notification 
         notification={notification} 
         onClose={() => setNotification(null)} 
       />
 
+      {/* Entry Type Selector */}
+      {showEntrySelector && (
+        <EntryTypeSelector 
+          onSelect={handleEntryTypeSelect}
+          onClose={() => setShowEntrySelector(false)}
+        />
+      )}
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <JournalHeader 
           entryCount={filteredEntries.length} 
-          onNewEntry={() => setIsWriting(true)} 
+          onNewEntry={handleNewEntryClick}
         />
 
         {/* Search and Filter */}
@@ -218,16 +280,52 @@ const JournalPage = () => {
         />
       </div>
 
+      {/* Media Recorder */}
+      {entryType && ['audio', 'video'].includes(entryType) && !isWriting && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background-secondary rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl border border-background-tertiary">
+            <div className="px-6 py-5 border-b border-background-tertiary bg-background-secondary/80 backdrop-blur-sm">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-text-primary">
+                  New {entryType === 'audio' ? 'Audio' : 'Video'} Entry
+                </h2>
+                <button
+                  onClick={handleCancelEntry}
+                  className="p-1.5 rounded-lg hover:bg-background-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-text-secondary mt-1">
+                Record your {entryType} entry below
+              </p>
+            </div>
+            <div className="p-6">
+              <MediaRecorderComponent
+                type={entryType}
+                onRecordingComplete={handleMediaRecorded}
+                onCancel={handleCancelEntry}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Entry Editor Modal */}
       {isWriting && (
         <JournalEditor
-          entry={editingEntry || { title: '', content: '', mood: 'neutral', tags: [] }}
+          entry={editingEntry || { 
+            title: '', 
+            content: '', 
+            mood: 'neutral', 
+            tags: [],
+            type: entryType || 'text',
+            media: mediaBlob ? [mediaBlob] : []
+          }}
           moods={MOODS}
           onSave={handleSaveEntry}
-          onCancel={() => {
-            setIsWriting(false);
-            setEditingEntry(null);
-          }}
+          onCancel={handleCancelEntry}
           isSaving={isSaving}
         />
       )}

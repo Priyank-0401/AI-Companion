@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Clock } from 'lucide-react';
+import { X, Save, Clock, Mic, Video, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { MediaRecorderComponent } from './MediaRecorder';
+import { MediaAttachment } from './MediaAttachment';
 
 export const JournalEditor = ({
   entry,
@@ -12,6 +14,9 @@ export const JournalEditor = ({
   const [content, setContent] = useState(entry?.content || '');
   const [mood, setMood] = useState(entry?.mood || 'neutral');
   const [tags, setTags] = useState(entry?.tags?.join(', ') || '');
+  const [media, setMedia] = useState(entry?.media || []);
+  const [entryType, setEntryType] = useState(entry?.type || 'text');
+  const [showMediaRecorder, setShowMediaRecorder] = useState(false);
 
   useEffect(() => {
     if (entry) {
@@ -19,6 +24,8 @@ export const JournalEditor = ({
       setContent(entry.content || '');
       setMood(entry.mood || 'neutral');
       setTags(entry.tags?.join(', ') || '');
+      setMedia(entry.media || []);
+      setEntryType(entry.type || 'text');
     }
   }, [entry]);
 
@@ -29,9 +36,17 @@ export const JournalEditor = ({
       title: title.trim(),
       content: content.trim(),
       mood,
-      tags: tags.split(',').map(tag => tag.trim()).filter(Boolean)
+      type: entryType,
+      tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
+      media
     });
   };
+
+  // Check if we should show the content field
+  const showContentField = entryType === 'text' || entryType === 'video';
+  
+  // Check if we should show media controls
+  const showMediaControls = entryType === 'audio' || entryType === 'video';
 
   const getWordCount = (text) => {
     return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
@@ -57,6 +72,7 @@ export const JournalEditor = ({
               onClick={onCancel}
               className="p-1.5 rounded-lg hover:bg-background-tertiary text-text-tertiary hover:text-text-primary transition-colors"
               aria-label="Close editor"
+              type="button"
             >
               <X className="w-5 h-5" />
             </button>
@@ -67,10 +83,11 @@ export const JournalEditor = ({
           <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]">
             {/* Title Input */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-primary">
+              <label htmlFor="entry-title" className="block text-sm font-medium text-text-primary">
                 Title <span className="text-red-500">*</span>
               </label>
               <input
+                id="entry-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -83,9 +100,9 @@ export const JournalEditor = ({
 
             {/* Mood Selection */}
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-text-primary">
+              <span className="block text-sm font-medium text-text-primary">
                 How are you feeling?
-              </label>
+              </span>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                 {Object.entries(moods).map(([key, moodData]) => (
                   <button
@@ -97,6 +114,7 @@ export const JournalEditor = ({
                         ? 'border-primary-500 bg-primary-500/10 scale-105'
                         : 'border-background-tertiary hover:border-primary-500/50 bg-background-tertiary/50'
                     }`}
+                    aria-pressed={mood === key}
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
                       mood === key ? 'bg-primary-500/10' : 'bg-background-tertiary'
@@ -116,36 +134,110 @@ export const JournalEditor = ({
             </div>
 
             {/* Content Input */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-text-primary">
-                  Your Thoughts <span className="text-red-500">*</span>
+            {showContentField && (
+              <div className="space-y-2">
+                <label htmlFor="entry-content" className="block text-sm font-medium text-text-primary">
+                  {entryType === 'video' ? 'Video Notes' : 'Your Thoughts'} 
+                  {entryType === 'text' && <span className="text-red-500">*</span>}
+                  {entryType === 'text' && (
+                    <div className="text-xs text-text-tertiary flex items-center mt-1">
+                      <Clock className="w-3 h-3 mr-1" />
+                      <span>{getReadingTime(content)} min read</span>
+                    </div>
+                  )}
                 </label>
-                <div className="text-xs text-text-tertiary flex items-center">
-                  <Clock className="w-3 h-3 mr-1" />
-                  <span>{getReadingTime(content)} min read</span>
+                <div className="relative">
+                  <textarea
+                    id="entry-content"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder={entryType === 'video' 
+                      ? 'Add notes about your video...' 
+                      : 'Write your thoughts here...'}
+                    className="w-full min-h-[200px] px-4 py-3 bg-background-tertiary/70 border border-background-tertiary rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 text-text-primary placeholder-text-tertiary resize-none"
+                    required={entryType === 'text'}
+                  />
+                  <div className="absolute bottom-3 right-3 text-xs text-text-tertiary">
+                    {content.length} characters • {getWordCount(content)} words
+                  </div>
                 </div>
               </div>
-              <div className="relative">
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Write your thoughts here..."
-                  className="w-full min-h-[200px] px-4 py-3 bg-background-tertiary/70 border border-background-tertiary rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 text-text-primary placeholder-text-tertiary resize-none"
-                  required
-                />
-                <div className="absolute bottom-3 right-3 text-xs text-text-tertiary">
-                  {content.length} characters • {getWordCount(content)} words
+            )}
+
+            {/* Media Attachments */}
+            {showMediaControls && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-text-primary">
+                    {entryType === 'audio' ? 'Audio Recording' : 'Video Recording'}
+                  </span>
+                  {media.length === 0 && !showMediaRecorder && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMediaRecorder(true)}
+                      className="px-3 py-1.5 text-sm bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 rounded-lg transition-colors flex items-center"
+                    >
+                      <Mic className="w-4 h-4 mr-1.5" />
+                      {entryType === 'audio' ? 'Record Audio' : 'Record Video'}
+                    </button>
+                  )}
                 </div>
+
+                {media.length > 0 ? (
+                  <div className="mt-2">
+                    <MediaAttachment 
+                      media={media[0]} 
+                      onRemove={() => setMedia([])}
+                      showRemove={!entry?.id} // Don't allow removing media when editing existing entry
+                    />
+                  </div>
+                ) : showMediaRecorder ? (
+                  <div className="mt-4 p-4 bg-background-tertiary/50 rounded-xl">
+                    <MediaRecorderComponent
+                      type={entryType}
+                      onRecordingComplete={(newMedia) => {
+                        setMedia([newMedia]);
+                        setShowMediaRecorder(false);
+                      }}
+                      onCancel={() => setShowMediaRecorder(false)}
+                    />
+                  </div>
+                ) : (
+                  <div className="p-6 border-2 border-dashed border-background-tertiary/50 rounded-xl text-center">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 mb-3">
+                      {entryType === 'audio' ? (
+                        <Mic className="w-6 h-6" />
+                      ) : (
+                        <Video className="w-6 h-6" />
+                      )}
+                    </div>
+                    <h4 className="text-sm font-medium text-text-primary mb-1">
+                      No {entryType} recorded yet
+                    </h4>
+                    <p className="text-xs text-text-tertiary mb-4">
+                      {entryType === 'audio' 
+                        ? 'Record your audio entry to get started.' 
+                        : 'Record your video entry to get started.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowMediaRecorder(true)}
+                      className="px-4 py-2 text-sm bg-primary-500 text-white hover:bg-primary-600 rounded-lg transition-colors flex items-center mx-auto"
+                    >
+                      {entryType === 'audio' ? 'Record Audio' : 'Record Video'}
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Tags Input */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-primary">
+              <label htmlFor="entry-tags" className="block text-sm font-medium text-text-primary">
                 Tags (comma separated)
               </label>
               <input
+                id="entry-tags"
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
