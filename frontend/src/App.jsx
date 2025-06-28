@@ -96,6 +96,14 @@ function AppContent() {
             } 
           />
           <Route 
+            path="/settings/:tab" 
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/volume-lip-sync-test" 
             element={
               <ProtectedRoute>
