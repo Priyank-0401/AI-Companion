@@ -15,7 +15,7 @@ import { ChatProvider } from './contexts/ChatContext'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
 import { ThemeProvider } from './contexts/ThemeContext'
 import ProtectedRoute from './components/ProtectedRoute'
-import VolumeLipSyncTest from './components/avatar/VolumeLipSyncTest'
+
 import './App.css'
 
 function AppContent() {
@@ -105,14 +105,7 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/volume-lip-sync-test" 
-            element={
-              <ProtectedRoute>
-                <VolumeLipSyncTest />
-              </ProtectedRoute>
-            } 
-          />
+
         </Routes>
       </motion.main>
       {!isAuthPage && isHomePage && <Footer />}
