@@ -5,7 +5,7 @@ import Navbar from './components/layout/Navbar'
 import HomePage from './pages/HomePage'
 import ChatPage from './pages/ChatPage'
 import DashboardPage from './pages/DashboardPage'
-import JournalingPage from './pages/JournalingPage'
+import JournalPage from './pages/JournalPage'
 import SettingsPage from './pages/SettingsPage'
 import AvatarCallPage from './pages/AvatarCallPage'
 import LoginPage from './pages/LoginPage'
@@ -13,6 +13,7 @@ import SignupPage from './pages/SignupPage'
 import Footer from './components/layout/Footer'
 import { ChatProvider } from './contexts/ChatContext'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
+import { ThemeProvider } from './contexts/ThemeContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import VolumeLipSyncTest from './components/avatar/VolumeLipSyncTest'
 import './App.css'
@@ -83,7 +84,7 @@ function AppContent() {
             path="/journal" 
             element={
               <ProtectedRoute>
-                <JournalingPage />
+                <JournalPage />
               </ProtectedRoute>
             } 
           />          <Route 
@@ -109,13 +110,16 @@ function AppContent() {
   );
 }
 
-function App() {  return (
+function App() {
+  return (
     <Router>
-      <AuthContextProvider>
-        <ChatProvider>
-          <AppContent />
-        </ChatProvider>
-      </AuthContextProvider>
+      <ThemeProvider>
+        <AuthContextProvider>
+          <ChatProvider>
+            <AppContent />
+          </ChatProvider>
+        </AuthContextProvider>
+      </ThemeProvider>
     </Router>
   )
 }
