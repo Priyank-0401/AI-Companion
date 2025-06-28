@@ -129,34 +129,8 @@ const Sidebar = ({
       transition={{ type: 'spring', damping: 30, stiffness: 400 }}
       className={`fixed md:static h-[calc(100vh-4rem)] pt-12 bg-gray-50 dark:bg-gray-900 w-72 z-50 flex flex-col shadow-xl border-r border-gray-200 dark:border-gray-800 transition-colors duration-200 ${mobileSidebarOpen ? 'block' : 'hidden md:flex'}`}
     >
-      {/* Header */}
-      <div className={`px-4 pb-4 transition-all duration-200 ${isScrolled ? 'border-b border-gray-200 dark:border-gray-800 pb-3' : ''}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Seriva AI
-          </h2>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-yellow-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-gray-600" />
-              )}
-            </button>
-            <button
-              onClick={onLogout}
-              className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Logout"
-            >
-              <LogOut className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </button>
-          </div>
-        </div>
-        
+      {/* Search and New Chat */}
+      <div className="px-4 pb-4">
         {/* Search */}
         <div className="relative mb-4">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

@@ -13,6 +13,22 @@ const getInitialBotMessage = () => ({
 });
 
 export const ChatProvider = ({ children }) => {
+  // Chat state
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentChatTitle, setCurrentChatTitle] = useState(null);
+  const [selectedModel, setSelectedModel] = useState('default');
+  const [conversationStyle, setConversationStyle] = useState('supportive');
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [activeChatDropdown, setActiveChatDropdown] = useState(null);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  
   const [messages, setMessages] = useState(() => {
     try {
       const storedMessages = localStorage.getItem('chatMessages');
@@ -45,6 +61,32 @@ export const ChatProvider = ({ children }) => {
 
   // We can also move conversationStyle here if it needs to be persisted globally
   // const [conversationStyle, setConversationStyle] = useState('supportive'); 
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedChats = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+      const processedChats = savedChats.map(chat => ({
+        ...chat,
+        date: new Date(chat.date),
+        lastActivity: new Date(chat.lastActivity || chat.timestamp)
+      }));
+      setChatHistory(processedChats);
+    } catch (error) {
+      console.error('Error loading chat history from localStorage:', error);
+    }
+  }, []);
+  
+  // Save chat history to localStorage when it changes
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      try {
+        localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+      } catch (error) {
+        console.error('Error saving chat history to localStorage:', error);
+      }
+    }
+  }, [chatHistory]);
 
   // Effect to save messages to localStorage
   useEffect(() => {
@@ -90,13 +132,48 @@ export const ChatProvider = ({ children }) => {
   };
 
   const value = {
+    // Messages
     messages,
+    setMessages,
     addMessage,
+    
+    // Conversation
     conversationId,
     setConversationId,
     resetChat,
-    // conversationStyle, // if moved
-    // setConversationStyle, // if moved
+    
+    // Chat History
+    chatHistory,
+    setChatHistory,
+    currentChatTitle,
+    setCurrentChatTitle,
+    
+    // Model and Voice
+    selectedModel,
+    setSelectedModel,
+    conversationStyle,
+    setConversationStyle,
+    voiceEnabled,
+    setVoiceEnabled,
+    availableVoices,
+    selectedVoice,
+    setSelectedVoice,
+    isSpeaking,
+    setIsSpeaking,
+    
+    // UI State
+    activeChatDropdown,
+    setActiveChatDropdown,
+    showModelDropdown,
+    setShowModelDropdown,
+    showOptions,
+    setShowOptions,
+    showVoiceDropdown,
+    setShowVoiceDropdown,
+    isLoading,
+    setIsLoading,
+    isSending,
+    setIsSending
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

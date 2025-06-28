@@ -76,6 +76,7 @@ const ChatInput = ({
   
   const typingTimeout = useRef(null);
   const emojiButtonRef = useRef(null);
+  const modelButtonRef = useRef(null);
   const textareaRef = useRef(null);
   const containerRef = useRef(null);
   
@@ -104,17 +105,6 @@ const ChatInput = ({
   const handleInputChange = (e) => {
     const value = e.target.value;
     setInput(value);
-    
-    // Auto-resize textarea
-    const textarea = e.target;
-    textarea.style.height = 'auto';
-    const rows = Math.min(
-      Math.max(1, Math.ceil((textarea.scrollHeight - 20) / 24)),
-      maxRows
-    );
-    setInputRows(rows);
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
     
     // Show typing indicator when user is typing
     if (!isTyping) {
@@ -145,10 +135,39 @@ const ChatInput = ({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (input.trim() && !isLoading) {
-        handleFormSubmit(e);
+    const textarea = e.target;
+    
+    if (e.key === 'Enter') {
+      if (!e.shiftKey) {
+        // Submit on Enter (without Shift)
+        e.preventDefault();
+        if (input.trim() && !isLoading) {
+          handleFormSubmit(e);
+        }
+      } else {
+        // Handle Shift+Enter for new line and textarea expansion
+        e.preventDefault();
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = input;
+        
+        // Insert newline at cursor position
+        const newValue = value.substring(0, start) + '\n' + value.substring(end);
+        setInput(newValue);
+        
+        // Update cursor position
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+          
+          // Adjust textarea height if needed
+          textarea.style.height = 'auto';
+          const rows = Math.min(
+            Math.max(1, Math.ceil((textarea.scrollHeight - 20) / 24)),
+            maxRows
+          );
+          setInputRows(rows);
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        }, 0);
       }
     }
   };
@@ -160,8 +179,9 @@ const ChatInput = ({
       if (emojiButtonRef.current && !emojiButtonRef.current.contains(event.target)) {
         setIsEmojiPickerOpen(false);
       }
-      // Close model selector when clicking outside
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      // Close model selector when clicking outside the model selector or its button
+      if (modelButtonRef.current && !modelButtonRef.current.contains(event.target) &&
+          containerRef.current && !containerRef.current.contains(event.target)) {
         setIsModelSelectorOpen(false);
       }
     };
@@ -171,6 +191,12 @@ const ChatInput = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+  
+  // Toggle model selector
+  const toggleModelSelector = (e) => {
+    e.stopPropagation();
+    setIsModelSelectorOpen(prev => !prev);
+  };
 
   // Animation variants
   const containerVariants = {
@@ -208,8 +234,9 @@ const ChatInput = ({
       >
         <div className="relative">
           <motion.button
+            ref={modelButtonRef}
             type="button"
-            onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
+            onClick={toggleModelSelector}
             className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
             disabled={isLoading}
             whileHover={{ backgroundColor: 'rgba(55, 65, 81, 0.8)' }}
@@ -282,13 +309,10 @@ const ChatInput = ({
       {/* Input Area */}
       <motion.div 
         ref={containerRef}
-        className={`relative bg-gray-800/50 border ${
-          isFocused ? 'border-indigo-500/50' : 'border-gray-700'
-        } rounded-2xl shadow-lg transition-all duration-200`}
-        whileHover={{ boxShadow: isFocused ? '0 0 0 3px rgba(79, 70, 229, 0.2)' : '0 4px 20px -5px rgba(0, 0, 0, 0.2)' }}
+        className={`relative bg-gray-800/50 border border-gray-700 rounded-2xl shadow-lg transition-all duration-200`}
+        whileHover={{ boxShadow: '0 4px 20px -5px rgba(0, 0, 0, 0.2)' }}
         animate={{
-          borderColor: isFocused ? 'rgba(79, 70, 229, 0.5)' : 'rgba(55, 65, 81, 0.5)',
-          boxShadow: isFocused ? '0 0 0 3px rgba(79, 70, 229, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
         }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
       >
@@ -310,12 +334,16 @@ const ChatInput = ({
                 setTimeout(() => setIsEmojiPickerOpen(false), 200);
               }}
               placeholder="Message Seriva..."
-              className={`w-full py-4 pl-5 pr-14 bg-transparent text-gray-100 placeholder-gray-500 focus:outline-none resize-none overflow-hidden transition-all duration-200 ${
+              className={`w-full py-4 pl-5 pr-14 bg-transparent text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none overflow-hidden transition-all duration-200 ${
                 inputRows >= maxRows ? 'overflow-y-auto' : ''
               }`}
               style={{
+                WebkitAppearance: 'none',
+                outline: 'none',
+                boxShadow: 'none',
+                border: 'none',
                 minHeight: '24px',
-                maxHeight: `${maxRows * 24}px`,
+                maxHeight: `${maxRows * 24}px`
               }}
               disabled={isLoading}
             />

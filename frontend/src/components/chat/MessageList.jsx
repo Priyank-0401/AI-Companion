@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, User, Copy, Check, Loader2, MoreVertical, ThumbsUp, ThumbsDown, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 import { format } from 'date-fns';
 
+// Get user initials for avatar
+const getUserInitials = (name) => {
+  if (!name || name.trim() === '') return 'U';
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 const Message = ({ message, isLast }) => {
-  const isUser = message.sender === 'user';
+  const { currentUser } = useAuth();
+  const isUser = message.type === 'user';
   const [copied, setCopied] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const optionsRef = useRef(null);
@@ -41,10 +51,18 @@ const Message = ({ message, isLast }) => {
       <div className={`flex max-w-3xl w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         {/* Avatar */}
         <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-          isUser ? 'ml-3 bg-gradient-to-br from-indigo-500 to-purple-600' : 'mr-3 bg-gradient-to-br from-gray-800 to-gray-700 border border-gray-600'
+          isUser 
+            ? 'ml-3 bg-background-tertiary border border-border/50' 
+            : 'mr-3 bg-gradient-to-br from-gray-800 to-gray-700 border border-gray-600'
         }`}>
           {isUser ? (
-            <User className="w-4 h-4 text-white" strokeWidth={2.5} />
+            currentUser?.displayName ? (
+              <span className="text-sm font-medium text-text-primary">
+                {getUserInitials(currentUser.displayName)}
+              </span>
+            ) : (
+              <User className="w-4 h-4 text-text-secondary" strokeWidth={2.5} />
+            )
           ) : (
             <Bot className="w-4 h-4 text-white" strokeWidth={2.5} />
           )}
@@ -53,7 +71,7 @@ const Message = ({ message, isLast }) => {
         {/* Message Bubble */}
         <div className={`relative rounded-2xl px-4 py-3 ${
           isUser 
-            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-br-none' 
+            ? 'bg-indigo-600 text-white rounded-br-none' 
             : 'bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700'
         } shadow-lg`}>
           <div className="prose prose-invert max-w-none text-sm leading-relaxed">

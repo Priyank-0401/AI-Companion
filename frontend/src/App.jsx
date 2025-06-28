@@ -51,7 +51,9 @@ function AppContent() {
           ? "pt-16 flex-grow" 
           : isDashboardPage 
             ? "pt-16 w-full flex-grow" 
-            : "pt-16 w-full py-4 flex-grow"
+            : location.pathname === '/chat' 
+              ? "pt-16 w-full flex-grow" 
+              : "pt-16 w-full py-4 flex-grow"
         }
       >
         <Routes>

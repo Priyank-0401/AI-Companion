@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ChatWrapper from '../components/chat/ChatWrapper';
@@ -170,7 +170,7 @@ const ChatPage = () => {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] pt-4">
+    <div className="flex h-[calc(100vh-4rem)]">
       {/* Mobile sidebar backdrop */}
       {mobileSidebarOpen && (
         <div 
