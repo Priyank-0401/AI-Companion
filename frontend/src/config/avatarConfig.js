@@ -6,6 +6,7 @@ export const AVATAR_CONFIG = {
     IDLE: '/models/Idle.glb',          // Animation data ONLY
     TALKING: '/models/Talking.glb',    // Animation data ONLY
     GREET: '/models/Greet.glb',        // Greeting animation data ONLY
+    NOD: '/models/Nod.glb',            // Nodding animation data ONLY
   },
 
   // Camera settings - Position at eye level and look at head
@@ -52,25 +53,28 @@ export const AVATAR_CONFIG = {
     FADE_DURATION: 0.3,                // Smooth transitions
     DEFAULT: 'idle',
     NAMES: {
-      GREET: 'greet',                  // NEW: Greeting animation
+      GREET: 'greet',                  // Greeting animation
       IDLE: 'idle',
       TALKING: 'talking',
+      NOD: 'nod',                      // Nodding animation
     },
     SPEEDS: {
-      GREET: 1.0,                      // NEW: Normal speed for greeting
+      GREET: 1.0,                      // Normal speed for greeting
       IDLE: 1.0,                       // Normal speed for idle
       TALKING: 0.3,                    // Slower speed for talking
+      NOD: 0.8,                        // Slightly slower for natural nod
     },
     LOOP_SETTINGS: {
       CONTINUOUS: true,                // Keep looping until manually stopped
       BUFFER_TIME: 0.1,               // Brief pause between animation loops
       SMOOTH_TRANSITIONS: true,        // Enable smooth transitions between loops
-      GREET_ONCE: true,               // NEW: Greeting plays only once
+      GREET_ONCE: true,               // Greeting plays only once
     },
-    // NEW: Animation priorities (higher number = higher priority)
+    // Animation priorities (higher number = higher priority)
     PRIORITIES: {
-      GREET: 3,                       // Highest priority
-      TALKING: 2,                     // Medium priority
+      GREET: 4,                       // Highest priority
+      TALKING: 3,                     // High priority
+      NOD: 2,                         // Medium priority (above idle)
       IDLE: 1,                        // Lowest priority
     },
   },

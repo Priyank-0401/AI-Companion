@@ -5,11 +5,12 @@ import { AVATAR_CONFIG } from '../config/avatarConfig';
 import { useAvatarExpressions } from '../hooks/useAvatarExpressions';
 import { useAvatarVoice } from '../hooks/useAvatarVoice';
 
-// Preload all model files for better performance - INCLUDING GREET
+// Preload all model files for better performance
 useGLTF.preload(AVATAR_CONFIG.MODELS.AVATAR);
 useGLTF.preload(AVATAR_CONFIG.MODELS.IDLE);
 useGLTF.preload(AVATAR_CONFIG.MODELS.TALKING);
-useGLTF.preload(AVATAR_CONFIG.MODELS.GREET); // NEW: Preload greeting animation
+useGLTF.preload(AVATAR_CONFIG.MODELS.GREET);
+useGLTF.preload(AVATAR_CONFIG.MODELS.NOD); // Preload nod animation
 
 // Loading fallback component
 function LoadingFallback() {
@@ -47,13 +48,15 @@ const AvatarModel = React.memo(({
   volumeLipSyncRef = null,
   // NEW: Greeting props
   enableGreeting = true,
-  onGreetingComplete = null
+  onGreetingComplete = null,
+  isListening = false // NEW: Listening state
 }) => {
-  // Load models - INCLUDING GREET
+  // Load all animation models
   const avatarModel = useGLTF(AVATAR_CONFIG.MODELS.AVATAR);
   const idleFile = useGLTF(AVATAR_CONFIG.MODELS.IDLE);
   const talkingFile = useGLTF(AVATAR_CONFIG.MODELS.TALKING);
-  const greetFile = useGLTF(AVATAR_CONFIG.MODELS.GREET); // NEW: Load greet model
+  const greetFile = useGLTF(AVATAR_CONFIG.MODELS.GREET);
+  const nodFile = useGLTF(AVATAR_CONFIG.MODELS.NOD); // Load nod animation
 
   // Refs
   const groupRef = useRef();
@@ -96,7 +99,7 @@ const AvatarModel = React.memo(({
     volume: avatarVolume
   });
 
-  // Enhanced animations preparation - INCLUDING GREET
+  // Enhanced animations preparation
   const animations = React.useMemo(() => {
     const allAnimations = [];
     
@@ -127,13 +130,22 @@ const AvatarModel = React.memo(({
       });
     }
 
+    // Process nod animations
+    if (nodFile?.animations && nodFile.animations.length > 0) {
+      nodFile.animations.forEach((clip, index) => {
+        const namedClip = clip.clone();
+        namedClip.name = `${AVATAR_CONFIG.ANIMATIONS.NAMES.NOD}_${index}`;
+        allAnimations.push(namedClip);
+      });
+    }
+
     return allAnimations;
-  }, [greetFile, idleFile, talkingFile]); // NEW: Include greetFile dependency
+  }, [greetFile, idleFile, talkingFile, nodFile]); // NEW: Include nodFile dependency
 
   // Animation system
   const { actions, mixer } = useAnimations(animations, avatarModel.scene);
 
-  // Hide all animation model geometries - INCLUDING GREET
+  // Hide all animation model geometries
   useEffect(() => {
     // Hide greeting file geometry
     if (greetFile?.scene) {
@@ -162,6 +174,15 @@ const AvatarModel = React.memo(({
       });
     }
 
+    // Hide nod file geometry
+    if (nodFile?.scene) {
+      nodFile.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.visible = false;
+        }
+      });
+    }
+
     // Ensure avatar head is visible
     if (avatarModel?.scene) {
       avatarModel.scene.traverse((child) => {
@@ -175,7 +196,7 @@ const AvatarModel = React.memo(({
         }
       });
     }
-  }, [greetFile, idleFile, talkingFile, avatarModel]); // NEW: Include greetFile
+  }, [greetFile, idleFile, talkingFile, nodFile, avatarModel]); // NEW: Include nodFile
 
   // Setup morph targets
   useEffect(() => {
@@ -348,17 +369,24 @@ const AvatarModel = React.memo(({
     let targetAnimation;
     let shouldLoop = true;
 
+    // Check greeting state first (highest priority)
     if (greetingState.isGreeting && !greetingState.greetingComplete) {
-      // HIGHEST PRIORITY: Greeting animation
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.GREET}_0`;
       shouldLoop = false; // Greeting plays once only
       console.log('🎬 Switching to greeting animation');
-    } else if (isTalking || isSpeaking) {
-      // MEDIUM PRIORITY: Talking animation
+    } 
+    // Check talking state (high priority)
+    else if (isTalking || isSpeaking) {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`;
       console.log('🗣️ Switching to talking animation');
-    } else {
-      // LOWEST PRIORITY: Idle animation
+    } 
+    // Check listening state (medium priority)
+    else if (isListening) {
+      targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.NOD}_0`;
+      console.log('👍 Switching to nod animation (listening)');
+    }
+    // Default to idle (lowest priority)
+    else {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;
       console.log('😌 Switching to idle animation');
     }
@@ -384,7 +412,9 @@ const AvatarModel = React.memo(({
             ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.GREET
             : (isTalking || isSpeaking) 
               ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.TALKING 
-              : AVATAR_CONFIG.ANIMATIONS.SPEEDS.IDLE;
+              : (isListening) 
+                ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.NOD
+                : AVATAR_CONFIG.ANIMATIONS.SPEEDS.IDLE;
               
           action.setEffectiveTimeScale(animationSpeed);
           action.fadeIn(AVATAR_CONFIG.ANIMATIONS.FADE_DURATION);
@@ -416,9 +446,9 @@ const AvatarModel = React.memo(({
         loopTimeoutRef.current = null;
       }
     };
-  }, [greetingState.isGreeting, greetingState.greetingComplete, isTalking, isSpeaking, actions, mixer]);
+  }, [greetingState.isGreeting, greetingState.greetingComplete, isTalking, isSpeaking, isListening, actions, mixer]);
 
-  // Animation frame updates with volume-based lip sync (unchanged)
+  // Animation frame updates with volume-based lip sync
   useFrame(() => {
     if (mixer) {
       mixer.update(0.016);
@@ -485,6 +515,7 @@ const AvatarModel = React.memo(({
 // Enhanced Avatar Scene Component with Greeting Support
 const AvatarScene = React.memo(({ 
   isTalking, 
+  isListening = false, 
   lastMessage = '', 
   voiceEnabled = true, 
   selectedVoice = null, 
@@ -551,6 +582,7 @@ const AvatarScene = React.memo(({
         <Suspense fallback={null}>
           <AvatarModel
             isTalking={isTalking}
+            isListening={isListening}
             lastMessage={lastMessage}
             voiceEnabled={voiceEnabled}
             selectedVoice={selectedVoice}
@@ -569,6 +601,7 @@ const AvatarScene = React.memo(({
 // Enhanced Main Export Component with Greeting Support
 const Avatar = React.memo(({ 
   isTalking = false,
+  isListening = false,
   lastMessage = '',
   voiceEnabled = true,
   selectedVoice = null,
@@ -582,6 +615,7 @@ const Avatar = React.memo(({
   return (
     <AvatarScene
       isTalking={isTalking}
+      isListening={isListening}
       lastMessage={lastMessage}
       voiceEnabled={voiceEnabled}
       selectedVoice={selectedVoice}

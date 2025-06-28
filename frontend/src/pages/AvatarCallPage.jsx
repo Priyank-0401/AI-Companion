@@ -931,7 +931,7 @@ const AvatarCallPage = () => {
             style={{ pointerEvents: 'none' }}
           >            {/* Avatar Component - Optimized with memoized props */}
             <div className="absolute inset-0">
-              <Avatar {...avatarProps} />
+              <Avatar isListening={isListening} {...avatarProps} />
             </div>
             
             {/* Video Overlays */}
