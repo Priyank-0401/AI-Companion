@@ -58,14 +58,14 @@ const HelpAndSupport = () => {
               </p>
               <div className="flex items-center space-x-4">
                 <a
-                  href="mailto:support@wellnessapp.com"
+                  href="mailto:priyankpahwa41@gmail.com"
                   className="inline-flex items-center px-4 py-2.5 bg-background-secondary hover:bg-background-tertiary/50 text-text-primary rounded-xl border border-border transition-colors"
                 >
                   <Mail className="w-4 h-4 mr-2" />
-                  support@wellnessapp.com
+                  priyankpahwa41@gmail.com
                 </a>
-                <span className="text-sm text-text-tertiary">
-                  Typical response time: 24-48 hours
+                <span className="text-base font-medium text-text-tertiary">
+                  Or visit: <a href="https://github.com/Priyank-0401" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary ml-1">Github</a>
                 </span>
               </div>
             </div>

@@ -68,10 +68,12 @@ const FAQItem = ({ question, answer, isOpen, onClick, icon }) => (
           <p className="text-sm text-text-tertiary">
             Still have questions?{' '}
             <a 
-              href="#help" 
+              href="https://github.com/Priyank-0401" 
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-primary hover:underline font-medium"
             >
-              Contact our support team
+              github.com/Priyank-0401
             </a>
           </p>
         </div>
@@ -120,11 +122,11 @@ const FAQs = () => {
             </p>
           </div>
           <a
-            href="mailto:support@wellnessapp.com"
+            href="mailto:priyankpahwa41@gmail.com"
             className="inline-flex items-center px-4 py-2.5 bg-background-secondary hover:bg-background-tertiary/50 text-text-primary rounded-xl border border-border transition-colors whitespace-nowrap"
           >
             <Mail className="w-4 h-4 mr-2" />
-            Contact Support
+            priyankpahwa41@gmail.com
           </a>
         </div>
       </div>
