@@ -29,25 +29,57 @@ import {
 import voiceService from '../services/voiceService';
 
 // Send message to Ollama and get response
-const sendToOllama = async (message, conversationHistory, setConversationHistory, voiceEnabled, setVoiceEnabled, selectedVoice, speakText, setError, setIsProcessing) => {
+const sendToOllama = async (message, conversationHistory, setConversationHistory, voiceEnabled, setVoiceEnabled, selectedVoice, speakText, setError, setIsProcessing, currentEmotion = 'neutral') => {
   if (!message || !message.trim()) {
-    console.warn('Empty message provided to sendToOllama');
+    console.warn('Empty message provided to sendToLLM');
     return null;
   }
   
-  console.log('Sending to Ollama:', { message, conversationHistory });
+  console.log('Sending to LLM:', { message, currentEmotion, conversationHistory });
   setIsProcessing(true);
   
   const abortController = new AbortController();
   
   try {
+    // Create emotion context message
+    const emotionContext = {
+      happy: "The user appears happy. Respond with an upbeat and positive tone, matching their energy while staying professional.",
+      sad: "The user seems sad. Respond with extra empathy, kindness, and support. Offer gentle encouragement.",
+      angry: "The user seems frustrated or angry. Respond with patience, understanding, and a calming tone. Avoid being confrontational.",
+      surprised: "The user seems surprised. Acknowledge their reaction and provide clear, reassuring information.",
+      neutral: "The user's expression is neutral. Maintain a warm, professional, and engaging tone."
+    };
+
+    // Prepare messages array ensuring proper format for Ollama
+    const messages = [
+      // System message with emotion context
+      { 
+        role: 'system', 
+        content: `You are Seriva, an AI wellness companion. ${emotionContext[currentEmotion] || emotionContext.neutral}`
+      },
+      // Add conversation history (filter out any existing system messages to avoid duplicates)
+      ...conversationHistory
+        .filter(msg => msg.role !== 'system')
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+      // Add current user message
+      { 
+        role: 'user',
+        content: message
+      }
+    ];
+
     const requestBody = {
       model: 'llama3',
-      messages: [
-        ...conversationHistory,
-        { role: 'user', content: message }
-      ],
+      messages: messages,
       stream: false,
+      options: {
+        temperature: 0.7,
+        top_p: 0.9,
+        num_ctx: 2048
+      }
     };
 
     console.log('Ollama Request:', JSON.stringify(requestBody, null, 2));
@@ -678,7 +710,7 @@ const AvatarCallPage = () => {
         }
         
         // Call Ollama API to get response
-        console.log('📡 Sending to Ollama API...');
+        console.log('📡 Sending to Ollama API with emotion:', emotion);
         const response = await sendToOllama(
           recognizedText,
           updatedHistory,
@@ -688,7 +720,8 @@ const AvatarCallPage = () => {
           selectedVoice,
           speakText,
           setError,
-          setIsProcessing
+          setIsProcessing,
+          emotion // Pass the current emotion to the LLM
         );
         
         if (response) {

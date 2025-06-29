@@ -1,6 +1,64 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { analyzeTextForExpression, ExpressionManager } from '../utils/expressionUtils';
 import { useEmotionDetection } from './useEmotionDetection';
+
+// Emotion transition configuration
+const EMOTION_INTENSITY = {
+  // Subtle transitions (e.g., neutral → slight smile)
+  subtle: {
+    delay: 250,
+    jitter: 0.1, // ±10%
+    fadeDuration: 200
+  },
+  // Moderate transitions (e.g., neutral → sad, sad → comfort)
+  moderate: {
+    delay: 500,
+    jitter: 0.15,
+    fadeDuration: 300
+  },
+  // Strong transitions (e.g., happy → angry, surprised → calm)
+  strong: {
+    delay: 850,
+    jitter: 0.1,
+    fadeDuration: 400
+  }
+};
+
+// Categorize emotions by their intensity
+const EMOTION_CATEGORIES = {
+  subtle: ['neutral', 'slight_smile', 'thinking'],
+  moderate: ['sad', 'happy', 'thinking', 'confused'],
+  strong: ['angry', 'surprised', 'excited', 'frustrated']
+};
+
+// Helper function to get transition type between two emotions
+const getTransitionType = (fromEmotion, toEmotion) => {
+  if (fromEmotion === toEmotion) return 'subtle';
+  
+  const fromStrong = EMOTION_CATEGORIES.strong.includes(fromEmotion);
+  const toStrong = EMOTION_CATEGORIES.strong.includes(toEmotion);
+  const fromModerate = EMOTION_CATEGORIES.moderate.includes(fromEmotion);
+  const toModerate = EMOTION_CATEGORIES.moderate.includes(toEmotion);
+  
+  // Strong to strong or strong to/from moderate
+  if (fromStrong || toStrong || (fromModerate && toModerate)) {
+    return 'strong';
+  }
+  
+  // Moderate to/from subtle
+  if (fromModerate || toModerate) {
+    return 'moderate';
+  }
+  
+  // Subtle to subtle
+  return 'subtle';
+};
+
+// Helper function to calculate delay with jitter
+const getDelayedAction = (baseDelay, jitterFactor) => {
+  const jitter = baseDelay * jitterFactor * (Math.random() * 2 - 1); // ±jitter
+  return baseDelay + jitter;
+};
 
 /**
  * Custom hook for managing avatar expressions with emotion detection
@@ -65,33 +123,72 @@ export const useAvatarExpressions = (
     return analyzeTextForExpression(message);
   }, [enableAutoExpression]);
 
+  // Track the current transition timeout
+  const transitionTimeout = useRef(null);
+  const previousEmotion = useRef('neutral');
+
+  // Clear any pending transitions
+  const clearPendingTransition = useCallback(() => {
+    if (transitionTimeout.current) {
+      clearTimeout(transitionTimeout.current);
+      transitionTimeout.current = null;
+    }
+  }, []);
+
+  // Apply expression with transition
+  const applyExpression = useCallback((newEmotion) => {
+    // Clear any pending transitions
+    clearPendingTransition();
+    
+    // Skip if no change
+    if (newEmotion === currentExpression) return;
+    
+    // Determine transition type
+    const transitionType = getTransitionType(previousEmotion.current, newEmotion);
+    const { delay, jitter, fadeDuration } = EMOTION_INTENSITY[transitionType];
+    
+    // Calculate actual delay with jitter
+    const actualDelay = getDelayedAction(delay, jitter);
+    
+    console.log(`Transitioning from ${previousEmotion.current} to ${newEmotion} (${transitionType} transition, ${actualDelay.toFixed(0)}ms)`);
+    
+    // Queue the expression with medium priority
+    expressionManager.current.queueExpression(
+      newEmotion,
+      expressionDuration,
+      2 // Medium priority
+    );
+    
+    // Schedule the expression change
+    transitionTimeout.current = setTimeout(() => {
+      // Update the expression with smooth transition
+      setCurrentExpression(newEmotion);
+      previousEmotion.current = newEmotion;
+      
+      // Schedule return to neutral if needed
+      if (expressionTimer.current) {
+        clearTimeout(expressionTimer.current);
+      }
+      
+      if (newEmotion !== 'neutral') {
+        expressionTimer.current = setTimeout(() => {
+          applyExpression('neutral');
+        }, expressionDuration - fadeDuration);
+      }
+    }, actualDelay);
+    
+  }, [currentExpression, expressionDuration, clearPendingTransition]);
+
   // Handle emotion changes from video detection
   const handleEmotionChange = useCallback((emotion) => {
     // Only update if we're not forcing an expression and auto expressions are enabled
     if (forceExpression || !enableAutoExpression) return;
+    
+    // Apply the new expression with transition
+    applyExpression(emotion);
+  }, [forceExpression, enableAutoExpression, applyExpression]);
 
-    // Queue the expression with medium priority (1 - high, 2 - medium, 3 - low)
-    expressionManager.current.queueExpression(
-      emotion,
-      expressionDuration,
-      2 // Medium priority
-    );
-
-    // Apply the expression
-    setCurrentExpression(emotion);
-
-    // Clear any existing timer
-    if (expressionTimer.current) {
-      clearTimeout(expressionTimer.current);
-    }
-
-    // Return to neutral after duration
-    expressionTimer.current = setTimeout(() => {
-      setCurrentExpression('neutral');
-    }, expressionDuration);
-  }, [expressionDuration, forceExpression, enableAutoExpression]);
-
-  // Handle new messages - MODIFIED to respect forced expressions
+  // Handle new messages - MODIFIED to respect forced expressions and use smooth transitions
   useEffect(() => {
     // Don't run auto expressions if we're forcing an expression
     if (!enableAutoExpression || forceExpression) return;
@@ -100,28 +197,11 @@ export const useAvatarExpressions = (
       const detectedExpression = analyzeMessage(lastMessage);
 
       if (detectedExpression !== 'neutral') {
-        // Queue the expression with high priority
-        expressionManager.current.queueExpression(
-          detectedExpression,
-          expressionDuration,
-          1 // High priority (overrides emotion detection)
-        );
-
-        // Apply the expression
-        setCurrentExpression(detectedExpression);
-
-        // Clear any existing timer
-        if (expressionTimer.current) {
-          clearTimeout(expressionTimer.current);
-        }
-
-        // Return to neutral after duration
-        expressionTimer.current = setTimeout(() => {
-          setCurrentExpression('neutral');
-        }, expressionDuration);
+        // Apply the expression with transition
+        applyExpression(detectedExpression);
       }
     }
-  }, [lastMessage, analyzeMessage, expressionDuration, enableAutoExpression, forceExpression]);
+  }, [lastMessage, analyzeMessage, enableAutoExpression, forceExpression, applyExpression]);
 
   // Automatic blinking system - MODIFIED to respect forced expressions
   useEffect(() => {
@@ -178,24 +258,28 @@ export const useAvatarExpressions = (
     }
   }, [forceExpression, currentExpression, isTalking]);
 
-  // Manual expression control
+  // Manual expression control with smooth transitions
   const setExpression = useCallback((expression, duration = expressionDuration) => {
-    setCurrentExpression(expression);
-
+    // Apply the expression with transition
+    applyExpression(expression);
+    
+    // Update the expression duration
     if (expressionTimer.current) {
       clearTimeout(expressionTimer.current);
     }
-
+    
     if (expression !== 'neutral') {
       expressionTimer.current = setTimeout(() => {
-        setCurrentExpression('neutral');
+        applyExpression('neutral');
       }, duration);
     }
-  }, [expressionDuration]);
+  }, [expressionDuration, applyExpression]);
 
   // Clear all expressions and return to neutral
   const resetExpression = useCallback(() => {
+    clearPendingTransition();
     setCurrentExpression('neutral');
+    previousEmotion.current = 'neutral';
     setIsBlinking(false);
     expressionManager.current.clearQueue();
 
@@ -207,14 +291,15 @@ export const useAvatarExpressions = (
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (blinkTimer.current) {
-        clearTimeout(blinkTimer.current);
-      }
+      clearPendingTransition();
       if (expressionTimer.current) {
         clearTimeout(expressionTimer.current);
       }
+      if (blinkTimer.current) {
+        clearTimeout(blinkTimer.current);
+      }
     };
-  }, []);
+  }, [clearPendingTransition]);
 
   return {
     currentExpression,
