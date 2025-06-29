@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { analyzeTextForExpression, ExpressionManager } from '../utils/expressionUtils';
+import { useEmotionDetection } from './useEmotionDetection';
 
 /**
- * Custom hook for managing avatar expressions based on chatbot responses
+ * Custom hook for managing avatar expressions with emotion detection
  * @param {boolean} isTalking - Whether the avatar is currently talking
  * @param {string} lastMessage - The most recent chatbot message
  * @param {object} options - Configuration options
@@ -16,11 +17,23 @@ export const useAvatarExpressions = (
   const {
     enableAutoExpression = true,
     enableBlinking = true,
+    enableEmotionDetection = true, // New option to enable/disable emotion detection
     expressionDuration = 3000,
     blinkInterval = [2000, 5000], // Min and max blink interval
     lipSyncEnabled = false,
-    forceExpression = null, // ADD THIS LINE - for greeting smile override
+    forceExpression = null,
   } = options;
+
+  // Emotion detection hook
+  const { emotion: detectedEmotion, videoRef } = useEmotionDetection({
+    enabled: enableEmotionDetection,
+    onEmotionDetected: (emotion) => {
+      // Only update if we're not forcing an expression and auto expressions are enabled
+      if (!forceExpression && enableAutoExpression) {
+        handleEmotionChange(emotion);
+      }
+    }
+  });
 
   const [currentExpression, setCurrentExpression] = useState('neutral');
   const [isBlinking, setIsBlinking] = useState(false);
@@ -31,15 +44,15 @@ export const useAvatarExpressions = (
   // NEW: Handle forced expressions (like greeting smile)
   useEffect(() => {
     if (forceExpression) {
-      console.log(`🎭 Forcing expression: ${forceExpression}`);
+      console.log(` Forcing expression: ${forceExpression}`);
       setCurrentExpression(forceExpression);
-      
+
       // Clear any existing expression timers when forcing
       if (expressionTimer.current) {
         clearTimeout(expressionTimer.current);
         expressionTimer.current = null;
       }
-      
+
       // Don't allow auto-expressions while forced
       return;
     }
@@ -48,34 +61,60 @@ export const useAvatarExpressions = (
   // Analyze message for expression
   const analyzeMessage = useCallback((message) => {
     if (!enableAutoExpression || !message) return 'neutral';
-    
+
     return analyzeTextForExpression(message);
   }, [enableAutoExpression]);
+
+  // Handle emotion changes from video detection
+  const handleEmotionChange = useCallback((emotion) => {
+    // Only update if we're not forcing an expression and auto expressions are enabled
+    if (forceExpression || !enableAutoExpression) return;
+
+    // Queue the expression with medium priority (1 - high, 2 - medium, 3 - low)
+    expressionManager.current.queueExpression(
+      emotion,
+      expressionDuration,
+      2 // Medium priority
+    );
+
+    // Apply the expression
+    setCurrentExpression(emotion);
+
+    // Clear any existing timer
+    if (expressionTimer.current) {
+      clearTimeout(expressionTimer.current);
+    }
+
+    // Return to neutral after duration
+    expressionTimer.current = setTimeout(() => {
+      setCurrentExpression('neutral');
+    }, expressionDuration);
+  }, [expressionDuration, forceExpression, enableAutoExpression]);
 
   // Handle new messages - MODIFIED to respect forced expressions
   useEffect(() => {
     // Don't run auto expressions if we're forcing an expression
     if (!enableAutoExpression || forceExpression) return;
-    
-    if (lastMessage && enableAutoExpression) {
+
+    if (lastMessage) {
       const detectedExpression = analyzeMessage(lastMessage);
-      
+
       if (detectedExpression !== 'neutral') {
-        // Queue the expression
+        // Queue the expression with high priority
         expressionManager.current.queueExpression(
-          detectedExpression, 
-          expressionDuration, 
-          2 // Higher priority than blinking
+          detectedExpression,
+          expressionDuration,
+          1 // High priority (overrides emotion detection)
         );
-        
+
         // Apply the expression
         setCurrentExpression(detectedExpression);
-        
+
         // Clear any existing timer
         if (expressionTimer.current) {
           clearTimeout(expressionTimer.current);
         }
-        
+
         // Return to neutral after duration
         expressionTimer.current = setTimeout(() => {
           setCurrentExpression('neutral');
@@ -94,29 +133,29 @@ export const useAvatarExpressions = (
     const scheduleBlink = () => {
       const [minInterval, maxInterval] = blinkInterval;
       const interval = minInterval + Math.random() * (maxInterval - minInterval);
-      
-      console.log(`👁️ Next blink scheduled in ${interval}ms`);
-        blinkTimer.current = setTimeout(() => {
-        console.log(`👁️ Blink timer fired. Current expression: ${currentExpression}`);
-        
+
+      console.log(` Next blink scheduled in ${interval}ms`);
+      blinkTimer.current = setTimeout(() => {
+        console.log(` Blink timer fired. Current expression: ${currentExpression}`);
+
         // Allow blinking even with mild expressions, but not during strong emotions
-        const allowBlinking = currentExpression === 'neutral' || 
-                              currentExpression === 'smile' || 
-                              Math.random() < 0.3; // 30% chance to blink during other expressions
-        
+        const allowBlinking = currentExpression === 'neutral' ||
+          currentExpression === 'smile' ||
+          Math.random() < 0.3; // 30% chance to blink during other expressions
+
         if (allowBlinking && Math.random() < 0.8) { // Increased probability to 80%
-          console.log('👁️ Starting blink');
+          console.log(' Starting blink');
           setIsBlinking(true);
-          
+
           // Brief blink without changing the main expression
           setTimeout(() => {
-            console.log('👁️ Ending blink');
+            console.log(' Ending blink');
             setIsBlinking(false);
           }, 150);
         } else {
-          console.log(`👁️ Skipping blink - expression: ${currentExpression}, allowBlinking: ${allowBlinking}`);
+          console.log(` Skipping blink - expression: ${currentExpression}, allowBlinking: ${allowBlinking}`);
         }
-        
+
         // Schedule next blink
         scheduleBlink();
       }, interval);
@@ -134,7 +173,7 @@ export const useAvatarExpressions = (
   // NEW: Reset to neutral when forced expression is removed
   useEffect(() => {
     if (forceExpression === null && currentExpression !== 'neutral' && !isTalking) {
-      console.log('🔄 Resetting to neutral expression after forced expression');
+      console.log(' Resetting to neutral expression after forced expression');
       setCurrentExpression('neutral');
     }
   }, [forceExpression, currentExpression, isTalking]);
@@ -142,11 +181,11 @@ export const useAvatarExpressions = (
   // Manual expression control
   const setExpression = useCallback((expression, duration = expressionDuration) => {
     setCurrentExpression(expression);
-    
+
     if (expressionTimer.current) {
       clearTimeout(expressionTimer.current);
     }
-    
+
     if (expression !== 'neutral') {
       expressionTimer.current = setTimeout(() => {
         setCurrentExpression('neutral');
@@ -159,7 +198,7 @@ export const useAvatarExpressions = (
     setCurrentExpression('neutral');
     setIsBlinking(false);
     expressionManager.current.clearQueue();
-    
+
     if (expressionTimer.current) {
       clearTimeout(expressionTimer.current);
     }
@@ -180,6 +219,8 @@ export const useAvatarExpressions = (
   return {
     currentExpression,
     isBlinking,
+    videoRef, // Expose video ref for the video element
+    detectedEmotion, // For debugging purposes
     setExpression,
     resetExpression,
     analyzeMessage

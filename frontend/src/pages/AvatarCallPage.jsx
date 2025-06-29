@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
 import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volume lip sync hook
+import { useEmotionDetection } from '../hooks/useEmotionDetection'; // Import the emotion detection hook
 // Removed expression hook import - keeping it simple
 import { 
   Mic, 
@@ -18,7 +19,11 @@ import {
   Loader2, 
   PhoneOff,
   User,
-  AlertTriangle
+  AlertTriangle,
+  Video,
+  VideoOff,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 import voiceService from '../services/voiceService';
@@ -142,6 +147,87 @@ const AvatarCallPage = () => {
   const [selectedTone, setSelectedTone] = useState('empathetic'); // New tone selector state
   const volumeLipSyncRef = useRef(null); // Add volume lip sync ref
   
+  // Emotion state
+  const [emotion, setEmotion] = useState('neutral');
+  
+  // Camera preview state
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  
+  // Camera state
+  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
+
+  // Emotion detection - starts with camera disabled by default
+  const { 
+    videoRef, 
+    videoStream,
+    isReady: isEmotionReady, 
+    hasCameraAccess, 
+    error: emotionError,
+    stopVideo,
+    startVideo
+  } = useEmotionDetection({ 
+    enabled: isCameraEnabled,
+    onEmotionDetected: (detectedEmotion) => {
+      setEmotion(detectedEmotion);
+    }
+  });
+
+  // Toggle camera
+  const toggleCamera = useCallback(async () => {
+    const newState = !isCameraEnabled;
+    console.log('Toggling camera to:', newState);
+    
+    if (newState) {
+      // When enabling camera
+      setIsPreviewVisible(true);
+      setIsCameraEnabled(true);
+    } else {
+      // When disabling camera
+      setIsCameraEnabled(false);
+      // Reset emotion to neutral when camera is off
+      setEmotion('neutral');
+      
+      // Stop any active video tracks
+      if (videoRef?.current?.srcObject) {
+        const stream = videoRef.current.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    }
+  }, [isCameraEnabled]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup camera on unmount
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, []);
+
+  // Handle camera toggle
+  useEffect(() => {
+    if (!isCameraEnabled) {
+      stopVideo?.();
+      setEmotion('neutral');
+    } else {
+      startVideo?.();
+    }
+  }, [isCameraEnabled, startVideo, stopVideo]);
+
+  // Log detected emotion
+  useEffect(() => {
+    if (emotion) {
+      console.log('Detected emotion:', emotion);
+    }
+  }, [emotion]);
+
   // Handle delayed animation state
   useEffect(() => {
     let timeout;
@@ -754,8 +840,9 @@ const AvatarCallPage = () => {
         getVolumeValue: () => currentLipSyncVolume || 0,
         isPlaying: () => isLipSyncing
       }
-    }
-  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive]);
+    },
+    detectedEmotion: emotion
+  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive, emotion]);
   
   const endCall = () => {
     // Handle ending the call
@@ -946,37 +1033,104 @@ const AvatarCallPage = () => {
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
       `}</style>
+      
       {/* Main Video Area */}
-      <div className="flex-1 flex relative">
-        {/* Video Area */}
-        <div className="w-full relative bg-black/20">
-          <motion.div 
-            className="absolute inset-0 rounded-none overflow-hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            style={{ pointerEvents: 'none' }}
-          >            {/* Avatar Component - Optimized with memoized props */}
-            <div className="absolute inset-0">
-              <Avatar 
-                isListening={isListening} 
-                isTalking={delayedIsSpeaking} 
-                {...avatarProps} 
-                className="w-full h-full"
-                volumeLipSyncRef={volumeLipSyncRef}
-                enableGreeting={true}
-                onGreetingComplete={() => {
-                  console.log('Greeting complete, transitioning to idle');
-                }}
-              />
-            </div>
-            
-            {/* Video Overlays */}
-            <div className="absolute inset-0 pointer-events-none">
-            </div>
-          </motion.div>
-        </div>
+      <div className="relative w-full h-full overflow-hidden">
+        {/* Hidden video element for emotion detection */}
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{
+            position: 'absolute',
+            top: '-9999px',
+            left: '-9999px',
+            width: '1px',
+            height: '1px',
+            opacity: 0,
+            pointerEvents: 'none',
+          }}
+        />
+        
+        <motion.div 
+          className="absolute inset-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          style={{ pointerEvents: 'none' }}
+        >
+          {/* 3D Avatar */}
+          <div className="absolute inset-0">
+            <Avatar
+              isListening={isListening}
+              isTalking={delayedIsSpeaking}
+              {...avatarProps}
+              className="w-full h-full"
+              volumeLipSyncRef={volumeLipSyncRef}
+              enableGreeting={true}
+              onGreetingComplete={() => {
+                console.log('Greeting complete, transitioning to idle');
+              }}
+              detectedEmotion={emotion}
+            />
+          </div>
+          
+          {/* Video Overlays */}
+          <div className="absolute inset-0 pointer-events-none">
+          </div>
+        </motion.div>
       </div>      
+      {/* Camera Preview */}
+      {isPreviewVisible && isCameraEnabled && (
+        <motion.div 
+          className={`fixed right-4 z-50 bg-black/80 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 backdrop-blur-sm transition-all duration-300 ${
+            isPreviewExpanded 
+              ? 'bottom-24 w-[500px] h-[375px]' 
+              : 'bottom-24 w-[320px] h-[240px]'
+          }`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+        >
+          <div className="relative w-full h-full">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover transform -scale-x-100"
+              style={{ transform: 'scaleX(-1)' }}
+            />
+            <div className="absolute top-2 right-2 flex space-x-1">
+              <button 
+                onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
+                className="p-1.5 bg-black/60 rounded-full text-white hover:bg-white/20 transition-colors"
+                title={isPreviewExpanded ? 'Minimize' : 'Maximize'}
+              >
+                {isPreviewExpanded ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </button>
+              <button 
+                onClick={() => setIsPreviewVisible(false)}
+                className="p-1.5 bg-black/60 rounded-full text-white hover:bg-white/20 transition-colors"
+                title="Close preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {emotion && (
+              <div className="absolute bottom-2 left-2 px-3 py-1.5 bg-black/60 text-white text-sm rounded-md font-medium">
+                {emotion}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Enhanced Bottom Controls */}
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent backdrop-blur-sm z-40">
         <div className="container mx-auto px-4 py-3">
@@ -1066,6 +1220,31 @@ const AvatarCallPage = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
+            </div>
+
+            {/* Camera Toggle */}
+            <div className="relative group">
+              {isPreviewVisible && isCameraEnabled && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
+              )}
+              <button 
+                onClick={toggleCamera}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
+                  isCameraEnabled 
+                    ? 'bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/30 hover:scale-105' 
+                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md'
+                }`}
+                title={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
+              >
+                {isCameraEnabled ? (
+                  <Video className="w-6 h-6 text-white" />
+                ) : (
+                  <VideoOff className="w-6 h-6 text-white/80" />
+                )}
+              </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+                {isCameraEnabled ? 'Camera On' : 'Camera Off'}
+              </div>
             </div>
 
             {/* Volume Control */}

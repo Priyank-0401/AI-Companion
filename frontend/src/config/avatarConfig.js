@@ -79,22 +79,42 @@ export const AVATAR_CONFIG = {
     },
   },
 
-  // Enhanced Expression Settings with Greeting
+  // Enhanced Expression Settings with Greeting and Emotion Detection
   EXPRESSIONS: {
     ENABLE_BLINKING: false,            // Disabled - no blink morph targets
-    ENABLE_AUTO_EXPRESSIONS: true,
-    ENABLE_GREETING_SMILE: true,       // NEW: Enable smile during greeting
-    BLINK_INTERVAL: [2000, 5000],      // Min and max blink interval (ms)
-    BLINK_DURATION: 150,               // How long a blink lasts (ms)
-    EXPRESSION_DURATION: 3000,         // How long expressions last (ms)
-    GREETING_EXPRESSION_DURATION: 4000, // NEW: How long greeting smile lasts
-    BLINK_PROBABILITY: 0.7,            // Probability of blinking when scheduled
+    ENABLE_AUTO_EXPRESSIONS: true,      // Enable automatic expressions from text
+    ENABLE_EMOTION_DETECTION: true,     // Enable webcam-based emotion detection
+    ENABLE_GREETING_SMILE: true,        // Enable smile during greeting
+    
+    // Timing settings
+    BLINK_INTERVAL: [2000, 5000],       // Min and max blink interval (ms)
+    BLINK_DURATION: 150,                // How long a blink lasts (ms)
+    EXPRESSION_DURATION: 3000,          // How long expressions last (ms)
+    GREETING_EXPRESSION_DURATION: 4000,  // How long greeting smile lasts
+    EMOTION_UPDATE_INTERVAL: 200,        // How often to check for emotion changes (ms)
+    EMOTION_CONFIDENCE_THRESHOLD: 0.7,  // Minimum confidence for emotion detection (0-1)
+    
+    // Behavior settings
+    BLINK_PROBABILITY: 0.7,             // Probability of blinking when scheduled
+    
+    // Emotion to expression mapping
+    EMOTION_MAPPING: {
+      happy: 'happy',
+      sad: 'sad',
+      angry: 'angry',
+      surprised: 'surprised',
+      neutral: 'neutral'
+    },
+    
+    // Morph target configurations
     MORPH_TARGETS: {
       // Eye blinking morph targets (NOT AVAILABLE in current model)
       EYE_BLINK_LEFT: 'eyeBlinkLeft',
       EYE_BLINK_RIGHT: 'eyeBlinkRight',
       EYE_BLINK: 'eyesClosed',         // Fallback if separate targets don't exist
       // Expression targets
+      MOUTH_SMILE: 'mouthSmile',       // Available - used for greeting
+      MOUTH_OPEN: 'mouthOpen',         // Available - used for talking
       MOUTH_SMILE: 'mouthSmile',       // ✅ Available - used for greeting
       MOUTH_OPEN: 'mouthOpen',         // ✅ Available - used for talking
       MOUTH_FROWN: 'mouthFrown',       // Not available

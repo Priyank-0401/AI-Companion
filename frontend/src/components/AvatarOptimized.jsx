@@ -73,19 +73,32 @@ const AvatarModel = React.memo(({
     shouldSmile: false,             // Should show smile expression
   });
 
-  // Enhanced expression system with greeting support
-  const { currentExpression, isBlinking } = useAvatarExpressions(
+  // Enhanced expression system with greeting and emotion detection support
+  const { 
+    currentExpression, 
+    isBlinking, 
+    videoRef,
+    detectedEmotion 
+  } = useAvatarExpressions(
     isTalking, 
     lastMessage, 
     {
       enableAutoExpression: AVATAR_CONFIG.EXPRESSIONS.ENABLE_AUTO_EXPRESSIONS,
       enableBlinking: AVATAR_CONFIG.EXPRESSIONS.ENABLE_BLINKING,
+      enableEmotionDetection: AVATAR_CONFIG.EXPRESSIONS.ENABLE_EMOTION_DETECTION || true,
       expressionDuration: AVATAR_CONFIG.EXPRESSIONS.EXPRESSION_DURATION,
       blinkInterval: AVATAR_CONFIG.EXPRESSIONS.BLINK_INTERVAL,
-      // NEW: Override expression during greeting
+      // Override expression during greeting
       forceExpression: greetingState.shouldSmile ? 'smile' : null,
     }
   );
+
+  // Log detected emotions for debugging
+  useEffect(() => {
+    if (detectedEmotion) {
+      console.log(`Detected user emotion: ${detectedEmotion}`);
+    }
+  }, [detectedEmotion]);
 
   // Voice system
   const {
@@ -500,12 +513,7 @@ const AvatarModel = React.memo(({
   }, []);
 
   return (
-    <group
-      ref={groupRef}
-      position={AVATAR_CONFIG.AVATAR.POSITION}
-      scale={AVATAR_CONFIG.AVATAR.SCALE}
-      rotation={AVATAR_CONFIG.AVATAR.ROTATION}
-    >
+    <group ref={groupRef} position={AVATAR_CONFIG.AVATAR.POSITION} scale={AVATAR_CONFIG.AVATAR.SCALE} rotation={AVATAR_CONFIG.AVATAR.ROTATION}>
       <primitive object={avatarModel.scene} />
     </group>
   );
