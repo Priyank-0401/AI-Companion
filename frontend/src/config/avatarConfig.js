@@ -59,10 +59,10 @@ export const AVATAR_CONFIG = {
       NOD: 'nod',                      // Nodding animation
     },
     SPEEDS: {
-      GREET: 1.0,                      // Normal speed for greeting
-      IDLE: 1.0,                       // Normal speed for idle
+      GREET: 0.5,                      // Normal speed for greeting
+      IDLE: 0.7,                   // Normal speed for idle
       TALKING: 0.3,                    // Slower speed for talking
-      NOD: 0.8,                        // Slightly slower for natural nod
+      NOD: 0.5,                        // Slightly slower for natural nod
     },
     LOOP_SETTINGS: {
       CONTINUOUS: true,                // Keep looping until manually stopped

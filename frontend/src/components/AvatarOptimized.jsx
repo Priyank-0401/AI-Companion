@@ -89,7 +89,6 @@ const AvatarModel = React.memo(({
 
   // Voice system
   const {
-    isSpeaking,
     speak,
     stopSpeaking,
     availableVoices  
@@ -376,7 +375,7 @@ const AvatarModel = React.memo(({
       console.log('🎬 Switching to greeting animation');
     } 
     // Check talking state (high priority)
-    else if (isTalking || isSpeaking) {
+    else if (isTalking) {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`;
       console.log('🗣️ Switching to talking animation');
     } 
@@ -410,7 +409,7 @@ const AvatarModel = React.memo(({
           // Set animation speed
           const animationSpeed = greetingState.isGreeting 
             ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.GREET
-            : (isTalking || isSpeaking) 
+            : isTalking
               ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.TALKING 
               : (isListening) 
                 ? AVATAR_CONFIG.ANIMATIONS.SPEEDS.NOD
@@ -446,7 +445,7 @@ const AvatarModel = React.memo(({
         loopTimeoutRef.current = null;
       }
     };
-  }, [greetingState.isGreeting, greetingState.greetingComplete, isTalking, isSpeaking, isListening, actions, mixer]);
+  }, [greetingState.isGreeting, greetingState.greetingComplete, isTalking, isListening, actions, mixer]);
 
   // Animation frame updates with volume-based lip sync
   useFrame(() => {
@@ -470,7 +469,7 @@ const AvatarModel = React.memo(({
             influences[targetIndex] = 0;
           }
         } else {
-          const shouldMoveMouth = (isTalking || isSpeaking) && !greetingState.isGreeting;
+          const shouldMoveMouth = isTalking && !greetingState.isGreeting;
           if (shouldMoveMouth) {
             const jawMovement = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
             influences[targetIndex] = jawMovement;

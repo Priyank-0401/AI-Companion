@@ -300,12 +300,7 @@ const MoodHistory = ({ userId }) => {
           }} 
         />
         
-        {/* Date indicator */}
-        <div className="absolute -bottom-5 left-0 right-0 flex justify-between px-2">
-          <div className="text-xs text-[#EEEEEE]/50 mt-1">Past Week</div>
-          <div className="text-xs text-[#00ADB5] font-medium -mt-6">Today</div>
-          <div className="text-xs text-[#EEEEEE]/50 mt-1">Next Days</div>
-        </div>
+        
       </div>
       
       <div className="mt-4 text-xs text-center text-[#EEEEEE]/50">

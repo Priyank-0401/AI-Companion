@@ -50,6 +50,7 @@ export const useAvatarVoice = (options = {}) => {
     
     return () => clearInterval(speakingStateInterval);
   }, [selectedVoice, isSpeaking]);
+
   // Speak text with Azure Neural TTS
   const speak = useCallback(async (text, customOptions = {}) => {
     if (!isEnabled || !text || isSpeaking) {
@@ -58,29 +59,34 @@ export const useAvatarVoice = (options = {}) => {
 
     try {
       console.log('🎵 Hook: Starting Azure TTS speech');
-      setIsSpeaking(true);
-        const speechOptions = {
+      
+      // Create a promise that resolves after 2 seconds
+      const delayPromise = new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Set up the speech options with our custom callbacks
+      const speechOptions = {
         voice: selectedVoice,
-        volume: volume, // Pass volume to voice service
+        volume: volume,
         ...voiceSettings,
         ...customOptions,
-        onStart: () => {
+        onStart: async () => {
+          console.log('🎵 Hook: Speech started, waiting delay before animation');
+          // Wait for the 2 second delay before starting animation
+          await delayPromise;
           setIsSpeaking(true);
-          console.log('🎵 Hook: Speech started');
-          customOptions.onStart?.();
+          console.log('🎵 Hook: Starting talking animation after delay');
         },
         onEnd: () => {
           setIsSpeaking(false);
           console.log('🎵 Hook: Speech ended');
-          customOptions.onEnd?.();
         },
         onError: (error) => {
           setIsSpeaking(false);
           console.error('❌ Hook: Speech error:', error);
-          customOptions.onError?.(error);
         }
       };
 
+      // Start the speech
       currentSpeechRef.current = voiceService.speak(text, speechOptions);
       await currentSpeechRef.current;
         } catch (error) {

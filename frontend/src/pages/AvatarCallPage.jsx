@@ -127,6 +127,7 @@ const AvatarCallPage = () => {
   const [recognizedText, setRecognizedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [delayedIsSpeaking, setDelayedIsSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [systemVolume, setSystemVolume] = useState(80);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
@@ -139,7 +140,23 @@ const AvatarCallPage = () => {
   const [availableVoices, setAvailableVoices] = useState([]);  
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [selectedTone, setSelectedTone] = useState('empathetic'); // New tone selector state
+  const volumeLipSyncRef = useRef(null); // Add volume lip sync ref
   
+  // Handle delayed animation state
+  useEffect(() => {
+    let timeout;
+    if (isSpeaking) {
+      timeout = setTimeout(() => {
+        setDelayedIsSpeaking(true); // Start animation after 2 seconds
+      }, 500);
+    } else {
+      setDelayedIsSpeaking(false); // Reset immediately if AI stops talking
+      clearTimeout(timeout);
+    }
+
+    return () => clearTimeout(timeout);
+  }, [isSpeaking]);
+
   // Voice tone options
   const voiceTones = [
     { id: 'empathetic', name: 'Empathetic', description: 'Caring & supportive', voice: 'en-US-JennyNeural' },
@@ -168,17 +185,16 @@ const AvatarCallPage = () => {
       voiceService.setVoice(selectedVoice);
     }
     
-    // Set the last message and speaking state
+    // Set the last message but don't start speaking yet
     setLastMessage(text);
-    setIsSpeaking(true);
 
     try {
-      
       // Use the voiceService to speak the text
       await voiceService.speak(text, {
         onStart: () => {
-          console.log('🎤 Speech started');
-          // No need to set state here as it's already set
+          console.log('🎤 Speech started, starting talking animation');
+          // Start the talking animation after delay
+          setIsSpeaking(true);
         },
         onEnd: () => {
           console.log('✅ Speech ended');
@@ -666,6 +682,15 @@ const AvatarCallPage = () => {
     setIsListening(prev => !prev);
   }, [isProcessing]);
 
+  // Volume lip sync setup
+  const { 
+    currentVolume: currentLipSyncVolume, 
+    isAnalyzing: isLipSyncing, 
+    setupVolumeAnalysis: setupLipSync,
+    startVolumeAnalysis: startLipSyncAnalysis, 
+    stopVolumeAnalysis: stopLipSyncAnalysis 
+  } = useVolumeLipSync();
+
   // Volume control functions with optimized hover
   const volumeHoverTimeoutRef = useRef(null);
   
@@ -724,12 +749,12 @@ const AvatarCallPage = () => {
     selectedVoice: selectedVoice,
     onVoiceEnd: handleVoiceEnd,
     avatarVolume: systemVolume, // Pass volume to avatar
-    volumeLipSyncRef: { 
+    volumeLipSyncRef: {
       current: {
-        getVolumeValue: () => lipSyncVolume || 0,
-        isPlaying: () => lipSyncActive
+        getVolumeValue: () => currentLipSyncVolume || 0,
+        isPlaying: () => isLipSyncing
       }
-    } // Provide proper interface for lip sync
+    }
   }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive]);
   
   const endCall = () => {
@@ -933,7 +958,17 @@ const AvatarCallPage = () => {
             style={{ pointerEvents: 'none' }}
           >            {/* Avatar Component - Optimized with memoized props */}
             <div className="absolute inset-0">
-              <Avatar isListening={isListening} {...avatarProps} />
+              <Avatar 
+                isListening={isListening} 
+                isTalking={delayedIsSpeaking} 
+                {...avatarProps} 
+                className="w-full h-full"
+                volumeLipSyncRef={volumeLipSyncRef}
+                enableGreeting={true}
+                onGreetingComplete={() => {
+                  console.log('Greeting complete, transitioning to idle');
+                }}
+              />
             </div>
             
             {/* Video Overlays */}

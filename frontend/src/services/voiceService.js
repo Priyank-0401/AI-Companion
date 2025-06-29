@@ -396,7 +396,6 @@ class VoiceService {
       
       // Set a timeout to prevent hanging if audio never loads
       const loadTimeout = setTimeout(() => {
-        console.warn('⚠️ Audio loading timeout, attempting playback anyway');
         clearInterval(readyStateCheck);
         audio.removeEventListener('canplaythrough', canPlayHandler);
         startPlayback();

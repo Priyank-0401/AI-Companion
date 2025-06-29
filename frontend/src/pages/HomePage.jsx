@@ -25,9 +25,9 @@ import {
 const features = [
   {
     icon: MessageCircle,
-    title: 'AI Chat Companion',
+    title: 'AI Companion',
     description: 'Engage in meaningful conversations with our intelligent Seriva powered by advanced language models.',
-    link: '/chat',
+    link: '/avatar-call',
     color: 'from-blue-500 to-cyan-500'
   },  {
     icon: BarChart3,
