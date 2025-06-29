@@ -335,29 +335,98 @@ class VoiceService {
       
       speechSynthesis.speak(utterance);
     });
-  }  // Play audio blob with proper event handling
+  }  // Play audio blob with buffer-aware playback system
   async playAudioBlob(audioBlob, options = {}) {
+    console.log('🎵 Starting buffer-aware audio playback');
     const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
+    const audio = new Audio();
     
     // Set volume from options, default to 0.8
     audio.volume = options.volume !== undefined ? options.volume : 0.8;
     
+    // Preload the audio
+    audio.preload = 'auto';
+    audio.src = audioUrl;
+    
     this.currentAudio = audio;
-
+    this._isSpeaking = true;
+    
+    // Call onStart immediately to sync with avatar animation
+    options.onStart?.();
+    
+    // Start loading the audio
+    audio.load();
+    
     return new Promise((resolve, reject) => {
-      // Event handlers
-      audio.onloadstart = () => {
-        options.onStart?.();
+      // Function to start playback when ready
+      const startPlayback = () => {
+        console.log('🎵 Audio ready to play, starting playback');
+        
+        // Small delay to ensure avatar animation is in sync
+        setTimeout(() => {
+          audio.play()
+            .then(() => {
+              console.log('▶️ Playback started successfully');
+            })
+            .catch(error => {
+              console.error('❌ Playback failed:', error);
+              this._handlePlaybackError(error, audioUrl, reject, options);
+            });
+        }, 150); // 150ms delay for visual sync
       };
-
-
+      
+      // Try using canplaythrough first (most reliable)
+      const canPlayHandler = () => {
+        console.log('✅ Audio can play through');
+        audio.removeEventListener('canplaythrough', canPlayHandler);
+        startPlayback();
+      };
+      
+      audio.addEventListener('canplaythrough', canPlayHandler);
+      
+      // Fallback: Check ready state periodically
+      const readyStateCheck = setInterval(() => {
+        if (audio.readyState >= 4) { // HAVE_ENOUGH_DATA
+          console.log('✅ Audio ready (via readyState check)');
+          clearInterval(readyStateCheck);
+          audio.removeEventListener('canplaythrough', canPlayHandler);
+          startPlayback();
+        }
+      }, 50);
+      
+      // Set a timeout to prevent hanging if audio never loads
+      const loadTimeout = setTimeout(() => {
+        console.warn('⚠️ Audio loading timeout, attempting playback anyway');
+        clearInterval(readyStateCheck);
+        audio.removeEventListener('canplaythrough', canPlayHandler);
+        startPlayback();
+      }, 5000); // 5 second timeout
+      
+      // Cleanup
+      audio.onended = () => {
+        console.log('✅ Playback completed');
+        clearInterval(readyStateCheck);
+        clearTimeout(loadTimeout);
+        this._isSpeaking = false;
+        this.currentAudio = null;
+        URL.revokeObjectURL(audioUrl);
+        options.onEnd?.();
+        resolve();
+      };
+      
       audio.onplay = () => {
-        this._isSpeaking = true;
-        options.onStart?.();
+        console.log('▶️ Audio playback started');
+      };
+      
+      audio.onerror = (error) => {
+        console.error('❌ Playback error:', error);
+        clearInterval(readyStateCheck);
+        clearTimeout(loadTimeout);
+        this._handlePlaybackError(error, audioUrl, reject, options);
       };
 
       audio.onended = () => {
+        console.log('✅ Audio playback completed');
         this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
@@ -367,32 +436,33 @@ class VoiceService {
 
       audio.onerror = (error) => {
         console.error('❌ Audio playback error:', error);
-        this._isSpeaking = false;
-        this.currentAudio = null;
-        URL.revokeObjectURL(audioUrl);
-        options.onError?.(error);
-        reject(error);
+        this._handlePlaybackError(error, audioUrl, reject, options);
       };
 
       audio.onpause = () => {
+        console.log('⏸️ Audio playback paused');
         options.onPause?.();
       };
 
       audio.onabort = () => {
+        console.log('⏹️ Audio playback aborted');
         this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
-      };      // Start playback
-      audio.play().catch(error => {
-        console.error('❌ Failed to play audio:', error);
-        this._isSpeaking = false;
-        this.currentAudio = null;
-        URL.revokeObjectURL(audioUrl);
-        reject(error);
-      });
+      };
     });
   }
 
+  // Handle playback errors consistently
+  _handlePlaybackError(error, audioUrl, reject, options = {}) {
+    console.error('❌ Handling playback error:', error);
+    this._isSpeaking = false;
+    this.currentAudio = null;
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    if (options.onError) options.onError(error);
+    if (reject) reject(error);
+  }
+  
   stop() {
     if (this.currentAudio) {
       this.currentAudio.pause();

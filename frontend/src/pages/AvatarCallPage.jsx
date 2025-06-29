@@ -7,6 +7,7 @@ import {
   Mic, 
   MicOff, 
   MessageSquare,
+  Volume1,  
   Volume2,
   VolumeX,
   X,
@@ -157,26 +158,27 @@ const AvatarCallPage = () => {
     if (!voiceEnabled) {
       console.log('Voice was disabled, enabling now...');
       setVoiceEnabled(true);
-      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     console.log('🔊 Starting to speak text:', text);
+    
+    // Set voice and speaking state immediately
+    if (selectedVoice) {
+      console.log('🎙️ Setting voice to:', selectedVoice.displayName);
+      voiceService.setVoice(selectedVoice);
+    }
+    
+    // Set the last message and speaking state
+    setLastMessage(text);
     setIsSpeaking(true);
 
     try {
-      // Set the selected voice if available
-      if (selectedVoice) {
-        console.log('🎙️ Setting voice to:', selectedVoice.displayName);
-        voiceService.setVoice(selectedVoice);
-      }
       
       // Use the voiceService to speak the text
       await voiceService.speak(text, {
         onStart: () => {
           console.log('🎤 Speech started');
-          setIsSpeaking(true);
-          // Set the last message for avatar animation
-          setLastMessage(text);
+          // No need to set state here as it's already set
         },
         onEnd: () => {
           console.log('✅ Speech ended');
