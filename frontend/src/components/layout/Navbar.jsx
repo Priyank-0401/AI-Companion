@@ -57,15 +57,21 @@ const Navbar = () => {
     }
   }
 
-  // Don't show protected nav items if user is redirecting after login
-  const filteredNavItems = isRedirecting && !currentUser
-    ? navItems.filter(item => item.public)
-    : navItems 
-
-  // Only show public nav items when not logged in
-  const visibleNavItems = !currentUser 
-    ? navItems.filter(item => item.public) 
-    : navItems 
+  // Filter navigation items based on authentication status and redirect state
+  const filteredNavItems = (() => {
+    // If user is not logged in, only show public items
+    if (!currentUser) {
+      return navItems.filter(item => item.public);
+    }
+    
+    // If user is logged in but we're in the middle of a redirect, show a minimal set
+    if (isRedirecting) {
+      return navItems.filter(item => item.public || item.path === '/dashboard');
+    }
+    
+    // Otherwise, show all items for logged-in users
+    return navItems;
+  })();
 
   return (
     <motion.nav 
