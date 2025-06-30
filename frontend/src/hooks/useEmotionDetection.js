@@ -189,10 +189,7 @@ export const useEmotionDetection = (options = {}) => {
       }
     };
     
-    // Only initialize if enabled is true
-    if (enabled) {
-      init();
-    }
+    init();
 
     return () => {
       if (detectionInterval.current) {
@@ -201,18 +198,37 @@ export const useEmotionDetection = (options = {}) => {
       }
       stopVideo();
     };
-  }, [loadModels, stopVideo, enabled]); // Add enabled to dependencies
+  }, [loadModels, stopVideo]);
 
-  // Handle video start/stop when explicitly called
-  // Removed automatic video toggle based on enabled prop
-  // Video will now only start when startVideo() is explicitly called
+  // Handle video start/stop when enabled changes
   useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      console.log('Cleaning up video on unmount');
-      stopVideo();
+    if (!isReady) {
+      console.log('Not ready to toggle video');
+      return;
+    }
+
+    console.log('Toggling video, enabled:', enabled);
+    
+    const handleVideoToggle = async () => {
+      if (enabled) {
+        console.log('Starting video...');
+        await startVideo();
+      } else {
+        console.log('Stopping video...');
+        stopVideo();
+      }
     };
-  }, [stopVideo]);
+
+    handleVideoToggle();
+    
+    // Cleanup on unmount or when enabled changes
+    return () => {
+      if (!enabled) {
+        console.log('Cleaning up video');
+        stopVideo();
+      }
+    };
+  }, [enabled, isReady, startVideo, stopVideo]);
 
   // Start/stop detection interval when camera is ready and enabled
   useEffect(() => {
