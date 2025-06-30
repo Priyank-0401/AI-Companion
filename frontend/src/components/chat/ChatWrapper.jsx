@@ -42,7 +42,7 @@ const ChatWrapper = () => {
   
   // Settings
   const [selectedModel, setSelectedModel] = useState('default');
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice disabled by default
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [conversationStyle, setConversationStyle] = useState('supportive');
   const [availableVoices, setAvailableVoices] = useState([]);
@@ -181,15 +181,26 @@ const ChatWrapper = () => {
     setIsSpeaking(true);
   }, [voiceEnabled, isSpeaking, selectedVoice]);
   
-  // Auto-speak bot messages when voice is enabled
+  // Voice functionality disabled
   useEffect(() => {
+    // Skip the first render to prevent speaking the welcome message
+    if (!initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true;
+      return;
+    }
+    
+    // Don't speak if voice is disabled
     if (!voiceEnabled) return;
     
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.type === 'bot' && lastMessage.id !== 1) {
-        speakMessage(lastMessage.content);
-      }
+    // Don't speak if there are no messages
+    if (messages.length === 0) return;
+    
+    // Get the last message
+    const lastMessage = messages[messages.length - 1];
+    
+    // Only speak bot messages that aren't the welcome message
+    if (lastMessage.type === 'bot' && lastMessage.id !== 1) {
+      speakMessage(lastMessage.content);
     }
   }, [messages, voiceEnabled, speakMessage]);
   

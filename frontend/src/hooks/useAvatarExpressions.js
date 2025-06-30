@@ -150,7 +150,7 @@ export const useAvatarExpressions = (
     // Calculate actual delay with jitter
     const actualDelay = getDelayedAction(delay, jitter);
     
-    console.log(`Transitioning from ${previousEmotion.current} to ${newEmotion} (${transitionType} transition, ${actualDelay.toFixed(0)}ms)`);
+    // console.log(`Transitioning from ${previousEmotion.current} to ${newEmotion} (${transitionType} transition, ${actualDelay.toFixed(0)}ms)`);
     
     // Queue the expression with medium priority
     expressionManager.current.queueExpression(
@@ -253,7 +253,7 @@ export const useAvatarExpressions = (
   // NEW: Reset to neutral when forced expression is removed
   useEffect(() => {
     if (forceExpression === null && currentExpression !== 'neutral' && !isTalking) {
-      console.log(' Resetting to neutral expression after forced expression');
+      // console.log(' Resetting to neutral expression after forced expression');
       setCurrentExpression('neutral');
     }
   }, [forceExpression, currentExpression, isTalking]);

@@ -205,15 +205,25 @@ const AvatarCallPage = () => {
     }
   });
 
-  // Toggle camera
+  // Toggle camera - explicitly starts/stops the camera
   const toggleCamera = useCallback(async () => {
     const newState = !isCameraEnabled;
     console.log('Toggling camera to:', newState);
     
     if (newState) {
       // When enabling camera
-      setIsPreviewVisible(true);
-      setIsCameraEnabled(true);
+      try {
+        setIsPreviewVisible(true);
+        // First start the video stream
+        await startVideo();
+        // Then enable the camera flag
+        setIsCameraEnabled(true);
+      } catch (err) {
+        console.error('Failed to start camera:', err);
+        setError(new Error('Could not access camera. Please check permissions.'));
+        setIsPreviewVisible(false);
+        setIsCameraEnabled(false);
+      }
     } else {
       // When disabling camera
       setIsCameraEnabled(false);
@@ -227,8 +237,11 @@ const AvatarCallPage = () => {
         tracks.forEach(track => track.stop());
         videoRef.current.srcObject = null;
       }
+      
+      // Hide preview when camera is off
+      setIsPreviewVisible(false);
     }
-  }, [isCameraEnabled]);
+  }, [isCameraEnabled, startVideo]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -243,7 +256,7 @@ const AvatarCallPage = () => {
     };
   }, []);
 
-  // Handle camera toggle
+  // Handle camera state changes
   useEffect(() => {
     if (!isCameraEnabled) {
       stopVideo?.();
