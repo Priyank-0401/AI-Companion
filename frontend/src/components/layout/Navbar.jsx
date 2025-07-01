@@ -57,14 +57,9 @@ const Navbar = () => {
     }
   }
 
-  // Don't show protected nav items if user is redirecting after login
-  const filteredNavItems = isRedirecting && !currentUser
+  // Filter navigation items based on authentication state
+  const filteredNavItems = !currentUser 
     ? navItems.filter(item => item.public)
-    : navItems 
-
-  // Only show public nav items when not logged in
-  const visibleNavItems = !currentUser 
-    ? navItems.filter(item => item.public) 
     : navItems 
 
   return (
