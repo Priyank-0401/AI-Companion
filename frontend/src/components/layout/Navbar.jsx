@@ -145,32 +145,32 @@ const Navbar = () => {
 
               {/* Authentication Buttons */}
               {!loading && (
-                <>
+                <div className="flex items-center space-x-2">
                   {currentUser && !isRedirecting ? (
                     <button
                       onClick={handleLogout}
-                      className="group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-200 dark:border-red-900/30 hover:shadow-sm"
                     >
-                      <LogOut className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
-                      <span>Logout</span>
+                      <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                      <span>Sign out</span>
                     </button>
                   ) : !currentUser ? (
                     <>
                       <Link
                         to="/login"
-                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border border-indigo-200 dark:border-indigo-900/30 hover:shadow-sm"
                       >
                         Log in
                       </Link>
                       <Link
                         to="/signup"
-                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md"
+                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
                       >
-                        Sign up
+                        Get Started
                       </Link>
                     </>
                   ) : null}
-                </>
+                </div>
               )}
             </div>
           </div>

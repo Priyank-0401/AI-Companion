@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
-const Hero = ({ user }) => {
+const Hero = ({ user, scrollToFeatures }) => {
   const { isDark } = useTheme();
   return (
     <section className={`relative py-20 overflow-hidden ${
@@ -49,8 +49,8 @@ const Hero = ({ user }) => {
                 {user ? 'Go to Dashboard' : 'Get Started Free'}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
-              <Link
-                to="/features"
+              <button
+                onClick={scrollToFeatures}
                 className={`inline-flex items-center justify-center px-8 py-3 border ${
                   isDark 
                     ? 'border-indigo-400 text-indigo-100 bg-indigo-900/30 hover:bg-indigo-900/50' 
@@ -58,7 +58,7 @@ const Hero = ({ user }) => {
                 } text-base font-medium rounded-md md:py-4 md:text-lg md:px-10 transition-colors duration-200`}
               >
                 Learn More
-              </Link>
+              </button>
             </motion.div>
           </div>
           <motion.div 
@@ -83,12 +83,12 @@ const Hero = ({ user }) => {
                       : 'bg-gradient-to-br from-indigo-100 to-purple-100'
                   }`}>
                     <div className="text-center p-8">
-                      <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${
-                        isDark ? 'bg-indigo-900/50' : 'bg-indigo-100'
-                      }`}>
-                        <Sparkles className={`w-12 h-12 ${
-                          isDark ? 'text-indigo-400' : 'text-indigo-600'
-                        }`} />
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-indigo-400 mx-auto mb-6">
+                        <img 
+                          src="/avatar-portrait.png" 
+                          alt="Seriva AI Companion"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <h3 className={`text-xl font-semibold mb-2 ${
                         isDark ? 'text-white' : 'text-gray-900'

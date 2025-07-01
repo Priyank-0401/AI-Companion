@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 // Import components
@@ -11,6 +11,11 @@ import CTA from '../components/home/CTA';
 
 const HomePage = () => {
   const { user } = useAuth();
+  const featuresRef = useRef(null);
+
+  const scrollToFeatures = () => {
+    featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
     // Scroll to top on mount
@@ -19,8 +24,8 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
-      <Hero user={user} />
-      <div className="bg-gray-50 dark:bg-gray-800/50 transition-colors duration-200">
+      <Hero user={user} scrollToFeatures={scrollToFeatures} />
+      <div ref={featuresRef} className="bg-gray-50 dark:bg-gray-800/50 transition-colors duration-200">
         <Features />
       </div>
       <HowItWorks />
