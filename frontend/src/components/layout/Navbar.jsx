@@ -12,9 +12,12 @@ import {
   User,
   Brain,
   LogIn,  LogOut,
-  UserPlus
+  UserPlus,
+  Sun,
+  Moon
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -22,6 +25,7 @@ const Navbar = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser, logout, loading, isRedirecting } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const isDashboardPage = location.pathname === '/dashboard'
 
   // Handle scroll effect for navbar
@@ -122,7 +126,18 @@ const Navbar = () => {
             </div>
               {/* Authentication Buttons */}
             {!loading && (
-              <div className="flex items-center space-x-2 ml-2">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-full text-gray-300 hover:bg-gray-700 transition-colors"
+                  aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="w-5 h-5" />
+                  ) : (
+                    <Moon className="w-5 h-5" />
+                  )}
+                </button>
                 {(currentUser && !isRedirecting) ? (
                   <button
                     onClick={handleLogout}

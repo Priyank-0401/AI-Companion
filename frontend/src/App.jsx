@@ -13,7 +13,7 @@ import SignupPage from './pages/SignupPage'
 import Footer from './components/layout/Footer'
 import { ChatProvider } from './contexts/ChatContext'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
-import { ThemeProvider } from './contexts/ThemeContext'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import ProtectedRoute from './components/ProtectedRoute'
 
 import './App.css'
@@ -41,20 +41,21 @@ function AppContent() {
     };
   }, [isHomePage, isDashboardPage, isSettingsPage]);
   return (
-    <div className="flex flex-col min-h-screen bg-[#222831] text-[#EEEEEE]">
+    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
       <Navbar />
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className={isAuthPage 
-          ? "pt-16 flex-grow" 
-          : isDashboardPage 
-            ? "pt-16 w-full flex-grow" 
-            : location.pathname === '/chat' 
+        className={`transition-colors duration-200 ${
+          isAuthPage 
+            ? "pt-16 flex-grow" 
+            : isDashboardPage 
               ? "pt-16 w-full flex-grow" 
-              : "pt-16 w-full py-4 flex-grow"
-        }
+              : location.pathname === '/chat' 
+                ? "pt-16 w-full flex-grow" 
+                : "pt-16 w-full py-4 flex-grow"
+        }`}
       >
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -113,17 +114,36 @@ function AppContent() {
   );
 }
 
+// Wrapper component to handle theme application
+const ThemeWrapper = ({ children }) => {
+  const { theme } = useTheme();
+
+  // Apply theme class to html element
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+    
+    // Also set a data-theme attribute for any CSS-in-JS libraries that might need it
+    root.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  return children;
+};
+
 function App() {
   return (
-    <Router>
+    <AuthContextProvider>
       <ThemeProvider>
-        <AuthContextProvider>
-          <ChatProvider>
-            <AppContent />
-          </ChatProvider>
-        </AuthContextProvider>
+        <ThemeWrapper>
+          <Router>
+            <ChatProvider>
+              <AppContent />
+            </ChatProvider>
+          </Router>
+        </ThemeWrapper>
       </ThemeProvider>
-    </Router>
+    </AuthContextProvider>
   )
 }
 
