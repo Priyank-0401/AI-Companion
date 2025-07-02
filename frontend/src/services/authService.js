@@ -20,6 +20,11 @@ export const signUpWithEmail = async (email, password, fullName) => {
       displayName: fullName
     });
 
+    // Get the ID token
+    const idToken = await user.getIdToken();
+    // Store the token in localStorage
+    localStorage.setItem('token', idToken);
+
     // Create user document in Firestore
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
@@ -44,6 +49,10 @@ export const signUpWithEmail = async (email, password, fullName) => {
 export const signInWithEmail = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // Get the ID token
+    const idToken = await userCredential.user.getIdToken();
+    // Store the token in localStorage
+    localStorage.setItem('token', idToken);
     return { success: true, user: userCredential.user };
   } catch (error) {
     console.error('Error signing in:', error);
@@ -64,6 +73,11 @@ export const signInWithGoogle = async () => {
 
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
+
+    // Get the ID token
+    const idToken = await user.getIdToken();
+    // Store the token in localStorage
+    localStorage.setItem('token', idToken);
 
     try {
       // Check if user document exists, create if not
@@ -118,6 +132,8 @@ export const signInWithGoogle = async () => {
 export const signOutUser = async () => {
   try {
     await signOut(auth);
+    // Clear the token from localStorage
+    localStorage.removeItem('token');
     return { success: true };
   } catch (error) {
     console.error('Error signing out:', error);

@@ -89,7 +89,7 @@ class VoiceService {
         // Pre-cache welcome messages
         await this.preCacheWelcomeMessages();
         this.isInitialized = true;
-        console.log('Voice service initialized and warmed up');
+        // console.log('Voice service initialized and warmed up');
       } catch (error) {
         console.warn('Voice service initialization warning:', error);
       }

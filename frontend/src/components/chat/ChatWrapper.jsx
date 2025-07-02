@@ -23,12 +23,15 @@ const ChatWrapper = ({ mobileSidebarOpen, setMobileSidebarOpen }) => {
     selectedModel,
     isLoading,
     isSending,
+    isTyping,
     showModelDropdown,
     
     // Session actions
     addMessage,
     sendMessage,
     updateSessionTitle,
+    createNewSession,
+    getInitialBotMessage,
     
     // UI state
     setSelectedModel,
@@ -43,6 +46,28 @@ const ChatWrapper = ({ mobileSidebarOpen, setMobileSidebarOpen }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [input, setInput] = useState('');
   const [copiedMessageId, setCopiedMessageId] = useState(null);
+  
+  // Stop any ongoing speech
+  const stopSpeaking = useCallback(() => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Handle new chat
+  const handleNewChat = useCallback(() => {
+    // Cancel any ongoing speech
+    stopSpeaking();
+    
+    // Create a new session (this will also abort any ongoing requests)
+    createNewSession();
+    
+    // Reset input
+    setInput('');
+  }, [createNewSession, stopSpeaking]);
+  
+
   
   // Refs
   const messagesEndRef = useRef(null);
@@ -207,17 +232,20 @@ const ChatWrapper = ({ mobileSidebarOpen, setMobileSidebarOpen }) => {
     }
   }, []);
   
-  // Handle message sending
-  const handleSend = useCallback(async (content) => {
-    if (!content.trim()) return;
+  // Handle send message
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isLoading || isSending) return false;
+    
+    // Clear input immediately for better UX
+    const messageContent = input.trim();
+    setInput('');
     
     try {
-      // Send the message through the context
-      await sendMessage(content);
-      setInput('');
+      // Send message to API - the ChatContext will handle adding the user message
+      await sendMessage(messageContent);
+      return true;
     } catch (error) {
       console.error('Error sending message:', error);
-      
       // Add error message
       addMessage({
         type: 'system',
@@ -225,24 +253,24 @@ const ChatWrapper = ({ mobileSidebarOpen, setMobileSidebarOpen }) => {
         status: 'error',
         error: error.message
       });
+      // Restore the input if there was an error
+      setInput(messageContent);
+      return false;
     }
-  }, [sendMessage, addMessage]);
+  }, [input, isLoading, isSending, sendMessage, addMessage]);
   
   // Handle form submission
-  const handleSubmit = useCallback((e) => {
-    e.preventDefault();
-    if (isLoading || isSending || !input.trim()) return;
+  const handleSubmit = useCallback(async (e, submittedContent = null) => {
+    e?.preventDefault();
+    const contentToSend = submittedContent !== null ? submittedContent : input;
     
-    handleSend(input);
+    if (isLoading || isSending || !contentToSend?.trim()) return;
+    
+    // Handle the send - the input is managed within handleSend now
+    await handleSend();
   }, [input, isLoading, isSending, handleSend]);
   
-  // Stop any ongoing speech
-  const stopSpeaking = useCallback(() => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      setIsSpeaking(false);
-    }
-  }, []);
+
   
   // Toggle voice on/off
   const toggleVoice = useCallback(() => {
@@ -269,6 +297,7 @@ const ChatWrapper = ({ mobileSidebarOpen, setMobileSidebarOpen }) => {
             speakMessage={speakMessage}
             copyMessage={copyMessage}
             isLoading={isLoading}
+            isTyping={isTyping}
           />
           <div ref={messagesEndRef} className="h-24"></div>
         </div>

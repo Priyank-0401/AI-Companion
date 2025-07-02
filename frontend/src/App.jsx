@@ -11,7 +11,7 @@ import AvatarCallPage from './pages/AvatarCallPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import Footer from './components/layout/Footer'
-import { ChatProvider } from './contexts/ChatContext'
+import ChatProvider from './contexts/ChatContext/ChatProvider'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -136,7 +136,12 @@ function App() {
     <AuthContextProvider>
       <ThemeProvider>
         <ThemeWrapper>
-          <Router>
+          <Router 
+            future={{
+              v7_startTransition: true, // Enable v7 startTransition behavior
+              v7_relativeSplatPath: true // Enable v7 relative splat path behavior
+            }}
+          >
             <ChatProvider>
               <AppContent />
             </ChatProvider>

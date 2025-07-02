@@ -17,6 +17,7 @@ import {
   Brain,
   Heart
 } from 'lucide-react';
+import TypingIndicator from './TypingIndicator';
 import { useAuth } from '../../hooks/useAuth';
 import { format } from 'date-fns';
 
@@ -36,6 +37,7 @@ const Message = ({
   isSpeaking = false,
   onDelete
 }) => {
+  // No need for manual cursor animation as we're using CSS animation now
   const { currentUser } = useAuth();
   const isUser = message.type === 'user';
   const [showOptions, setShowOptions] = useState(false);
@@ -140,38 +142,157 @@ const Message = ({
   };
 
   return (
-    <motion.div
-      ref={messageRef}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ 
-        opacity: 1, 
-        y: 0,
-        transition: { duration: 0.2, ease: 'easeOut' }
-      }}
-      exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
-      className={`group relative flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 w-full px-4`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} w-full max-w-3xl ${isUser ? 'ml-auto' : 'mr-auto'}`}>
+    <div className="relative w-full pt-4 mb-4 group">
+      {/* Floating action buttons */}
+      <AnimatePresence>
+        {(isHovered || showOptions) && (
+          <motion.div 
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className={`absolute top-0 left-0 right-0 flex items-center z-10 ${
+              isUser ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            <div className="flex items-center space-x-1 bg-gray-800/90 backdrop-blur-sm rounded-lg px-2 py-1 shadow-lg border border-gray-700">
+              {/* Copy Button */}
+              <button 
+                onClick={handleCopy}
+                className="p-1.5 rounded-full text-gray-300 hover:bg-gray-700/80 hover:text-white transition-colors"
+                title="Copy message"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+              
+              {/* Voice Button (for bot messages) */}
+              {!isUser && (
+                <button 
+                  onClick={() => onSpeak && onSpeak(message.content)}
+                  className={`p-1.5 rounded-full ${
+                    isSpeaking 
+                      ? 'text-indigo-400 bg-indigo-500/20' 
+                      : 'text-gray-300 hover:bg-gray-700/80 hover:text-white'
+                  } transition-colors`}
+                  title={isSpeaking ? 'Stop speaking' : 'Read aloud'}
+                >
+                  {isSpeaking ? (
+                    <VolumeX className="w-3.5 h-3.5" />
+                  ) : (
+                    <Volume2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+              
+              {/* Like/Dislike Buttons */}
+              {!isUser && (
+                <>
+                  <button 
+                    onClick={handleLike}
+                    className={`p-1.5 rounded-full ${
+                      isLiked 
+                        ? 'text-green-400 bg-green-500/20' 
+                        : 'text-gray-300 hover:bg-gray-700/80 hover:text-green-400'
+                    } transition-colors`}
+                    title="Like response"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    onClick={handleDislike}
+                    className={`p-1.5 rounded-full ${
+                      isDisliked 
+                        ? 'text-red-400 bg-red-500/20' 
+                        : 'text-gray-300 hover:bg-gray-700/80 hover:text-red-400'
+                    } transition-colors`}
+                    title="Dislike response"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+              
+              {/* More Options Dropdown */}
+              <div className="relative">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowOptions(!showOptions);
+                  }}
+                  className="p-1.5 rounded-full text-gray-300 hover:bg-gray-700/80 hover:text-white transition-colors"
+                  title="More options"
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
+                
+                {/* Dropdown Menu */}
+                {showOptions && (
+                  <div 
+                    className={`absolute z-20 mt-1 w-40 bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden ${
+                      isUser ? 'right-0' : 'left-0'
+                    }`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!isUser && (
+                      <button 
+                        onClick={handleEdit}
+                        className="flex items-center w-full px-3 py-2 text-sm text-left text-gray-200 hover:bg-gray-700 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                    <button 
+                      onClick={handleDelete}
+                      className="flex items-center w-full px-3 py-2 text-sm text-left text-red-400 hover:bg-gray-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Message content */}
+      <motion.div
+        ref={messageRef}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ 
+          opacity: 1, 
+          y: 0,
+          transition: { duration: 0.2, ease: 'easeOut' }
+        }}
+        exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
+        className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} w-full max-w-3xl ${
+          isUser ? 'ml-auto' : 'mr-auto'
+        } px-4`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         {/* Avatar */}
-        <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-          isUser 
-            ? 'ml-3 bg-indigo-600 border border-indigo-500' 
-            : 'mr-3 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-700 border border-purple-400 dark:border-indigo-600 shadow-sm'
-        }`}>
-          {isUser ? (
-            currentUser?.displayName ? (
+        {isUser ? (
+          <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ml-3 bg-indigo-600">
+            {currentUser?.displayName ? (
               <span className="text-sm font-medium text-white">
                 {getUserInitials(currentUser.displayName)}
               </span>
             ) : (
               <User className="w-4 h-4 text-white" strokeWidth={2.5} />
-            )
-          ) : (
-            <Bot className="w-4 h-4 text-white dark:text-gray-100" strokeWidth={2.5} />
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center mr-3">
+            <img 
+              src="/logo.svg" 
+              alt="Seriva" 
+              className="w-12 h-12"
+            />
+          </div>
+        )}
 
         {/* Message Content */}
         <div className={`flex-1 min-w-0 ${isUser ? 'flex flex-col items-end' : ''}`} style={{ maxWidth: 'calc(100% - 3rem)' }}>
@@ -191,10 +312,16 @@ const Message = ({
           {/* Message Bubble */}
           <div 
             className={`relative rounded-2xl px-4 py-3 inline-block ${
-              isUser 
-                ? 'bg-indigo-600 text-white rounded-br-sm dark:bg-indigo-600' 
-                : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100 rounded-bl-sm border border-gray-200 dark:border-gray-700'
-            } shadow-md hover:shadow-lg transition-all duration-200 max-w-full`}
+              message.isError
+                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/50'
+                : isUser 
+                  ? 'bg-indigo-600 text-white rounded-br-sm dark:bg-indigo-600' 
+                  : message.isStreaming
+                    ? 'bg-gray-50 dark:bg-gray-800/70 text-gray-800 dark:text-gray-200 border-2 border-dashed border-blue-200 dark:border-blue-900/50'
+                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700'
+            } shadow-md hover:shadow-lg transition-all duration-200 max-w-full ${
+              message.isStreaming ? 'animate-pulse' : ''
+            }`}
             style={{
               wordBreak: 'break-word',
               overflowWrap: 'break-word'
@@ -234,132 +361,30 @@ const Message = ({
                 </div>
               </div>
             ) : (
-              <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap break-words">
-                {message.content}
-              </div>
+              <div className={`prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap break-words ${
+              message.isError ? 'text-red-600 dark:text-red-400' : ''
+            }`}>
+              {message.content}
+              {message.isStreaming && isLast && (
+                <div className="mt-2">
+                  <TypingIndicator />
+                </div>
+              )}
+            </div>
             )}
             
             {/* Timestamp */}
             <div className={`mt-1 text-xs ${
               isUser ? 'text-indigo-200 dark:text-indigo-200' : 'text-gray-500 dark:text-gray-400'
-            } flex items-center justify-between`}>
-              <span>{formatTime(message.timestamp)}</span>
-              
-              {/* Message Actions - Visible on hover or when options are open */}
-              {(isHovered || showOptions) && (
-                <div className={`flex items-center space-x-1 ml-2 ${
-                  isUser ? 'flex-row-reverse ml-0 mr-2' : ''
-                }`}>
-                  {/* Copy Button */}
-                  <button 
-                    onClick={handleCopy}
-                    className="p-1 rounded-full text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors"
-                    title="Copy message"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                  
-                  {/* Voice Button (for bot messages) */}
-                  {!isUser && (
-                    <button 
-                      onClick={() => onSpeak && onSpeak(message.content)}
-                      className={`p-1 rounded-full ${
-                        isSpeaking 
-                          ? 'text-indigo-400 bg-indigo-500/20' 
-                          : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
-                      } transition-colors`}
-                      title={isSpeaking ? 'Stop speaking' : 'Read aloud'}
-                    >
-                      {isSpeaking ? (
-                        <VolumeX className="w-3.5 h-3.5" />
-                      ) : (
-                        <Volume2 className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
-                  
-                  {/* Like/Dislike Buttons */}
-                  {!isUser && (
-                    <>
-                      <button 
-                        onClick={handleLike}
-                        className={`p-1 rounded-full ${
-                          isLiked 
-                            ? 'text-green-400 bg-green-500/20' 
-                            : 'text-gray-300 hover:bg-gray-700/50 hover:text-green-400'
-                        } transition-colors`}
-                        title="Like response"
-                      >
-                        <ThumbsUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={handleDislike}
-                        className={`p-1 rounded-full ${
-                          isDisliked 
-                            ? 'text-red-400 bg-red-500/20' 
-                            : 'text-gray-300 hover:bg-gray-700/50 hover:text-red-400'
-                        } transition-colors`}
-                        title="Dislike response"
-                      >
-                        <ThumbsDown className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                  
-                  {/* More Options Dropdown */}
-                  <div className="relative" ref={optionsRef}>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowOptions(!showOptions);
-                      }}
-                      className="p-1 rounded-full text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors"
-                      title="More options"
-                    >
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
-                    
-                    {/* Dropdown Menu */}
-                    {showOptions && (
-                      <div className={`absolute z-20 mt-1 w-40 bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden ${
-                        isUser ? 'right-0' : 'left-0'
-                      }`}>
-                        {!isUser && (
-                          <button 
-                            onClick={handleEdit}
-                            className="flex items-center w-full px-3 py-2 text-sm text-left text-gray-200 hover:bg-gray-700 transition-colors"
-                          >
-                            <Pencil className="w-4 h-4 mr-2" />
-                            <span>Edit</span>
-                          </button>
-                        )}
-                        <button 
-                          onClick={handleDelete}
-                          className="flex items-center w-full px-3 py-2 text-sm text-left text-red-400 hover:bg-gray-700 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+            }`}>
+              {formatTime(message.timestamp)}
             </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 };
-
-const TypingIndicator = () => (
-  <div className="flex items-center space-x-2 py-2 px-4">
-    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-  </div>
-);
 
 const MessageList = ({ 
   messages = [], 
@@ -367,7 +392,8 @@ const MessageList = ({
   onSpeak,
   onCopy,
   onDelete,
-  speakingMessageId
+  speakingMessageId,
+  isTyping = false
 }) => {
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -413,7 +439,7 @@ const MessageList = ({
       ref={containerRef}
       className="flex-1 overflow-y-auto overflow-x-hidden relative"
     >
-      <div className="max-w-4xl mx-auto w-full pt-20 pb-4">
+      <div className="max-w-4xl mx-auto w-full pt-16 pb-4">
         <AnimatePresence initial={false}>
           {messages.map((message, index) => (
             <Message 
@@ -427,23 +453,42 @@ const MessageList = ({
             />
           ))}
           
-          {isLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="flex justify-start mb-4 px-4"
+          {/* Typing indicator */}
+          {isTyping && (
+            <div 
+              key="typing-indicator" 
+              className={`flex w-full max-w-3xl mr-auto px-4`}
             >
-              <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-700 border border-gray-600 mr-3">
-                <Bot className="w-4 h-4 text-white" strokeWidth={2.5} />
+              {/* Avatar - matches bot message avatar */}
+              <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center mr-3">
+                <img 
+                  src="/logo.svg" 
+                  alt="Seriva" 
+                  className="w-12 h-12"
+                />
               </div>
-              <div className="bg-gray-800 text-gray-100 rounded-2xl rounded-bl-none px-4 py-3 border border-gray-700 shadow-lg">
-                <TypingIndicator />
+
+              {/* Message Content - matches bot message styling */}
+              <div className="flex-1 min-w-0" style={{ maxWidth: 'calc(100% - 3rem)' }}>
+                {/* Sender Info - matches bot message styling */}
+                <div className="flex items-center mb-1 justify-start">
+                  <span className="text-xs font-medium text-gray-400">
+                    Seriva
+                  </span>
+                </div>
+                
+                {/* Typing indicator bubble - matches message bubble styling */}
+                <div className="mt-1">
+                  <div className="inline-flex items-center px-4 py-2.5 bg-indigo-50 dark:bg-gray-800 rounded-2xl shadow-sm">
+                    <TypingIndicator />
+                  </div>
+                </div>
               </div>
-            </motion.div>
+            </div>
           )}
           
-          <div ref={messagesEndRef} />
+          {/* Scroll anchor */}
+          <div ref={messagesEndRef} className="h-4" />
         </AnimatePresence>
       </div>
       

@@ -1,64 +1,29 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 
 const TypingIndicator = () => {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex justify-start max-w-4xl mx-auto"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-12 h-12 flex items-center justify-center">
-          <img 
-            src="/logo.png" 
-            alt="Seriva" 
-            className="w-12 h-12 object-contain"
-          />
-        </div>
-        <div className="px-4 py-3 bg-[#393E46] rounded-2xl shadow-lg">
-          <div className="flex items-center gap-2">
-            <motion.div
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.4, 1, 0.4]
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="w-2 h-2 bg-[#00ADB5] rounded-full"
-            />
-            <motion.div
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.4, 1, 0.4]
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.2
-              }}
-              className="w-2 h-2 bg-[#00ADB5] rounded-full"
-            />
-            <motion.div
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.4, 1, 0.4]
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.4
-              }}
-              className="w-2 h-2 bg-[#00ADB5] rounded-full"
-            />
-          </div>
-        </div>
-      </div>
-    </motion.div>
+    <div className="flex items-center space-x-1.5 h-6 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full w-fit">
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="w-2 h-2 bg-indigo-500 dark:bg-indigo-400 rounded-full"
+          animate={{
+            y: ['0%', '-70%', '0%'],
+            opacity: [0.6, 1, 0.6],
+          }}
+          transition={{
+            duration: 1.2,
+            repeat: Infinity,
+            delay: i * 0.15,
+            ease: 'easeInOut',
+          }}
+          style={{
+            boxShadow: '0 2px 4px rgba(99, 102, 241, 0.2)',
+          }}
+        />
+      ))}
+    </div>
   );
 };
 

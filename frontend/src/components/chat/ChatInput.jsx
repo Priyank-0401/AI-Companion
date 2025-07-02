@@ -99,12 +99,20 @@ const ChatInput = ({
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
+      // Store the current input value before clearing
+      const currentInput = input;
+      
+      // Clear the input immediately for better UX
+      setInput('');
+      setInputRows(1);
+      
       // Reset textarea height after submission
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
-        setInputRows(1);
       }
-      handleSubmit(e);
+      
+      // Call the submit handler with the current input
+      handleSubmit(e, currentInput);
     }
   };
 
@@ -180,14 +188,14 @@ const ChatInput = ({
         {/* Input Area */}
         <div 
           ref={containerRef}
-          className={`relative border rounded-2xl shadow-xl transition-all duration-200 min-h-[60px] flex items-center ${
+          className={`relative border rounded-2xl shadow-xl transition-all duration-200 min-h-[60px] ${
             theme === 'dark' 
               ? 'bg-gray-800/95 border-gray-700' 
               : 'bg-white border-gray-200'
           }`}
         >
           <form onSubmit={handleFormSubmit} className="w-full">
-            <div className="relative flex items-center">
+            <div className="relative">
               {/* Hidden file input */}
               <input
                 type="file"
@@ -197,7 +205,7 @@ const ChatInput = ({
                 accept="image/*,.pdf,.doc,.docx,.txt"
                 disabled={isLoading}
               />
-              
+    
               <div className="flex-1 min-w-0">
                 <textarea
                   ref={(el) => {
@@ -226,10 +234,12 @@ const ChatInput = ({
                   disabled={isLoading}
                   aria-label="Type your message"
                 />
+              </div>
             </div>
+  
             {/* Action Buttons - Right Side */}
-            <div className="absolute right-3 bottom-3 flex items-center space-x-1.5">
-            <button
+            <div className="absolute right-3 top-3 flex items-center space-x-1.5">
+              <button
                 type="button"
                 onClick={isRecording ? onStopSpeaking : onVoiceToggle}
                 className={`p-1.5 rounded-full transition-colors ${
@@ -239,81 +249,83 @@ const ChatInput = ({
                 }`}
                 disabled={isLoading}
                 aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-              >
-                {isRecording ? (
-                  <div className="w-5 h-5 rounded-full bg-red-500 animate-pulse"></div>
-                ) : (
-                  <Mic className="w-5 h-5" />
-                )}
-              </button>
-              {/* Emoji Picker Button */}
-              <button
-                type="button"
-                ref={emojiButtonRef}
-                onClick={() => {
-                  setIsEmojiPickerOpen(!isEmojiPickerOpen);
-                }}
-                className={`p-1.5 rounded-full transition-colors ${
-                  isEmojiPickerOpen 
-                    ? 'text-indigo-400 bg-indigo-500/20' 
-                    : 'text-gray-400 hover:text-indigo-400 hover:bg-gray-700/50'
-                }`}
-                disabled={isLoading}
-                aria-label="Open emoji picker"
-              >
-                <Smile className="w-5 h-5" />
-              </button>
-              
-              <div className="h-5 w-px bg-gray-700"></div>
-              
-              {/* Send Button */}
-              <button
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                className={`p-1.5 rounded-full transition-colors ${
-                  input.trim() && !isLoading
-                    ? 'text-indigo-400 hover:bg-indigo-500/20'
-                    : 'text-gray-500 cursor-not-allowed'
-                }`}
-                aria-label={input.trim() ? 'Send message' : 'Type a message to send'}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-          
-          {/* Character counter */}
-          <div className="px-4 py-1.5 text-xs text-gray-500 border-t border-gray-700/50 flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <span>Press Enter to send, Shift+Enter for new line</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className={`${input.length > 4000 ? 'text-red-400' : ''}`}>
-                {input.length}/4000
-              </span>
-            </div>
-          </div>
-          </form>
-          
-          {/* Emoji Picker */}
-          <AnimatePresence>
-            {isEmojiPickerOpen && (
-              <div className="absolute bottom-full right-0 mb-2 z-20">
-                <MockEmojiPicker
-                  onEmojiSelect={handleEmojiSelect}
-                  onClose={() => setIsEmojiPickerOpen(false)}
-                />
+                >
+                  {isRecording ? (
+                    <div className="w-5 h-5 rounded-full bg-red-500 animate-pulse"></div>
+                  ) : (
+                    <Mic className="w-5 h-5" />
+                  )}
+                </button>
+                
+                {/* Emoji Picker Button */}
+                <button
+                  type="button"
+                  ref={emojiButtonRef}
+                  onClick={() => {
+                    setIsEmojiPickerOpen(!isEmojiPickerOpen);
+                  }}
+                  className={`p-1.5 rounded-full transition-colors ${
+                    isEmojiPickerOpen 
+                      ? 'text-indigo-400 bg-indigo-500/20' 
+                      : 'text-gray-400 hover:text-indigo-400 hover:bg-gray-700/50'
+                  }`}
+                  disabled={isLoading}
+                  aria-label="Open emoji picker"
+                >
+                  <Smile className="w-5 h-5" />
+                </button>
+                
+                <div className="h-5 w-px bg-gray-700"></div>
+                
+                {/* Send Button */}
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isLoading}
+                  className={`p-2 rounded-full transition-all ${
+                    isLoading
+                      ? 'bg-indigo-500 text-white cursor-wait'
+                      : input.trim()
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
+                  }`}
+                  aria-label={isLoading ? 'Sending...' : 'Send message'}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                </button>
               </div>
-            )}
-          </AnimatePresence>
-        </div>
+              
+              {/* Character counter */}
+              <div className="px-4 py-1.5 text-xs text-gray-500 border-t border-gray-700/50 flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <span>Press Enter to send, Shift+Enter for new line</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className={`${input.length > 4000 ? 'text-red-400' : ''}`}>
+                    {input.length}/4000
+                  </span>
+                </div>
+              </div>
+            </form>
+        
+        {/* Emoji Picker */}
+        <AnimatePresence>
+          {isEmojiPickerOpen && (
+            <div className="absolute bottom-full right-0 mb-2 z-20">
+              <MockEmojiPicker
+                onEmojiSelect={handleEmojiSelect}
+                onClose={() => setIsEmojiPickerOpen(false)}
+              />
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default ChatInput;

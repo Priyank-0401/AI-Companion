@@ -2,6 +2,7 @@ const http = require('http')
 const url = require('url')
 const dotenv = require('dotenv')
 const path = require('path')
+const { verifyToken } = require('./middleware/auth')
 
 // Load environment variables
 dotenv.config()
@@ -104,14 +105,21 @@ function setupCors(res) {
 async function handleRequest(req, res) {
   try {
     // Setup CORS
-    setupCors(res)
+    setupCors(res);
     
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
-      res.statusCode = 200
-      res.end()
-      return
+      res.statusCode = 200;
+      res.end();
+      return;
     }
+    
+    // Wrap response methods to ensure headers are set before sending
+    const originalEnd = res.end;
+    res.end = function(chunk, encoding) {
+      setupCors(res);
+      return originalEnd.call(res, chunk, encoding);
+    };
     
     // Parse URL
     const parsedUrl = url.parse(req.url, true)
@@ -126,9 +134,35 @@ async function handleRequest(req, res) {
     req.parseRequestBody = parseRequestBody
     req.validateRequiredFields = validateRequiredFields
     
+    // Apply authentication to protected routes
+    if (pathname.startsWith('/api/auth/')) {
+      // Skip auth for certain public auth endpoints
+      if (pathname === '/api/auth/health') {
+        return sendJsonResponse(res, 200, { status: 'healthy' });
+      }
+    } else if (pathname === '/api/health') {
+      // Public health check endpoint
+      return sendJsonResponse(res, 200, {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        ollama: await global.ollamaClient.checkHealth()
+      });
+    } else {
+      // Apply auth middleware to all other routes
+      await new Promise((resolve) => {
+        verifyToken(req, res, resolve);
+      });
+      
+      // If headers were sent by the auth middleware, stop further processing
+      if (res.headersSent) return;
+    }
+    
     // Route handling
     if (pathname.startsWith('/api/chat')) {
-      await chatHandler(req, res)
+      // Remove the /api prefix before passing to the handler
+      req.url = req.url.replace('/api', '');
+      await chatHandler(req, res);
     } else if (pathname.startsWith('/api/wellness')) {
       await wellnessHandler(req, res)
     } else if (pathname.startsWith('/api/journal')) {
