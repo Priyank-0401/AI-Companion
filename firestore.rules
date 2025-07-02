@@ -1,6 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow users to manage their own conversations
+    match /conversations/{conversationId} {
+      // Users can create conversations if they are authenticated
+      allow create: if request.auth != null && 
+                   request.resource.data.userId == request.auth.uid;
+      
+      // Users can read and update their own conversations
+      allow read, update, delete: if request.auth != null && 
+                                 resource.data.userId == request.auth.uid;
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Users can add messages to their own conversations
+        allow create: if request.auth != null && 
+                     get(/databases/$(database)/documents/conversations/$(conversationId)).data.userId == request.auth.uid;
+        
+        // Users can read messages from their own conversations
+        allow read: if request.auth != null && 
+                   get(/databases/$(database)/documents/conversations/$(conversationId)).data.userId == request.auth.uid;
+      }
+    }
+    
     // Allow users to read and write their own mood entries
     match /moodEntries/{entryId} {
       allow read, create: if request.auth != null && 

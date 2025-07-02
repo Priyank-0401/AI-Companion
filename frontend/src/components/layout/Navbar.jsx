@@ -14,7 +14,8 @@ import {
   LogOut,
   UserPlus,
   Sun,
-  Moon
+  Moon,
+  MessageSquareText
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -116,63 +117,88 @@ const Navbar = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-2">
-            <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800/50 rounded-xl p-1.5">
-              {filteredNavItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={isActive(item.path)}
-                />
-              ))}
-            </div>
+          <div className="hidden md:flex items-center space-x-1">
+            <NavLink 
+              to="/" 
+              icon={Home} 
+              label="Home" 
+              isActive={location.pathname === '/'} 
+            />
+            <NavLink 
+              to="/avatar-call" 
+              icon={User} 
+              label="Seriva Call" 
+              isActive={location.pathname === '/avatar-call'} 
+            />
+            <NavLink 
+              to="/conversations" 
+              icon={MessageSquareText} 
+              label="Conversations" 
+              isActive={location.pathname.startsWith('/conversations')} 
+            />
+            <NavLink 
+              to="/dashboard" 
+              icon={BarChart3} 
+              label="Dashboard" 
+              isActive={location.pathname === '/dashboard'} 
+            />
+            <NavLink 
+              to="/journal" 
+              icon={BookOpen} 
+              label="Journal" 
+              isActive={location.pathname === '/journal'} 
+            />
+            <NavLink 
+              to="/settings" 
+              icon={Settings} 
+              label="Settings" 
+              isActive={location.pathname === '/settings'} 
+            />
+          </div>
 
-            <div className="flex items-center space-x-2 ml-2">
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </button>
-
-              {/* Authentication Buttons */}
-              {!loading && (
-                <div className="flex items-center space-x-2">
-                  {currentUser && !isRedirecting ? (
-                    <button
-                      onClick={handleLogout}
-                      className="group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-200 dark:border-red-900/30 hover:shadow-sm"
-                    >
-                      <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                      <span>Sign out</span>
-                    </button>
-                  ) : !currentUser ? (
-                    <>
-                      <Link
-                        to="/login"
-                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border border-indigo-200 dark:border-indigo-900/30 hover:shadow-sm"
-                      >
-                        Log in
-                      </Link>
-                      <Link
-                        to="/signup"
-                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                      >
-                        Get Started
-                      </Link>
-                    </>
-                  ) : null}
-                </div>
+          <div className="hidden md:flex items-center space-x-2 ml-2">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
               )}
-            </div>
+            </button>
+
+            {/* Authentication Buttons */}
+            {!loading && (
+              <div className="flex items-center space-x-2">
+                {currentUser && !isRedirecting ? (
+                  <button
+                    onClick={handleLogout}
+                    className="group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-200 dark:border-red-900/30 hover:shadow-sm"
+                  >
+                    <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                    <span>Sign out</span>
+                  </button>
+                ) : !currentUser ? (
+                  <>
+                    <Link
+                      to="/login"
+                      className="px-4 py-2.5 rounded-xl text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border border-indigo-200 dark:border-indigo-900/30 hover:shadow-sm"
+                    >
+                      Log in
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className="px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                    >
+                      Get Started
+                    </Link>
+                  </>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -201,65 +227,108 @@ const Navbar = () => {
             transition={{ duration: 0.2, ease: 'easeInOut' }}
             className="md:hidden bg-white dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 overflow-hidden"
           >
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {filteredNavItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={isActive(item.path)}
-                  onClick={() => setIsOpen(false)}
-                  className="block w-full"
-                />
-              ))}
+            <div className="space-y-1 px-2 pb-3 pt-2">
+              <NavLink 
+                to="/" 
+                icon={Home} 
+                label="Home" 
+                isActive={location.pathname === '/'} 
+                onClick={() => setIsOpen(false)}
+                className="w-full justify-start"
+              />
+              <NavLink 
+                to="/chat" 
+                icon={MessageCircle} 
+                label="Chat" 
+                isActive={location.pathname === '/chat'} 
+                onClick={() => setIsOpen(false)}
+                className="w-full justify-start"
+              />
+              <NavLink 
+                to="/conversations" 
+                icon={MessageSquareText} 
+                label="Conversations" 
+                isActive={location.pathname.startsWith('/conversations')} 
+                onClick={() => setIsOpen(false)}
+                className="w-full justify-start"
+              />
+              <NavLink 
+                to="/dashboard" 
+                icon={BarChart3} 
+                label="Dashboard" 
+                isActive={location.pathname === '/dashboard'} 
+                onClick={() => setIsOpen(false)}
+                className="w-full justify-start"
+              />
+              <NavLink 
+                to="/journal" 
+                icon={BookOpen} 
+                label="Journal" 
+                isActive={location.pathname === '/journal'} 
+                onClick={() => setIsOpen(false)}
+                className="w-full justify-start"
+              />
+              <NavLink 
+                to="/settings" 
+                icon={Settings} 
+                label="Settings" 
+                isActive={location.pathname === '/settings'} 
+                onClick={() => setIsOpen(false)}
+                className="w-full justify-start"
+              />
+            </div>
 
-              <div className="pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">
-                {!loading && (
-                  <>
-                    {currentUser ? (
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center px-4 py-3 text-left rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      >
-                        <LogOut className="w-5 h-5 mr-2.5" />
-                        Logout
-                      </button>
-                    ) : (
-                      <>
-                        <Link
-                          to="/login"
-                          onClick={() => setIsOpen(false)}
-                          className="block w-full px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-                        >
-                          Log in
-                        </Link>
-                        <Link
-                          to="/signup"
-                          onClick={() => setIsOpen(false)}
-                          className="block w-full mt-2 px-4 py-3 rounded-xl text-sm font-medium text-center text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all"
-                        >
-                          Sign up
-                        </Link>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">
+            <div className="pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">
+              <div className="px-2 py-2">
+                {/* Theme Toggle */}
                 <button
                   onClick={toggleTheme}
-                  className="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                 >
-                  {theme === 'dark' ? (
-                    <Sun className="w-5 h-5 mr-2.5" />
-                  ) : (
-                    <Moon className="w-5 h-5 mr-2.5" />
-                  )}
-                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                  <div className="flex items-center">
+                    {theme === 'dark' ? (
+                      <Sun className="w-5 h-5 mr-2.5" />
+                    ) : (
+                      <Moon className="w-5 h-5 mr-2.5" />
+                    )}
+                    {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                  </div>
                 </button>
               </div>
+
+              {/* Authentication Buttons */}
+              {!loading && (
+                <div className="px-2 pb-2">
+                  {currentUser ? (
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <LogOut className="w-5 h-5 mr-2.5" />
+                        Sign out
+                      </div>
+                    </button>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        onClick={() => setIsOpen(false)}
+                        className="block w-full px-4 py-3 rounded-xl text-sm font-medium text-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors mb-2"
+                      >
+                        Log in
+                      </Link>
+                      <Link
+                        to="/signup"
+                        onClick={() => setIsOpen(false)}
+                        className="block w-full px-4 py-3 rounded-xl text-sm font-medium text-center text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all"
+                      >
+                        Get Started
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -34,8 +34,8 @@ async function journalHandler(req, res) {
   const searchParams = new URLSearchParams(url.search);
 
   try {
-    // GET /api/journal/entries - Get journal entries with optional filtering
-    if (pathname === '/api/journal/entries' && method === 'GET') {
+    // GET /entries - Get journal entries with optional filtering
+    if (pathname === '/entries' && method === 'GET') {
       const data = await initializeJournalData();
       
       let entries = [...data.entries];
@@ -92,8 +92,8 @@ async function journalHandler(req, res) {
       });
     }
 
-    // POST /api/journal/entries - Create new journal entry
-    if (pathname === '/api/journal/entries' && method === 'POST') {
+    // POST /entries - Create a new journal entry
+    if (pathname === '/entries' && method === 'POST') {
       const body = await parseRequestBody(req);
       const { title, content, mood, tags } = body;
       
@@ -140,8 +140,8 @@ async function journalHandler(req, res) {
       });
     }
 
-    // GET /api/journal/entries/:id - Get specific journal entry
-    if (pathname.startsWith('/api/journal/entries/') && method === 'GET') {
+    // GET /entries/:id - Get a specific journal entry
+    if (pathname.match(/^\/entries\/[^\/]+$/) && method === 'GET') {
       const entryId = pathname.split('/').pop();
       const data = await initializeJournalData();
       
@@ -153,8 +153,8 @@ async function journalHandler(req, res) {
       return sendJsonResponse(res, 200, entry);
     }
 
-    // PUT /api/journal/entries/:id - Update journal entry
-    if (pathname.startsWith('/api/journal/entries/') && method === 'PUT') {
+    // PUT /entries/:id - Update a journal entry
+    if (pathname.match(/^\/entries\/[^\/]+$/) && method === 'PUT') {
       const entryId = pathname.split('/').pop();
       const body = await parseRequestBody(req);
       const data = await initializeJournalData();
@@ -184,8 +184,8 @@ async function journalHandler(req, res) {
       });
     }
 
-    // DELETE /api/journal/entries/:id - Delete journal entry
-    if (pathname.startsWith('/api/journal/entries/') && method === 'DELETE') {
+    // DELETE /entries/:id - Delete a journal entry
+    if (pathname.match(/^\/entries\/[^\/]+$/) && method === 'DELETE') {
       const entryId = pathname.split('/').pop();
       const data = await initializeJournalData();
       
@@ -204,8 +204,8 @@ async function journalHandler(req, res) {
       });
     }
 
-    // GET /api/journal/stats - Get journal statistics
-    if (pathname === '/api/journal/stats' && method === 'GET') {
+    // GET /stats - Get journal statistics
+    if (pathname === '/stats' && method === 'GET') {
       const data = await initializeJournalData();
       
       // Calculate stats
@@ -237,8 +237,8 @@ async function journalHandler(req, res) {
       return sendJsonResponse(res, 200, stats);
     }
 
-    // GET /api/journal/tags - Get all unique tags
-    if (pathname === '/api/journal/tags' && method === 'GET') {
+    // GET /tags - Get all unique tags
+    if (pathname === '/tags' && method === 'GET') {
       const data = await initializeJournalData();
       
       const allTags = data.entries.flatMap(entry => entry.tags || []);
@@ -247,8 +247,8 @@ async function journalHandler(req, res) {
       return sendJsonResponse(res, 200, { tags: uniqueTags });
     }
 
-    // POST /api/journal/export - Export journal entries
-    if (pathname === '/api/journal/export' && method === 'POST') {
+    // POST /export - Export journal entries
+    if (pathname === '/export' && method === 'POST') {
       const body = await parseRequestBody(req);
       const { format = 'json', startDate, endDate } = body;
       const data = await initializeJournalData();

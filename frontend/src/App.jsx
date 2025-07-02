@@ -8,12 +8,14 @@ import DashboardPage from './pages/DashboardPage'
 import JournalPage from './pages/JournalPage'
 import SettingsPage from './pages/SettingsPage'
 import AvatarCallPage from './pages/AvatarCallPage'
+import Conversations from './pages/Conversations'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import Footer from './components/layout/Footer'
 import ChatProvider from './contexts/ChatContext/ChatProvider'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { ConversationProvider } from './contexts/ConversationContext.jsx'
 import ProtectedRoute from './components/ProtectedRoute'
 
 import './App.css'
@@ -52,7 +54,7 @@ function AppContent() {
             ? "pt-16 flex-grow" 
             : isDashboardPage 
               ? "pt-16 w-full flex-grow" 
-              : location.pathname === '/chat' 
+              : location.pathname === '/chat' || location.pathname.startsWith('/conversations')
                 ? "pt-16 w-full flex-grow" 
                 : "pt-16 w-full py-4 flex-grow"
         }`}
@@ -68,13 +70,31 @@ function AppContent() {
                 <ChatPage />
               </ProtectedRoute>
             } 
-          />          <Route 
+          />
+          <Route 
+            path="/conversations" 
+            element={
+              <ProtectedRoute>
+                <Conversations />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/conversations/:conversationId" 
+            element={
+              <ProtectedRoute>
+                <Conversations />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/avatar-call" 
             element={
               <ProtectedRoute>
                 <AvatarCallPage />
               </ProtectedRoute>
-            }          />
+            } 
+          />
           <Route 
             path="/dashboard" 
             element={
@@ -90,7 +110,8 @@ function AppContent() {
                 <JournalPage />
               </ProtectedRoute>
             } 
-          />          <Route 
+          />
+          <Route 
             path="/settings" 
             element={
               <ProtectedRoute>
@@ -133,22 +154,19 @@ const ThemeWrapper = ({ children }) => {
 
 function App() {
   return (
-    <AuthContextProvider>
-      <ThemeProvider>
-        <ThemeWrapper>
-          <Router 
-            future={{
-              v7_startTransition: true, // Enable v7 startTransition behavior
-              v7_relativeSplatPath: true // Enable v7 relative splat path behavior
-            }}
-          >
+    <Router>
+      <AuthContextProvider>
+        <ThemeProvider>
+          <ThemeWrapper>
             <ChatProvider>
-              <AppContent />
+              <ConversationProvider>
+                <AppContent />
+              </ConversationProvider>
             </ChatProvider>
-          </Router>
-        </ThemeWrapper>
-      </ThemeProvider>
-    </AuthContextProvider>
+          </ThemeWrapper>
+        </ThemeProvider>
+      </AuthContextProvider>
+    </Router>
   )
 }
 

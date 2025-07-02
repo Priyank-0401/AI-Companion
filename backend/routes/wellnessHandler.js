@@ -35,8 +35,8 @@ async function wellnessHandler(req, res) {
   const method = req.method;
 
   try {
-    // GET /api/wellness/stats - Get wellness statistics
-    if (pathname === '/api/wellness/stats' && method === 'GET') {
+    // GET /stats - Get wellness statistics
+    if (pathname === '/stats' && method === 'GET') {
       const data = await initializeWellnessData();
       
       const stats = {
@@ -51,8 +51,8 @@ async function wellnessHandler(req, res) {
       return sendJsonResponse(res, 200, stats);
     }
 
-    // POST /api/wellness/mood - Log mood entry
-    if (pathname === '/api/wellness/mood' && method === 'POST') {
+    // POST /mood - Log mood entry
+    if (pathname === '/mood' && method === 'POST') {
       const body = await parseRequestBody(req);
       const { mood, energy, notes } = body;
       
@@ -86,8 +86,8 @@ async function wellnessHandler(req, res) {
       });
     }
 
-    // GET /api/wellness/moods - Get mood history
-    if (pathname === '/api/wellness/moods' && method === 'GET') {
+    // GET /moods - Get mood history
+    if (pathname === '/moods' && method === 'GET') {
       const data = await initializeWellnessData();
       
       // Get last 30 days of mood entries

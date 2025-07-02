@@ -7,8 +7,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
  * @returns {string} The full URL
  */
 function getApiUrl(path) {
-  const cleanBase = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  // Remove any trailing slashes from base URL and leading/trailing slashes from path
+  const cleanBase = API_BASE_URL.replace(/\/+$/, '');
+  const cleanPath = path.replace(/^\/+|\/+$/g, '');
+  
+  // Only add /api/ if it's not already in the base URL or path
+  if (!cleanBase.includes('/api') && !cleanPath.startsWith('api/')) {
+    return `${cleanBase}/api/${cleanPath}`;
+  }
   return `${cleanBase}/${cleanPath}`;
 }
 
@@ -29,37 +35,47 @@ class ApiClient {
   async request(endpoint, options = {}) {
     const url = getApiUrl(endpoint);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
     
-    // Get the auth token from localStorage
-    const token = localStorage.getItem('authToken');
+    // Get the auth token from localStorage or cookies
+    let token = localStorage.getItem('token');
     
-    if (!token) {
-      console.warn('No auth token found in localStorage');
+    // If no token in localStorage, try to get it from cookies
+    if (!token && typeof document !== 'undefined' && document.cookie) {
+      const match = document.cookie.match(/(?:^|;\s*)token=([^;]*)/);
+      if (match) token = decodeURIComponent(match[1]);
     }
     
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     
+    // Include authorization header if token exists
     if (token) {
       headers.append('Authorization', `Bearer ${token}`);
     }
     
-    // Add any custom headers
-    if (options.headers) {
-      Object.entries(options.headers).forEach(([key, value]) => {
-        headers.set(key, value);
+    // Log the request for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('API Request:', {
+        url,
+        method: options.method || 'GET',
+        headers: Object.fromEntries(headers.entries())
       });
     }
     
-    const config = {
-      ...options,
-      signal: controller.signal,
-      headers,
-    };
-
     try {
-      const response = await fetch(url, config);
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include', // Important for sending/receiving cookies
+        signal: controller.signal
+      });
+      
+      console.log('Received response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -171,7 +187,7 @@ export const chatApi = {
    */
   async sendMessage({ message, model = 'llama3', style = 'supportive', conversationId }) {
     try {
-      const response = await apiClient.post('api/chat/messages', {
+      const response = await apiClient.post('chat/messages', {
         message,
         model,
         style,
@@ -190,7 +206,7 @@ export const chatApi = {
    */
   async getModels() {
     try {
-      const response = await apiClient.get('api/chat/models');
+      const response = await apiClient.get('chat/models');
       return response.data || [];
     } catch (error) {
       console.error('Error fetching models:', error);
@@ -204,7 +220,7 @@ export const chatApi = {
    */
   async getConversations() {
     try {
-      const response = await apiClient.get('api/chat/conversations');
+      const response = await apiClient.get('chat/conversations');
       return response.data || [];
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -219,7 +235,7 @@ export const chatApi = {
    */
   async getConversation(conversationId) {
     try {
-      const response = await apiClient.get(`api/chat/conversations/${conversationId}`);
+      const response = await apiClient.get(`chat/conversations/${conversationId}`);
       return response.data || null;
     } catch (error) {
       console.error(`Error fetching conversation ${conversationId}:`, error);
@@ -234,7 +250,7 @@ export const chatApi = {
    */
   async deleteConversation(conversationId) {
     try {
-      await apiClient.delete(`api/chat/conversations/${conversationId}`);
+      await apiClient.delete(`chat/conversations/${conversationId}`);
       return true;
     } catch (error) {
       console.error(`Error deleting conversation ${conversationId}:`, error);
@@ -251,8 +267,8 @@ export const chatApi = {
     try {
       const { id, ...conversationData } = conversation;
       const response = id
-        ? await apiClient.put(`api/chat/conversations/${id}`, conversationData)
-        : await apiClient.post('api/chat/conversations', conversationData);
+        ? await apiClient.put(`chat/conversations/${id}`, conversationData)
+        : await apiClient.post('chat/conversations', conversationData);
       
       return response.data || null;
     } catch (error) {
@@ -291,7 +307,7 @@ export const wellnessApi = {
    */
   async getStats() {
     try {
-      const response = await apiClient.get('api/wellness/stats');
+      const response = await apiClient.get('wellness/stats');
       return response.data || {};
     } catch (error) {
       console.error('Error fetching wellness stats:', error);
@@ -308,7 +324,7 @@ export const wellnessApi = {
    */
   async logMood(mood, energy, notes) {
     try {
-      const response = await apiClient.post('api/wellness/mood', {
+      const response = await apiClient.post('wellness/mood', {
         mood,
         energy: Number(energy),
         notes
@@ -326,7 +342,7 @@ export const wellnessApi = {
    */
   async getMoods() {
     try {
-      const response = await apiClient.get('api/wellness/mood');
+      const response = await apiClient.get('wellness/mood');
       return response.data || [];
     } catch (error) {
       console.error('Error fetching mood history:', error);
@@ -341,7 +357,7 @@ export const wellnessApi = {
    */
   async completeBreathingSession(duration = 5) {
     try {
-      const response = await apiClient.post('api/wellness/breathing-sessions', {
+      const response = await apiClient.post('wellness/breathing-sessions', {
         duration: Number(duration)
       });
       return response.data || { duration };
@@ -358,7 +374,7 @@ export const wellnessApi = {
    */
   async updateWeeklyGoal(weeklyGoal) {
     try {
-      const response = await apiClient.put('api/wellness/goals/weekly', weeklyGoal);
+      const response = await apiClient.put('wellness/goals/weekly', weeklyGoal);
       return response.data || { weeklyGoal };
     } catch (error) {
       console.error('Error updating weekly goal:', error);
@@ -372,7 +388,7 @@ export const wellnessApi = {
    */
   async getInsights() {
     try {
-      const response = await apiClient.get('api/wellness/insights');
+      const response = await apiClient.get('wellness/insights');
       return response.data || {};
     } catch (error) {
       console.error('Error fetching wellness insights:', error);
@@ -392,7 +408,7 @@ export const journalApi = {
    */
   async getEntries(params = {}) {
     try {
-      const response = await apiClient.get('api/journal/entries', { params });
+      const response = await apiClient.get('journal/entries', { params });
       return response.data || [];
     } catch (error) {
       console.error('Error fetching journal entries:', error);
@@ -410,7 +426,7 @@ export const journalApi = {
    */
   async createEntry(title, content, mood, tags) {
     try {
-      const response = await apiClient.post('api/journal/entries', {
+      const response = await apiClient.post('journal/entries', {
         title,
         content,
         mood,
@@ -430,7 +446,7 @@ export const journalApi = {
    */
   async getEntry(id) {
     try {
-      const response = await apiClient.get(`api/journal/entries/${id}`);
+      const response = await apiClient.get(`journal/entries/${id}`);
       return response.data || null;
     } catch (error) {
       console.error(`Error fetching journal entry ${id}:`, error);
@@ -446,7 +462,7 @@ export const journalApi = {
    */
   async updateEntry(id, data) {
     try {
-      const response = await apiClient.put(`api/journal/entries/${id}`, data);
+      const response = await apiClient.put(`journal/entries/${id}`, data);
       return response.data || null;
     } catch (error) {
       console.error(`Error updating journal entry ${id}:`, error);
@@ -461,7 +477,7 @@ export const journalApi = {
    */
   async deleteEntry(id) {
     try {
-      await apiClient.delete(`api/journal/entries/${id}`);
+      await apiClient.delete(`journal/entries/${id}`);
       return true;
     } catch (error) {
       console.error(`Error deleting journal entry ${id}:`, error);
@@ -475,7 +491,7 @@ export const journalApi = {
    */
   async getStats() {
     try {
-      const response = await apiClient.get('api/journal/stats');
+      const response = await apiClient.get('journal/stats');
       return response.data || {};
     } catch (error) {
       console.error('Error fetching journal stats:', error);
@@ -489,7 +505,7 @@ export const journalApi = {
    */
   async getTags() {
     try {
-      const response = await apiClient.get('api/journal/tags');
+      const response = await apiClient.get('journal/tags');
       return response.data || [];
     } catch (error) {
       console.error('Error fetching journal tags:', error);
@@ -510,7 +526,7 @@ export const journalApi = {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       
-      const response = await apiClient.get(`api/journal/export?${params.toString()}`, {
+      const response = await apiClient.get(`journal/export?${params.toString()}`, {
         responseType: format === 'json' ? 'json' : 'blob'
       });
       
@@ -532,7 +548,7 @@ export const settingsApi = {
    */
   async getSettings() {
     try {
-      const response = await apiClient.get('api/settings');
+      const response = await apiClient.get('settings');
       return response.data || {};
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -547,7 +563,7 @@ export const settingsApi = {
    */
   async getSection(section) {
     try {
-      const response = await apiClient.get(`api/settings/${section}`);
+      const response = await apiClient.get(`settings/${section}`);
       return response.data || {};
     } catch (error) {
       console.error(`Error fetching settings section ${section}:`, error);
@@ -563,7 +579,7 @@ export const settingsApi = {
    */
   async updateSection(section, data) {
     try {
-      const response = await apiClient.put(`api/settings/${section}`, data);
+      const response = await apiClient.put(`settings/${section}`, data);
       return response.data || null;
     } catch (error) {
       console.error(`Error updating settings section ${section}:`, error);
@@ -578,7 +594,7 @@ export const settingsApi = {
    */
   async resetSettings(section = null) {
     try {
-      const endpoint = section ? `api/settings/${section}` : 'api/settings';
+      const endpoint = section ? `settings/${section}` : 'settings';
       await apiClient.delete(endpoint);
       return true;
     } catch (error) {
@@ -593,7 +609,7 @@ export const settingsApi = {
    */
   async exportSettings() {
     try {
-      const response = await apiClient.get('api/settings/export');
+      const response = await apiClient.get('settings/export');
       return response.data || {};
     } catch (error) {
       console.error('Error exporting settings:', error);
@@ -608,7 +624,7 @@ export const settingsApi = {
    */
   async importSettings(settings) {
     try {
-      const response = await apiClient.post('api/settings/import', { settings });
+      const response = await apiClient.post('settings/import', { settings });
       return response.data || { success: true };
     } catch (error) {
       console.error('Error importing settings:', error);
@@ -622,7 +638,7 @@ export const settingsApi = {
    */
   async getBackup() {
     try {
-      const response = await apiClient.get('api/settings/backup');
+      const response = await apiClient.get('settings/backup');
       return response.data || {};
     } catch (error) {
       console.error('Error fetching settings backup:', error);
@@ -635,8 +651,7 @@ export const settingsApi = {
  * Health API service
  */
 export const healthApi = {
-  checkHealth: () =>
-    apiClient.get('/health'),
+  checkHealth: () => apiClient.get('health'),
 };
 
 // Export the API client for direct use if needed

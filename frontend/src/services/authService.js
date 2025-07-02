@@ -4,7 +4,8 @@ import {
   signInWithPopup, 
   signOut,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  onAuthStateChanged
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../config/firebase';
@@ -138,6 +139,23 @@ export const signOutUser = async () => {
   } catch (error) {
     console.error('Error signing out:', error);
     return { success: false, error: error.message };
+  }
+};
+
+// Get the current user's authentication token
+export const getAuthToken = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    // Get the ID token
+    const idToken = await user.getIdToken();
+    return idToken;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    throw error;
   }
 };
 

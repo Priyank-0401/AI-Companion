@@ -130,14 +130,14 @@ async function settingsHandler(req, res) {
   const method = req.method;
 
   try {
-    // GET /api/settings - Get all settings
-    if (pathname === '/api/settings' && method === 'GET') {
+    // GET / - Get all settings
+    if ((pathname === '/' || pathname === '') && method === 'GET') {
       const settings = await initializeSettingsData();
       return sendJsonResponse(res, 200, settings);
     }
 
-    // GET /api/settings/:section - Get specific settings section
-    if (pathname.startsWith('/api/settings/') && method === 'GET') {
+    // GET /:section - Get specific settings section
+    if (pathname.startsWith('/') && pathname !== '/' && method === 'GET') {
       const section = pathname.split('/').pop();
       const settings = await initializeSettingsData();
       
@@ -148,8 +148,8 @@ async function settingsHandler(req, res) {
       return sendJsonResponse(res, 200, settings[section]);
     }
 
-    // PUT /api/settings/:section - Update specific settings section
-    if (pathname.startsWith('/api/settings/') && method === 'PUT') {
+    // PUT /:section - Update specific settings section
+    if (pathname.startsWith('/') && pathname !== '/' && method === 'PUT') {
       const section = pathname.split('/').pop();
       const body = await parseRequestBody(req);
       
@@ -175,8 +175,8 @@ async function settingsHandler(req, res) {
       });
     }
 
-    // POST /api/settings/reset - Reset all settings to defaults
-    if (pathname === '/api/settings/reset' && method === 'POST') {
+    // POST /reset - Reset all settings to defaults
+    if (pathname === '/reset' && method === 'POST') {
       const body = await parseRequestBody(req);
       const { section } = body;
       

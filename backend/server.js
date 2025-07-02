@@ -1,221 +1,174 @@
-const http = require('http')
-const url = require('url')
-const dotenv = require('dotenv')
-const path = require('path')
-const { verifyToken } = require('./middleware/auth')
+const express = require('express');
+const http = require('http');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
+const { initializeFirebase } = require('./config/firebase-admin');
 
 // Load environment variables
-dotenv.config()
+dotenv.config();
 
-// Import handlers
-const chatHandler = require('./routes/chatHandler')
-const wellnessHandler = require('./routes/wellnessHandler')
-const journalHandler = require('./routes/journalHandler')
-const settingsHandler = require('./routes/settingsHandler')
+// Initialize Express app
+const app = express();
+const server = http.createServer(app);
+
+// Import routes
+const chatRouter = require('./routes/chatHandler');
+const wellnessRouter = require('./routes/wellnessHandler');
+const journalRouter = require('./routes/journalHandler');
+const settingsRouter = require('./routes/settingsHandler');
+const conversationRouter = require('./routes/conversationHandler');
 
 // Import Ollama client
-const OllamaClient = require('./utils/ollamaClient')
+const OllamaClient = require('./utils/ollamaClient');
 
 // Configuration
-const PORT = process.env.PORT || 3001
-const HOST = process.env.HOST || 'localhost'
+const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Initialize Ollama client globally
-global.ollamaClient = new OllamaClient()
+global.ollamaClient = new OllamaClient();
 
-/**
- * Send JSON response with proper headers
- */
-function sendJsonResponse(res, statusCode, data) {
-  res.setHeader('Content-Type', 'application/json')
-  res.statusCode = statusCode
-  res.end(JSON.stringify(data, null, 2))
-}
+// Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
-/**
- * Send error response with consistent format
- */
-function sendErrorResponse(res, statusCode, message, details = null) {
-  const response = {
-    error: true,
-    message: message,
-    timestamp: new Date().toISOString()
-  }
-  
-  // Add details only in development mode
-  if (details && process.env.NODE_ENV === 'development') {
-    response.details = details
-  }
-  
-  res.setHeader('Content-Type', 'application/json')
-  res.statusCode = statusCode
-  res.end(JSON.stringify(response, null, 2))
-}
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',  // Vite dev server
+  'http://localhost:3000',  // Common frontend port
+  'http://127.0.0.1:5173',  // Vite dev server (alternative)
+  'http://127.0.0.1:3000',  // Common frontend port (alternative)
+  'http://localhost:5174',  // Alternative Vite port
+  'http://127.0.0.1:5174'   // Alternative Vite port (alternative)
+];
 
-/**
- * Parse request body for POST/PUT requests
- */
-async function parseRequestBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = ''
+// Enable CORS with specific origin
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
     
-    req.on('data', chunk => {
-      body += chunk.toString()
-    })
-    
-    req.on('end', () => {
-      try {
-        const parsedBody = body ? JSON.parse(body) : {}
-        resolve(parsedBody)
-      } catch (error) {
-        reject(new Error('Invalid JSON in request body'))
-      }
-    })
-    
-    req.on('error', reject)
-  })
-}
-
-/**
- * Validate required fields in request data
- */
-function validateRequiredFields(data, requiredFields) {
-  const missing = requiredFields.filter(field => 
-    data[field] === undefined || data[field] === null || data[field] === ''
-  )
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required fields: ${missing.join(', ')}`)
-  }
-}
-
-/**
- * Setup CORS headers
- */
-function setupCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  res.setHeader('Access-Control-Max-Age', '86400')
-}
-
-/**
- * Route handler
- */
-async function handleRequest(req, res) {
-  try {
-    // Setup CORS
-    setupCors(res);
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.statusCode = 200;
-      res.end();
-      return;
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
     }
     
-    // Wrap response methods to ensure headers are set before sending
-    const originalEnd = res.end;
-    res.end = function(chunk, encoding) {
-      setupCors(res);
-      return originalEnd.call(res, chunk, encoding);
-    };
-    
-    // Parse URL
-    const parsedUrl = url.parse(req.url, true)
-    const pathname = parsedUrl.pathname
-    const method = req.method
-    
-    console.log(`${method} ${pathname}`)
-    
-    // Add helper functions to request object
-    req.sendJsonResponse = sendJsonResponse
-    req.sendErrorResponse = sendErrorResponse
-    req.parseRequestBody = parseRequestBody
-    req.validateRequiredFields = validateRequiredFields
-    
-    // Apply authentication to protected routes
-    if (pathname.startsWith('/api/auth/')) {
-      // Skip auth for certain public auth endpoints
-      if (pathname === '/api/auth/health') {
-        return sendJsonResponse(res, 200, { status: 'healthy' });
-      }
-    } else if (pathname === '/api/health') {
-      // Public health check endpoint
-      return sendJsonResponse(res, 200, {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        ollama: await global.ollamaClient.checkHealth()
-      });
-    } else {
-      // Apply auth middleware to all other routes
-      await new Promise((resolve) => {
-        verifyToken(req, res, resolve);
-      });
-      
-      // If headers were sent by the auth middleware, stop further processing
-      if (res.headersSent) return;
-    }
-    
-    // Route handling
-    if (pathname.startsWith('/api/chat')) {
-      // Remove the /api prefix before passing to the handler
-      req.url = req.url.replace('/api', '');
-      await chatHandler(req, res);
-    } else if (pathname.startsWith('/api/wellness')) {
-      await wellnessHandler(req, res)
-    } else if (pathname.startsWith('/api/journal')) {
-      await journalHandler(req, res)
-    } else if (pathname.startsWith('/api/settings')) {
-      await settingsHandler(req, res)
-    } else if (pathname === '/api/health') {
-      // Health check endpoint
-      sendJsonResponse(res, 200, {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        ollama: await global.ollamaClient.checkHealth()
-      })
-    } else {
-      // 404 - Not Found
-      sendErrorResponse(res, 404, 'Route not found')
-    }
-    
-  } catch (error) {
-    console.error('Server error:', error)
-    sendErrorResponse(res, 500, 'Internal server error', error.message)
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Initialize Firebase Admin
+initializeFirebase();
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// API Routes
+app.use('/api/chat', chatRouter);
+app.use('/api/wellness', wellnessRouter);
+app.use('/api/journal', journalRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/conversations', conversationRouter);
+
+// Handle all other routes
+app.all('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.path}`
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.path}`
+  });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  
+  // Handle CORS errors
+  if (err.name === 'UnauthorizedError' || err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+      message: 'Invalid or expired token'
+    });
   }
-}
+  
+  // Handle validation errors
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      details: err.message
+    });
+  }
+  
+  // Handle other errors
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+  
+  res.status(statusCode).json({
+    success: false,
+    error: message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
 
-// Create and start server
-const server = http.createServer(handleRequest)
-
+// Start server
 server.listen(PORT, HOST, () => {
-  console.log(`🚀 AI Companion Backend Server running on http://${HOST}:${PORT}`)
-  console.log(`📋 Available endpoints:`)
-  console.log(`   POST /api/chat/send - Send message to AI`)
-  console.log(`   GET  /api/wellness - Get wellness content`)
-  console.log(`   POST /api/wellness/exercises - Create wellness exercise`)
-  console.log(`   GET  /api/journal/entries - Get journal entries`)
-  console.log(`   POST /api/journal/entries - Create journal entry`)
-  console.log(`   GET  /api/settings - Get settings`)
-  console.log(`   POST /api/settings - Update settings`)
-  console.log(`   GET  /api/health - Health check`)
-  console.log(`🤖 Ollama model: ${process.env.OLLAMA_MODEL || 'llama3:latest'}`)
-})
+  console.log(`🚀 Server running at http://${HOST}:${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🤖 Ollama model: ${process.env.OLLAMA_MODEL || 'llama3:latest'}`);
+  
+  // Test database connection
+  const { db } = require('./config/firebase-admin');
+  db.listCollections()
+    .then(() => console.log('✅ Firestore database connected successfully'))
+    .catch(err => console.error('❌ Error connecting to Firestore:', err));
+});
 
-// Graceful shutdown
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('❌ Unhandled Rejection:', err);
+  // Close server & exit process
+  server.close(() => process.exit(1));
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+  // Close server & exit process
+  server.close(() => process.exit(1));
+});
+
+// Handle SIGTERM
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully')
+  console.log('🛑 SIGTERM received. Shutting down gracefully...');
   server.close(() => {
-    console.log('Process terminated')
-  })
-})
+    console.log('👋 Process terminated');
+  });
+});
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully')
-  server.close(() => {
-    console.log('Process terminated')
-  })
-})
+module.exports = { app, server };

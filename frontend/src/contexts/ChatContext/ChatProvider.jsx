@@ -47,6 +47,7 @@ const ChatProvider = ({ children }) => {
   // State for conversations from Firestore
   const [sessions, setSessions] = useState([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [sessionsError, setSessionsError] = useState(null);
 
   const [currentSessionId, setCurrentSessionId] = useState(() => {
@@ -195,7 +196,9 @@ const ChatProvider = ({ children }) => {
           : new Date(),
       };
       
-      setCurrentSession(updatedSession);
+      // Update the current session ID and messages
+      setCurrentSessionId(updatedSession.id);
+      setMessages(updatedSession.messages.length > 0 ? updatedSession.messages : [getInitialBotMessage()]);
       
       // Update URL with session ID
       window.history.pushState({}, '', `/chat/${sessionId}`);
@@ -227,7 +230,7 @@ const ChatProvider = ({ children }) => {
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return false;
     
-    setCurrentSession(session);
+    setCurrentSessionId(session.id);
     
     // Update URL with session ID
     window.history.pushState({}, '', `/chat/${sessionId}`);
@@ -260,42 +263,43 @@ const ChatProvider = ({ children }) => {
       
       console.log('Creating new session:', newSession);
       
-      // Save to backend
-      const savedSession = await chatApi.saveConversation(newSession);
-      
-      // Use the saved session or fallback to the new session
-      const sessionToUse = savedSession || newSession;
-      
-      // Update state
-      setCurrentSession(sessionToUse);
-      setSessions(prev => [sessionToUse, ...prev]);
-      
-      // Update URL
-      window.history.pushState({}, '', `/chat/${sessionToUse.id}`);
-      
-      console.log('Session created successfully:', sessionToUse);
-      return sessionToUse;
+      try {
+        // Try to save to backend first
+        const savedSession = await chatApi.saveConversation(newSession);
+        
+        // Use the saved session or fallback to the new session
+        const sessionToUse = savedSession || newSession;
+        
+        // Update state
+        setCurrentSessionId(sessionToUse.id);
+        setSessions(prev => [sessionToUse, ...prev]);
+        
+        // Update URL
+        window.history.pushState({}, '', `/chat/${sessionToUse.id}`);
+        
+        console.log('Session created successfully:', sessionToUse);
+        return sessionToUse;
+      } catch (backendError) {
+        console.error('Error saving to backend, creating local session:', backendError);
+        
+        // Create a local session if backend save fails
+        const localSession = {
+          ...newSession,
+          id: `local_${Date.now()}`,
+          title: 'New Chat (Local)',
+          isLocal: true
+        };
+        
+        setCurrentSessionId(localSession.id);
+        setSessions(prev => [localSession, ...prev]);
+        window.history.pushState({}, '', `/chat/${localSession.id}`);
+        
+        console.log('Local session created successfully:', localSession);
+        return localSession;
+      }
     } catch (error) {
-      console.error('Error creating new session:', error);
-      
-      // Create a local session even if backend save fails
-      const localSession = {
-        id: `local_${Date.now()}`,
-        title: 'New Chat (Local)',
-        messages: [],
-        model: 'default',
-        style: 'supportive',
-        userId: currentUser.uid,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isLocal: true
-      };
-      
-      setCurrentSession(localSession);
-      setSessions(prev => [localSession, ...prev]);
-      window.history.pushState({}, '', `/chat/${localSession.id}`);
-      
-      return localSession;
+      console.error('Unexpected error in createNewSession:', error);
+      throw error; // Re-throw to be caught by the caller
     } finally {
       setIsCreatingSession(false);
     }
@@ -517,7 +521,7 @@ const ChatProvider = ({ children }) => {
       
       // Update current session if it's the active one
       if (currentSession?.id === sessionId) {
-        setCurrentSession(finalSession);
+        setCurrentSessionId(finalSession.id);
       }
       
       console.log('Session updated successfully:', finalSession);
@@ -645,7 +649,7 @@ const ChatProvider = ({ children }) => {
         await chatApi.saveConversation(finalSession);
         
         // Update the UI with the bot's response
-        setCurrentSession(finalSession);
+        setCurrentSessionId(finalSession.id);
         setSessions(prevSessions => 
           prevSessions.map(s => 
             s.id === finalSession.id ? finalSession : s
@@ -670,10 +674,8 @@ const ChatProvider = ({ children }) => {
       };
       
       // Add error message to the conversation
-      setCurrentSession(prev => ({
-        ...prev,
-        messages: [...(prev?.messages || []), errorMessage]
-      }));
+      setCurrentSessionId(currentSessionId);
+      setMessages(prev => [...prev, errorMessage]);
       
       return false;
     } finally {
@@ -761,11 +763,7 @@ const ChatProvider = ({ children }) => {
       
       // Update current session if it's the one being modified
       if (currentSessionId === sessionId) {
-        setCurrentSession(prev => ({
-          ...prev,
-          title: trimmedTitle,
-          updatedAt: new Date()
-        }));
+        setCurrentSessionId(sessionId);
       }
       
       // Save to backend
@@ -798,11 +796,7 @@ const ChatProvider = ({ children }) => {
     );
     
     // Also update the current session if it's the one being updated
-    setCurrentSession(prev => ({
-      ...prev,
-      ...updates,
-      updatedAt: new Date()
-    }));
+    setCurrentSessionId(currentSessionId);
     
     // Save to backend if needed
     if (currentUser?.uid) {

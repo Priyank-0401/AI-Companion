@@ -51,11 +51,11 @@ async function chatHandler(req, res) {
 
   try {
     // Conversation endpoints
-    if (pathname === '/chat/conversations' || pathname === '/chat/conversations/') {
+    if (pathname === '/conversations' || pathname === '/conversations/') {
       if (method === 'GET') {
         try {
           if (!req.user?.uid) {
-            console.error('No authenticated user');
+            console.warn('No authenticated user');
             return sendJsonResponse(res, 200, []);
           }
           
@@ -68,6 +68,7 @@ async function chatHandler(req, res) {
           // Ensure we always return an array, even if empty
           const response = Array.isArray(conversations) ? conversations : [];
           return sendJsonResponse(res, 200, response);
+          
         } catch (error) {
           console.error('Error getting conversations:', error);
           // Return empty array instead of error to prevent frontend from retrying
@@ -75,19 +76,12 @@ async function chatHandler(req, res) {
         }
       }
       
-      // Handle other methods
-      setupCors(res);
-      if (method === 'OPTIONS') {
-        res.statusCode = 204;
-        res.end();
-        return;
-      }
-      
+      // Handle unsupported methods
       return sendErrorResponse(res, 405, 'Method not allowed');
     }
 
     // Get single conversation
-    if (pathname.startsWith('/chat/conversations/') && method === 'GET') {
+    if (pathname.startsWith('/conversations/') && method === 'GET') {
       const conversationId = pathname.split('/').pop();
       const userId = req.user?.uid;
       
@@ -99,51 +93,110 @@ async function chatHandler(req, res) {
         return sendJsonResponse(res, 200, conversation);
       } catch (error) {
         console.error('Error getting conversation:', error);
-        return sendErrorResponse(res, 500, 'Failed to fetch conversation');
+        return sendErrorResponse(res, 500, 'Failed to get conversation', error.message);
+      }
+    }
+
+    // Create or update conversation
+    if (pathname.startsWith('/conversations') && (method === 'POST' || method === 'PUT')) {
+      try {
+        if (!req.user?.uid) {
+          return sendErrorResponse(res, 401, 'Unauthorized');
+        }
+
+        const userId = req.user.uid;
+        const body = await parseRequestBody(req);
+        
+        if (!body) {
+          return sendErrorResponse(res, 400, 'Invalid request body');
+        }
+
+        let conversation;
+        if (method === 'POST') {
+          // Create new conversation
+          conversation = {
+            ...body,
+            userId,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          const created = await chatService.createConversation(conversation);
+          return sendJsonResponse(res, 201, created);
+          
+        } else {
+          // Update existing conversation
+          if (!body.id) {
+            return sendErrorResponse(res, 400, 'Conversation ID is required');
+          }
+          
+          conversation = {
+            ...body,
+            userId,
+            updatedAt: new Date()
+          };
+          
+          const updated = await chatService.updateConversation(conversation);
+          if (!updated) {
+            return sendErrorResponse(res, 404, 'Conversation not found');
+          }
+          
+          return sendJsonResponse(res, 200, updated);
+        }
+        
+      } catch (error) {
+        console.error('Error saving conversation:', error);
+        return sendErrorResponse(res, 500, 'Failed to save conversation', error.message);
       }
     }
 
     // Delete conversation
-    if (pathname.startsWith('/chat/conversations/') && method === 'DELETE') {
-      const conversationId = pathname.split('/').pop();
-      const userId = req.user?.uid;
-      
-      try {
-        await chatService.deleteConversation(conversationId, userId);
-        return sendJsonResponse(res, 200, { success: true });
-      } catch (error) {
-        console.error('Error deleting conversation:', error);
-        return sendErrorResponse(res, 500, 'Failed to delete conversation');
-      }
-    }
-
-    // Update conversation
-    if (pathname.startsWith('/chat/conversations/') && method === 'PUT') {
+    if (pathname.startsWith('/conversations/') && method === 'DELETE') {
       const conversationId = pathname.split('/').pop();
       const userId = req.user?.uid;
       
       if (!userId) {
-        return sendErrorResponse(res, 401, 'Authentication required');
+        return sendErrorResponse(res, 401, 'Unauthorized');
       }
       
       try {
-        const body = await parseRequestBody(req);
-        if (!body || typeof body !== 'object') {
-          return sendErrorResponse(res, 400, 'Invalid request body');
+        const success = await chatService.deleteConversation(conversationId, userId);
+        if (!success) {
+          return sendErrorResponse(res, 404, 'Conversation not found');
         }
-        
-        console.log(`[Chat Handler] Updating conversation ${conversationId} for user ${userId}`);
-        const updatedConversation = await chatService.updateConversation(conversationId, body, userId);
-        
-        if (!updatedConversation) {
-          return sendErrorResponse(res, 404, 'Conversation not found or access denied');
-        }
-        
-        console.log(`[Chat Handler] Successfully updated conversation ${conversationId}`);
-        return sendJsonResponse(res, 200, updatedConversation);
+        return sendJsonResponse(res, 200, { success: true });
       } catch (error) {
-        console.error('Error updating conversation:', error);
-        return sendErrorResponse(res, 500, 'Failed to update conversation');
+        console.error('Error deleting conversation:', error);
+        return sendErrorResponse(res, 500, 'Failed to delete conversation', error.message);
+      }
+    }
+
+    // Send message
+    if (pathname === '/message' && method === 'POST') {
+      try {
+        if (!req.user?.uid) {
+          return sendErrorResponse(res, 401, 'Unauthorized');
+        }
+        
+        const userId = req.user.uid;
+        const body = await parseRequestBody(req);
+        
+        if (!body || !body.conversationId || !body.content) {
+          return sendErrorResponse(res, 400, 'Missing required fields');
+        }
+        
+        const message = {
+          ...body,
+          userId,
+          timestamp: new Date()
+        };
+        
+        const savedMessage = await chatService.saveMessage(message);
+        return sendJsonResponse(res, 201, savedMessage);
+        
+      } catch (error) {
+        console.error('Error sending message:', error);
+        return sendErrorResponse(res, 500, 'Failed to send message', error.message);
       }
     }
 
@@ -178,7 +231,7 @@ async function chatHandler(req, res) {
           });
         } catch (error) {
           console.error('Chat error:', error);
-          return sendErrorResponse(res, 500, 'Failed to get AI response');
+          return sendErrorResponse(res, 500, 'Failed to get AI response', error.message);
         }
       }
 
@@ -191,7 +244,7 @@ async function chatHandler(req, res) {
         return sendJsonResponse(res, 200, conversations);
       } catch (error) {
         console.error('Error fetching conversations:', error);
-        return sendErrorResponse(res, 500, 'Failed to fetch conversations');
+        return sendErrorResponse(res, 500, 'Failed to fetch conversations', error.message);
       }
     }
 
@@ -207,7 +260,7 @@ async function chatHandler(req, res) {
         return sendJsonResponse(res, 200, conversation);
       } catch (error) {
         console.error('Error fetching conversation:', error);
-        return sendErrorResponse(res, 500, 'Failed to fetch conversation');
+        return sendErrorResponse(res, 500, 'Failed to fetch conversation', error.message);
       }
     }
 
@@ -223,7 +276,7 @@ async function chatHandler(req, res) {
         return sendJsonResponse(res, 200, { message: 'Conversation deleted successfully' });
       } catch (error) {
         console.error('Error deleting conversation:', error);
-        return sendErrorResponse(res, 500, 'Failed to delete conversation');
+        return sendErrorResponse(res, 500, 'Failed to delete conversation', error.message);
       }
     }
 
@@ -259,7 +312,7 @@ async function chatHandler(req, res) {
         }
       } catch (error) {
         console.error('Export error:', error);
-        return sendErrorResponse(res, 500, 'Failed to export conversation');
+        return sendErrorResponse(res, 500, 'Failed to export conversation', error.message);
       }
     }
 
@@ -270,16 +323,18 @@ async function chatHandler(req, res) {
         return sendJsonResponse(res, 200, models);
       } catch (error) {
         console.error('Error fetching models:', error);
-        return sendErrorResponse(res, 500, 'Failed to fetch models');
+        return sendErrorResponse(res, 500, 'Failed to fetch models', error.message);
       }
     }
 
-    // If no route matches
-    return sendErrorResponse(res, 404, 'Chat endpoint not found');
-
+    // If no routes matched
+    return sendErrorResponse(res, 404, 'Endpoint not found');
+    
   } catch (error) {
-    console.error('Chat handler error:', error);
-    return sendErrorResponse(res, 500, 'Internal server error');
+    console.error('Unexpected error in chat handler:', error);
+    if (!res.headersSent) {
+      return sendErrorResponse(res, 500, 'Internal server error', error.message);
+    }
   }
 }
 
