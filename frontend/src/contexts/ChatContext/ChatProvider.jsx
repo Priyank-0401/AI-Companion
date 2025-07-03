@@ -334,10 +334,6 @@ const ChatProvider = ({ children }) => {
     }
   }, [currentUser?.uid]);
 
-  // Track previous user ID to prevent unnecessary reloads
-  const prevUserIdRef = useRef(null);
-  const isInitialLoad = useRef(true);
-
   const loadData = useCallback(async () => {
     const currentUserId = currentUser?.uid;
     
@@ -361,46 +357,51 @@ const ChatProvider = ({ children }) => {
       if (!isMountedRef.current) return;
       
       console.log(`Loaded ${sessions.length} sessions for user: ${currentUser.uid}`);
+      setSessions(sessions); // Make sure to update the sessions state
       
-      // Only auto-load or create sessions when on the chat page
-      if (window.location.pathname === '/chat') {
-        if (sessions.length > 0) {
-          // If we have a current session ID, try to load it
-          if (currentSessionId) {
-            const sessionExists = sessions.some(s => s.id === currentSessionId);
+      // Only auto-load or create sessions when on the chat or conversations page
+      const isChatPage = window.location.pathname === '/chat' || window.location.pathname.startsWith('/conversations');
+      
+      if (isChatPage) {
+        // If we're on a specific conversation page
+        if (window.location.pathname.startsWith('/conversations/')) {
+          const conversationId = window.location.pathname.split('/').pop();
+          if (conversationId && conversationId !== 'conversations') {
+            const sessionExists = sessions.some(s => s.id === conversationId);
             if (sessionExists) {
-              console.log('Loading existing session:', currentSessionId);
-              await loadSession(currentSessionId);
+              console.log('Loading specific conversation:', conversationId);
+              await loadSession(conversationId);
               return;
             }
           }
-          
-          // Otherwise load the most recent session
-          if (sessions.length > 0) {
-            console.log('Loading most recent session:', sessions[0].id);
+        }
+        
+        // For /conversations or /chat without a specific ID
+        if (sessions.length > 0) {
+          // If we have a current session ID that exists, load it
+          if (currentSessionId && sessions.some(s => s.id === currentSessionId)) {
+            console.log('Loading existing session:', currentSessionId);
+            await loadSession(currentSessionId);
+          } else {
+            // Otherwise load the most recent session
+            console.log('Loading most recent session');
             await loadSession(sessions[0].id);
           }
-        } else if (isInitialLoad.current) {
-          // Only create a new session on initial load
-          console.log('No sessions found, creating new session');
+        } else if (window.location.pathname === '/chat') {
+          // Only create a new session if we're on /chat, not on /conversations
+          console.log('No sessions found, creating a new one');
           await createNewSession();
         }
       }
     } catch (error) {
       console.error('Error loading chat data:', error);
-      
-      // Only create a new session on initial load if we're on the chat page
-      if (isMountedRef.current && isInitialLoad.current && window.location.pathname === '/chat') {
-        console.log('Error loading sessions, creating new session');
-        await createNewSession();
-      }
-    } finally {
-      if (isMountedRef.current) {
-        console.log('Finished loading chat data');
-        isInitialLoad.current = false;
-      }
+      // Don't create a new session on error to prevent infinite loop
     }
-  }, [currentUser?.uid, fetchConversations, loadSession, createNewSession, currentSessionId]);
+  }, [currentUser?.uid, currentSessionId, fetchConversations, loadSession, createNewSession]);
+
+  // Track previous user ID to prevent unnecessary reloads
+  const prevUserIdRef = useRef(null);
+  const isInitialLoad = useRef(true);
 
   // Load data effect - only run when currentUser changes
   useEffect(() => {

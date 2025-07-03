@@ -3,6 +3,40 @@ import { getAuthToken } from './authService';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api`;
 
+// Helper function to handle API requests
+const fetchWithAuth = async (url, options = {}) => {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error('Authentication required');
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers,
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Request failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch (e) {
+      console.error('Failed to parse error response:', e);
+    }
+    
+    const error = new Error(errorMessage);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response;
+};
+
 /**
  * Get all conversations for the current user
  * @param {Object} options - Options for the request
@@ -11,34 +45,19 @@ const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3
  */
 export const getConversations = async ({ limit } = {}) => {
   try {
-    const token = await getAuthToken();
-    if (!token) {
-      console.warn('No auth token available');
-      return [];
-    }
-
     const url = new URL(`${API_BASE_URL}/conversations`);
     if (limit) {
       url.searchParams.append('limit', limit);
     }
     
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || 'Failed to fetch conversations');
-    }
-    
+    const response = await fetchWithAuth(url.toString());
     return await response.json();
   } catch (error) {
     console.error('Error in getConversations:', error);
+    if (error.status === 401) {
+      // Handle unauthorized (e.g., redirect to login)
+      window.location.href = '/login';
+    }
     throw error;
   }
 };
@@ -49,30 +68,18 @@ export const getConversations = async ({ limit } = {}) => {
  * @returns {Promise<Object>} - The conversation object with messages
  */
 export const getConversation = async (conversationId) => {
-  try {
-    const token = await getAuthToken();
-    if (!token) {
-      console.warn('No auth token available');
-      throw new Error('Authentication required');
-    }
+  if (!conversationId) {
+    throw new Error('Conversation ID is required');
+  }
 
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || 'Failed to fetch conversation');
-    }
-    
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/conversations/${conversationId}`);
     return await response.json();
   } catch (error) {
-    console.error('Error in getConversation:', error);
+    console.error(`Error in getConversation (ID: ${conversationId}):`, error);
+    if (error.status === 404) {
+      throw new Error('Conversation not found');
+    }
     throw error;
   }
 };
@@ -86,23 +93,16 @@ export const getConversation = async (conversationId) => {
  * @returns {Promise<Object>} - The created conversation
  */
 export const createConversation = async (conversationData) => {
-  const token = await getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/conversations`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    credentials: 'include',
-    body: JSON.stringify(conversationData)
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to create conversation');
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/conversations`, {
+      method: 'POST',
+      body: JSON.stringify(conversationData)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error in createConversation:', error);
+    throw error;
   }
-  
-  return response.json();
 };
 
 /**
@@ -115,23 +115,16 @@ export const createConversation = async (conversationData) => {
  * @returns {Promise<Object>} - The updated conversation
  */
 export const updateConversation = async (conversationId, updates) => {
-  const token = await getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    credentials: 'include',
-    body: JSON.stringify(updates)
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to update conversation');
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/conversations/${conversationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error in updateConversation:', error);
+    throw error;
   }
-  
-  return response.json();
 };
 
 /**
@@ -140,22 +133,15 @@ export const updateConversation = async (conversationId, updates) => {
  * @returns {Promise<Object>} - Result of the operation
  */
 export const deleteConversation = async (conversationId) => {
-  const token = await getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to delete conversation');
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/conversations/${conversationId}`, {
+      method: 'DELETE'
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error in deleteConversation:', error);
+    throw error;
   }
-  
-  return response.json();
 };
 
 /**
@@ -168,23 +154,16 @@ export const deleteConversation = async (conversationId) => {
  * @returns {Promise<Object>} - The created message
  */
 export const addMessage = async (conversationId, messageData) => {
-  const token = await getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    credentials: 'include',
-    body: JSON.stringify(messageData)
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to add message');
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(messageData)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error in addMessage:', error);
+    throw error;
   }
-  
-  return response.json();
 };
 
 /**
@@ -195,28 +174,18 @@ export const addMessage = async (conversationId, messageData) => {
  * @returns {Promise<Array>} - Array of messages
  */
 export const getMessages = async (conversationId, { limit } = {}) => {
-  const token = await getAuthToken();
-  const url = new URL(`${API_BASE_URL}/conversations/${conversationId}/messages`);
-  
-  if (limit) {
-    url.searchParams.append('limit', limit);
+  try {
+    const url = new URL(`${API_BASE_URL}/conversations/${conversationId}/messages`);
+    if (limit) {
+      url.searchParams.append('limit', limit);
+    }
+    
+    const response = await fetchWithAuth(url.toString());
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getMessages:', error);
+    throw error;
   }
-  
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to fetch messages');
-  }
-  
-  return response.json();
 };
 
 /**

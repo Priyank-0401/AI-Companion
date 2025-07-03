@@ -46,6 +46,7 @@ import BotIcon from '@mui/icons-material/SmartToyOutlined';
 // Context
 import { useAuth } from '../contexts/AuthContext';
 import { useConversationContext } from '../contexts/ConversationContext';
+import { useSnackbar } from 'notistack';
 
 // Components
 import ConversationList from '../components/conversations/ConversationList';
@@ -134,39 +135,68 @@ const MobileHeader = styled(AppBar)(({ theme }) => ({
 }));
 
 const Conversations = () => {
+  // 1. All hooks must be called unconditionally at the top level
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const location = useLocation();
+  const { enqueueSnackbar } = useSnackbar();
   const { currentUser, logout } = useAuth();
   const { 
     conversations = [], 
     currentConversation = null, 
     messages = [], 
     isLoading = false, 
-    error = null, 
+    error: conversationError = null, 
     loadConversations,
     loadConversation,
-    createConversation,
+    createConversation: createConversationInContext,
     updateConversation,
     deleteConversation,
-    addMessage,
+    addMessage: addMessageInContext,
   } = useConversationContext();
   
+  // 2. All state hooks at the top level
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewChat, setIsNewChat] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState(null);
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [error, setError] = useState(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  
+  // 3. Refs
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   
-  // Handle conversation selection
+  // 4. Memoized values
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    const query = searchQuery.toLowerCase();
+    return conversations.filter(conv => 
+      (conv.title && conv.title.toLowerCase().includes(query)) ||
+      (conv.messages && conv.messages.some(msg => 
+        msg.content && msg.content.toLowerCase().includes(query)
+      ))
+    );
+  }, [conversations, searchQuery]);
+
+  // Handle new chat creation
+  const handleNewChat = useCallback(() => {
+    setIsNewChat(true);
+    setMessageInput('');
+    navigate('/conversations');
+    if (isMobile) {
+      setMobileOpen(false);
+    }
+  }, [isMobile, navigate]);
+
+  // 5. All callbacks
   const handleSelectConversation = useCallback(async (conversation) => {
     if (!conversation) {
-      // Handle new chat
       setIsNewChat(true);
       navigate('/conversations');
       return;
@@ -177,54 +207,14 @@ const Conversations = () => {
       navigate(`/conversations/${conversation.id}`);
     } catch (err) {
       console.error('Failed to load conversation:', err);
-      // Handle error
+      setError('Failed to load conversation');
+      enqueueSnackbar('Failed to load conversation', { variant: 'error' });
     }
-  }, [loadConversation, navigate]);
+  }, [loadConversation, navigate, enqueueSnackbar]);
 
-  // Handle conversation deletion
-  const handleDeleteConversation = useCallback(async (conversationId) => {
-    if (!conversationId) return;
-    
-    try {
-      setIsDeletingId(conversationId);
-      await deleteConversation(conversationId);
-      
-      // If the deleted conversation was the current one, navigate to conversations list
-      if (currentConversation?.id === conversationId) {
-        navigate('/conversations');
-      }
-    } catch (err) {
-      console.error('Failed to delete conversation:', err);
-      // Handle error
-    } finally {
-      setIsDeletingId(null);
-    }
-  }, [currentConversation, deleteConversation, navigate]);
-
-  // Load conversations on mount
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
-
-  // Handle drawer toggle for mobile
-  const handleDrawerToggle = useCallback(() => {
-    setMobileOpen(!mobileOpen);
-  }, [mobileOpen]);
-
-  // Handle message input change
   const handleInputChange = useCallback((e) => {
     setMessageInput(e.target.value);
   }, []);
-
-  // Handle new chat
-  const handleNewChat = useCallback(() => {
-    setIsNewChat(true);
-    handleSelectConversation(null);
-    setMessageInput('');
-    if (isMobile) {
-      setMobileOpen(false);
-    }
-  }, [isMobile, handleSelectConversation]);
 
   // Handle message submission
   const handleSendMessage = useCallback(async (e) => {
@@ -279,7 +269,7 @@ const Conversations = () => {
     } finally {
       setIsSending(false);
     }
-  }, [messageInput, currentUser, currentConversation, isNewChat, createConversation, addMessage, navigate, isSending]);
+  }, [messageInput, currentUser, currentConversation, isNewChat, createConversationInContext, addMessageInContext, navigate, isSending, enqueueSnackbar]);
 
   // Handle key down for message input
   const handleKeyDown = useCallback((e) => {
@@ -319,6 +309,28 @@ const Conversations = () => {
     }
   }, [messages, scrollToBottom]);
 
+  // Handle conversation deletion
+  const handleDeleteConversation = useCallback(async (conversationId) => {
+    if (!conversationId) return;
+    
+    try {
+      setIsDeletingId(conversationId);
+      await deleteConversation(conversationId);
+      
+      // If the deleted conversation was the current one, navigate to conversations list
+      if (currentConversation?.id === conversationId) {
+        navigate('/conversations');
+      }
+      
+      enqueueSnackbar('Conversation deleted', { variant: 'success' });
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+      enqueueSnackbar('Failed to delete conversation', { variant: 'error' });
+    } finally {
+      setIsDeletingId(null);
+    }
+  }, [currentConversation, deleteConversation, navigate, enqueueSnackbar]);
+
   // Handle message deletion
   const handleDeleteMessage = useCallback(async (messageId) => {
     try {
@@ -345,45 +357,6 @@ const Conversations = () => {
     }
   }, [conversationId, conversations, navigate, handleSelectConversation]);
 
-  // Filter conversations based on search query
-  const filteredConversations = useMemo(() => 
-    conversations.filter(conv => 
-      conv.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.messages?.some(msg => 
-        msg.content.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    ),
-    [conversations, searchQuery]
-  );
-
-  // Loading state
-  if (isLoading && conversations.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <Box p={3}>
-        <Typography color="error" gutterBottom>
-          Error loading conversations: {error.message || 'Unknown error'}
-        </Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={loadConversations}
-          startIcon={<RefreshIcon />}
-        >
-          Retry
-        </Button>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -399,7 +372,7 @@ const Conversations = () => {
             color="inherit"
             aria-label="open drawer"
             edge="start"
-            onClick={handleDrawerToggle}
+            onClick={() => setMobileOpen(true)}
             sx={{ mr: 2 }}
           >
             <MenuIcon />
@@ -414,7 +387,7 @@ const Conversations = () => {
       <StyledDrawer
         variant={isMobile ? 'temporary' : 'permanent'}
         open={mobileOpen}
-        onClose={handleDrawerToggle}
+        onClose={() => setMobileOpen(false)}
         ModalProps={{
           keepMounted: true, // Better open performance on mobile.
         }}
@@ -460,7 +433,7 @@ const Conversations = () => {
         
         <Box sx={{ overflowY: 'auto', flex: 1 }}>
           <ConversationList
-            conversations={conversations}
+            conversations={filteredConversations}
             selectedConversationId={currentConversation?.id}
             onSelectConversation={handleSelectConversation}
             onDeleteConversation={handleDeleteConversation}
@@ -540,7 +513,7 @@ const Conversations = () => {
             </Box>
 
             {/* Scroll to bottom button */}
-            <Zoom in={showScrollToBottom}>
+            <Zoom in={false}>
               <Box
                 onClick={scrollToBottom}
                 sx={{
@@ -641,14 +614,14 @@ const Conversations = () => {
                   }}
                 />
                 <Tooltip 
-                  title={input.trim() ? 'Send message' : 'Type a message to send'}
+                  title={messageInput.trim() ? 'Send message' : 'Type a message to send'}
                   placement="top"
                 >
                   <span>
                     <IconButton 
                       type="submit" 
                       color="primary"
-                      disabled={!input.trim() || isSending}
+                      disabled={!messageInput.trim() || isSending}
                       sx={{
                         height: '48px',
                         width: '48px',

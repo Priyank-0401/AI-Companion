@@ -63,38 +63,42 @@ export const useConversation = () => {
       
       // Load conversation data
       const conversation = await getConversation(conversationId);
-      setCurrentConversation(conversation);
-      setMessages(conversation?.messages || []);
-      
-      // Subscribe to real-time updates if we have a conversation
-      if (conversation) {
-        unsubscribeRef.current = subscribeToConversation(conversationId, (err, data) => {
-          if (err) {
-            console.error('Error in conversation subscription:', err);
-            setError('Connection to conversation lost. Please refresh the page.');
-            return;
-          }
-          
-          if (data) {
-            setCurrentConversation(prev => ({
-              ...prev,
-              ...data,
-              messages: data.messages || []
-            }));
-            setMessages(data.messages || []);
-          }
-        });
+      if (!conversation) {
+        throw new Error('Conversation not found');
       }
       
+      setCurrentConversation(conversation);
+      setMessages(conversation.messages || []);
+      
+      // Subscribe to real-time updates
+      unsubscribeRef.current = subscribeToConversation(conversationId, (err, data) => {
+        if (err) {
+          console.error('Error in conversation subscription:', err);
+          setError('Connection to conversation lost. Please refresh the page.');
+          return;
+        }
+        
+        if (data) {
+          setCurrentConversation(prev => ({
+            ...prev,
+            ...data,
+            messages: data.messages || []
+          }));
+          setMessages(data.messages || []);
+        }
+      });
+      
+      return conversation;
     } catch (err) {
       console.error('Failed to load conversation:', err);
       setError(err.message || 'Failed to load conversation');
       setCurrentConversation(null);
       setMessages([]);
+      throw err; // Re-throw to allow error handling in the component
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentUser]);
 
   // Create a new conversation
   const createConversation = useCallback(async (conversationData) => {
@@ -122,7 +126,7 @@ export const useConversation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadConversation]);
+  }, [loadConversation, currentUser]);
 
   // Update a conversation
   const updateConversation = useCallback(async (conversationId, updates) => {
@@ -151,7 +155,7 @@ export const useConversation = () => {
       setError(err.message || 'Failed to update conversation');
       throw err;
     }
-  }, [currentConversation]);
+  }, [currentConversation, currentUser]);
 
   // Delete a conversation
   const deleteConversation = useCallback(async (conversationId) => {
@@ -173,7 +177,7 @@ export const useConversation = () => {
       setError(err.message || 'Failed to delete conversation');
       throw err;
     }
-  }, [currentConversation]);
+  }, [currentConversation, currentUser]);
 
   // Add a message to the current conversation
   const addMessage = useCallback(async (messageData) => {
@@ -213,7 +217,7 @@ export const useConversation = () => {
       setError(err.message || 'Failed to send message');
       throw err;
     }
-  }, [currentConversation]);
+  }, [currentConversation, currentUser]);
 
   // Clean up subscription on unmount
   useEffect(() => {
