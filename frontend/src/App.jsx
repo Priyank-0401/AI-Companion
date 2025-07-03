@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation, createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useEffect } from 'react'
 import Navbar from './components/layout/Navbar'
@@ -17,6 +17,7 @@ import { AuthContextProvider } from './contexts/AuthContextProvider'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import ConversationProvider from './contexts/ConversationContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import { Toaster } from 'react-hot-toast';
 
 import './App.css'
 
@@ -24,11 +25,13 @@ function AppContent() {
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isHomePage = location.pathname === '/';
+  const isChatPage = location.pathname === '/chat';
   const isDashboardPage = location.pathname === '/dashboard';
   const isSettingsPage = location.pathname === '/settings';
+  
   // Prevent body scrolling on all pages except HomePage and Dashboard
   useEffect(() => {
-    if (!isHomePage && !isDashboardPage && !isSettingsPage) {
+    if (!isHomePage && !isDashboardPage && !isSettingsPage && !isChatPage) {
       document.body.style.overflow = 'hidden';
       document.body.style.height = '100vh';
     } else {
@@ -41,10 +44,11 @@ function AppContent() {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     };
-  }, [isHomePage, isDashboardPage, isSettingsPage]);
+  }, [isHomePage, isDashboardPage, isSettingsPage, isChatPage]);
+  
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
-      <Navbar />
+      {!isChatPage && <Navbar />}
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -153,21 +157,35 @@ const ThemeWrapper = ({ children }) => {
 };
 
 function App() {
-  return (
-    <Router>
-      <AuthContextProvider>
-        <ThemeProvider>
-          <ThemeWrapper>
-            <ChatProvider>
-              <ConversationProvider>
-                <AppContent />
-              </ConversationProvider>
-            </ChatProvider>
-          </ThemeWrapper>
-        </ThemeProvider>
-      </AuthContextProvider>
-    </Router>
-  )
+  // Create router with future flags
+  const router = createBrowserRouter([
+    {
+      path: '/*',
+      element: (
+        <AuthContextProvider>
+          <ChatProvider>
+            <ConversationProvider>
+              <ThemeProvider>
+                <ThemeWrapper>
+                  <AppContent />
+                </ThemeWrapper>
+              </ThemeProvider>
+            </ConversationProvider>
+          </ChatProvider>
+        </AuthContextProvider>
+      ),
+    },
+  ], {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+      v7_fetcherPersist: true,
+      v7_normalizeFormMethod: true,
+    },
+  });
+
+
+  return <RouterProvider router={router} future={{ v7_startTransition: true }} />;
 }
 
 export default App

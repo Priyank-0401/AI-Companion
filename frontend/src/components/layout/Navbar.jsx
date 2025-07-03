@@ -96,7 +96,7 @@ const Navbar = () => {
 
   return (
     <motion.nav 
-      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-white/80 dark:bg-gray-900/80 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-gray-200 dark:border-gray-800 backdrop-blur-md bg-white/80 dark:bg-gray-900/80 transition-all duration-300 ${
         scrolled ? 'shadow-sm border-b border-gray-200 dark:border-gray-800' : ''
       }`}
       initial={{ y: -100 }}
@@ -194,19 +194,21 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-            aria-label="Toggle menu"
-            aria-expanded={isOpen}
-          >
-            {isOpen ? (
-              <X className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-            ) : (
-              <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-            )}
-          </button>
+          {/* Mobile Menu Button - Only show if there are navigation items */}
+          {(currentUser || publicNavItems.length > 1) && (
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+              aria-label="Toggle menu"
+              aria-expanded={isOpen}
+            >
+              {isOpen ? (
+                <X className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              ) : (
+                <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -214,16 +216,24 @@ const Navbar = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="md:hidden absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 shadow-lg rounded-b-lg overflow-hidden z-50"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg rounded-b-xl overflow-hidden z-50"
           >
-            <div className="space-y-1 px-2 pb-3 pt-2">
+            <div className="px-2 pt-2 pb-3 space-y-1">
               {currentUser ? (
                 // Show all navigation items for authenticated users
                 <>
+                  <NavLink
+                    to="/"
+                    icon={Home}
+                    label="Home"
+                    isActive={isActive('/')}
+                    onClick={() => setIsOpen(false)}
+                    className="w-full justify-start"
+                  />
                   {authNavItems.map((item) => (
                     <NavLink
                       key={item.path}
@@ -272,38 +282,6 @@ const Navbar = () => {
                   </div>
                 </>
               )}
-              <NavLink 
-                to="/conversations" 
-                icon={MessageSquareText} 
-                label="Conversations" 
-                isActive={location.pathname.startsWith('/conversations')} 
-                onClick={() => setIsOpen(false)}
-                className="w-full justify-start"
-              />
-              <NavLink 
-                to="/dashboard" 
-                icon={BarChart3} 
-                label="Dashboard" 
-                isActive={location.pathname === '/dashboard'} 
-                onClick={() => setIsOpen(false)}
-                className="w-full justify-start"
-              />
-              <NavLink 
-                to="/journal" 
-                icon={BookOpen} 
-                label="Journal" 
-                isActive={location.pathname === '/journal'} 
-                onClick={() => setIsOpen(false)}
-                className="w-full justify-start"
-              />
-              <NavLink 
-                to="/settings" 
-                icon={Settings} 
-                label="Settings" 
-                isActive={location.pathname === '/settings'} 
-                onClick={() => setIsOpen(false)}
-                className="w-full justify-start"
-              />
             </div>
 
             <div className="pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">

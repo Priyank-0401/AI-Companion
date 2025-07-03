@@ -1,720 +1,87 @@
-import React, { useState, useEffect, useCallback, useContext, useRef, useMemo } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { alpha, Zoom, Tooltip, IconButton, CircularProgress } from '@mui/material';
-import { styled, useTheme } from '@mui/material/styles';
-import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  InputAdornment,
-  Drawer,
-  AppBar,
-  Toolbar,
-  CssBaseline,
-  List,
-  Divider,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Badge,
-  Menu,
-  MenuItem,
-  Avatar,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  DialogContentText,
-  Snackbar,
-  Alert,
-  useMediaQuery,
-} from '@mui/material';
-
-// Icons
-import MenuIcon from '@mui/icons-material/Menu';
-import SendIcon from '@mui/icons-material/Send';
-import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import MessageIcon from '@mui/icons-material/Message';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import BotIcon from '@mui/icons-material/SmartToyOutlined';
+import { useMediaQuery } from '@mui/material';
+import { Menu, X } from 'lucide-react';
 
 // Context
-import { useAuth } from '../contexts/AuthContext';
 import { useConversationContext } from '../contexts/ConversationContext';
-import { useSnackbar } from 'notistack';
 
 // Components
-import ConversationList from '../components/conversations/ConversationList';
-import MessageBubble from '../components/chat/MessageBubble';
-
-// Styled Components
-const drawerWidth = 300;
-
-const StyledDrawer = styled(Drawer)(({ theme, open }) => ({
-  width: drawerWidth,
-  flexShrink: 0,
-  whiteSpace: 'nowrap',
-  boxSizing: 'border-box',
-  '& .MuiDrawer-paper': {
-    width: drawerWidth,
-    borderRight: 'none',
-    boxShadow: theme.shadows[3],
-    position: 'relative',
-    height: '100vh',
-    transition: theme.transitions.create('width', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-    [theme.breakpoints.down('md')]: {
-      position: 'fixed',
-      zIndex: theme.zIndex.drawer + 1,
-      '&.MuiDrawer-paper': {
-        width: '100%',
-        maxWidth: 380,
-      },
-    },
-  },
-  ...(!open && {
-    '& .MuiDrawer-paper': {
-      overflowX: 'hidden',
-      transition: theme.transitions.create('width', {
-        easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.leavingScreen,
-      }),
-      width: 0,
-      [theme.breakpoints.up('sm')]: {
-        width: theme.spacing(9) + 1,
-      },
-    },
-  }),
-}));
-
-const DrawerHeader = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: theme.spacing(0, 2),
-  ...theme.mixins.toolbar,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-}));
-
-const MainContent = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
-  ({ theme, open }) => ({
-    flexGrow: 1,
-    padding: theme.spacing(0),
-    transition: theme.transitions.create('margin', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.leavingScreen,
-    }),
-    marginLeft: 0,
-    height: '100vh',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    [theme.breakpoints.up('md')]: {
-      marginLeft: 0,
-      width: `calc(100% - ${open ? drawerWidth : 73}px)`,
-      transition: theme.transitions.create(['width', 'margin'], {
-        easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.leavingScreen,
-      }),
-    },
-  })
-);
-
-const MobileHeader = styled(AppBar)(({ theme }) => ({
-  [theme.breakpoints.up('md')]: {
-    display: 'none',
-  },
-  zIndex: theme.zIndex.drawer + 1,
-}));
+import ConversationSidebar from '../components/conversations/ConversationSidebar';
+import ConversationChatArea from '../components/conversations/ConversationChatArea';
 
 const Conversations = () => {
-  // 1. All hooks must be called unconditionally at the top level
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const navigate = useNavigate();
   const { conversationId } = useParams();
-  const location = useLocation();
-  const { enqueueSnackbar } = useSnackbar();
-  const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  
   const { 
-    conversations = [], 
-    currentConversation = null, 
-    messages = [], 
-    isLoading = false, 
-    error: conversationError = null, 
-    loadConversations,
+    currentConversation,
+    isLoading,
     loadConversation,
-    createConversation: createConversationInContext,
-    updateConversation,
-    deleteConversation,
-    addMessage: addMessageInContext,
   } = useConversationContext();
-  
-  // 2. All state hooks at the top level
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isNewChat, setIsNewChat] = useState(false);
-  const [isDeletingId, setIsDeletingId] = useState(null);
-  const [messageInput, setMessageInput] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [error, setError] = useState(null);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  
-  // 3. Refs
-  const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
-  
-  // 4. Memoized values
-  const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const query = searchQuery.toLowerCase();
-    return conversations.filter(conv => 
-      (conv.title && conv.title.toLowerCase().includes(query)) ||
-      (conv.messages && conv.messages.some(msg => 
-        msg.content && msg.content.toLowerCase().includes(query)
-      ))
-    );
-  }, [conversations, searchQuery]);
 
-  // Handle new chat creation
-  const handleNewChat = useCallback(() => {
-    setIsNewChat(true);
-    setMessageInput('');
-    navigate('/conversations');
-    if (isMobile) {
-      setMobileOpen(false);
-    }
-  }, [isMobile, navigate]);
-
-  // 5. All callbacks
-  const handleSelectConversation = useCallback(async (conversation) => {
-    if (!conversation) {
-      setIsNewChat(true);
-      navigate('/conversations');
-      return;
-    }
-    
-    try {
-      await loadConversation(conversation.id);
-      navigate(`/conversations/${conversation.id}`);
-    } catch (err) {
-      console.error('Failed to load conversation:', err);
-      setError('Failed to load conversation');
-      enqueueSnackbar('Failed to load conversation', { variant: 'error' });
-    }
-  }, [loadConversation, navigate, enqueueSnackbar]);
-
-  const handleInputChange = useCallback((e) => {
-    setMessageInput(e.target.value);
-  }, []);
-
-  // Handle message submission
-  const handleSendMessage = useCallback(async (e) => {
-    e.preventDefault();
-    
-    if (!messageInput.trim() || !currentUser || isSending) return;
-    
-    const userMessage = {
-      id: Date.now().toString(),
-      content: messageInput,
-      role: 'user',
-      timestamp: new Date().toISOString()
-    };
-    
-    try {
-      setIsSending(true);
-      
-      // Create a new conversation if needed
-      if (isNewChat || !currentConversation) {
-        const newConversation = await createConversationInContext({
-          title: messageInput.slice(0, 30) + (messageInput.length > 30 ? '...' : ''),
-          messages: [userMessage]
-        });
-        
-        setIsNewChat(false);
-        navigate(`/conversations/${newConversation.id}`);
-      } else {
-        // Add message to existing conversation
-        await addMessageInContext(currentConversation.id, userMessage);
-      }
-      
-      // Clear input
-      setMessageInput('');
-      
-      // Here you would typically call your API to get a response
-      // For now, we'll just add a placeholder response
-      const botMessage = {
-        id: (Date.now() + 1).toString(),
-        content: 'This is a simulated response. In a real app, this would come from your AI service.',
-        role: 'assistant',
-        timestamp: new Date().toISOString()
-      };
-      
-      // Add bot's response
-      if (currentConversation) {
-        await addMessageInContext(currentConversation.id, botMessage);
-      }
-      
-    } catch (err) {
-      console.error('Failed to send message:', err);
-      // Handle error (e.g., show error message to user)
-    } finally {
-      setIsSending(false);
-    }
-  }, [messageInput, currentUser, currentConversation, isNewChat, createConversationInContext, addMessageInContext, navigate, isSending, enqueueSnackbar]);
-
-  // Handle key down for message input
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage(e);
-    }
-  }, [handleSendMessage]);
-
-  // Handle scroll events
-  const handleScroll = useCallback(() => {
-    if (!messagesContainerRef.current) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-    const isAtBottom = scrollHeight - scrollTop <= clientHeight + 100;
-    // setShowScrollToBottom(!isAtBottom);
-  }, []);
-
-  // Scroll to bottom when messages change
-  const scrollToBottom = useCallback(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: 'smooth',
+  // Load conversation when ID changes
+  useEffect(() => {
+    if (conversationId) {
+      console.log('Loading conversation:', conversationId);
+      loadConversation(conversationId).catch(error => {
+        console.error('Error loading conversation:', error);
+        // Handle error (e.g., show error message or redirect)
       });
-      setShowScrollToBottom(false);
+    } else {
+      // Handle case when there's no conversation ID (new conversation)
+      console.log('No conversation ID - new conversation flow');
     }
-  }, []);
+  }, [conversationId, loadConversation]);
 
-  // Auto-scroll to bottom when messages change
+  // Close mobile sidebar when conversation is selected
   useEffect(() => {
-    if (messages.length > 0) {
-      const timer = setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-      return () => clearTimeout(timer);
+    if (mobileSidebarOpen && conversationId) {
+      console.log('Closing mobile sidebar after conversation selection');
+      setMobileSidebarOpen(false);
     }
-  }, [messages, scrollToBottom]);
+  }, [conversationId, mobileSidebarOpen]);
 
-  // Handle conversation deletion
-  const handleDeleteConversation = useCallback(async (conversationId) => {
-    if (!conversationId) return;
-    
-    try {
-      setIsDeletingId(conversationId);
-      await deleteConversation(conversationId);
-      
-      // If the deleted conversation was the current one, navigate to conversations list
-      if (currentConversation?.id === conversationId) {
-        navigate('/conversations');
-      }
-      
-      enqueueSnackbar('Conversation deleted', { variant: 'success' });
-    } catch (err) {
-      console.error('Failed to delete conversation:', err);
-      enqueueSnackbar('Failed to delete conversation', { variant: 'error' });
-    } finally {
-      setIsDeletingId(null);
-    }
-  }, [currentConversation, deleteConversation, navigate, enqueueSnackbar]);
-
-  // Handle message deletion
-  const handleDeleteMessage = useCallback(async (messageId) => {
-    try {
-      // Implement message deletion logic here
-      console.log('Delete message:', messageId);
-      // Note: You'll need to implement the actual deletion in your ConversationContext
-    } catch (error) {
-      console.error('Error deleting message:', error);
-    }
-  }, []);
-
-  // Handle conversation selection from URL
-  useEffect(() => {
-    if (conversationId && conversations.length > 0) {
-      const conversation = conversations.find(c => c.id === conversationId);
-      if (conversation) {
-        handleSelectConversation(conversation);
-        setIsNewChat(false);
-      } else {
-        navigate('/conversations');
-      }
-    } else if (conversations.length > 0 && !conversationId) {
-      handleSelectConversation(conversations[0]);
-    }
-  }, [conversationId, conversations, navigate, handleSelectConversation]);
+  // Toggle mobile sidebar
+  const toggleSidebar = useCallback(() => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  }, [mobileSidebarOpen]);
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      height: '100vh', 
-      width: '100%',
-      overflow: 'hidden',
-      position: 'relative'
-    }}>
-      {/* Mobile Header */}
-      <MobileHeader>
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={() => setMobileOpen(true)}
-            sx={{ mr: 2 }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            {currentConversation?.title || 'New Chat'}
-          </Typography>
-        </Toolbar>
-      </MobileHeader>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-2 flex items-center justify-between">
+        <button
+          onClick={toggleSidebar}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+          aria-label="Toggle sidebar"
+        >
+          {mobileSidebarOpen ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Menu className="h-5 w-5" />
+          )}
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {currentConversation?.title || 'New Chat'}
+        </h1>
+        <div className="w-9"></div> {/* Spacer for alignment */}
+      </div>
 
       {/* Sidebar */}
-      <StyledDrawer
-        variant={isMobile ? 'temporary' : 'permanent'}
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        ModalProps={{
-          keepMounted: true, // Better open performance on mobile.
-        }}
-      >
-        <DrawerHeader>
-          <Typography variant="h6" noWrap>
-            Chats
-          </Typography>
-          <Box>
-            <Tooltip title="New Chat">
-              <IconButton onClick={handleNewChat} size="small">
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Refresh">
-              <IconButton onClick={loadConversations} size="small" disabled={isLoading}>
-                {isLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </DrawerHeader>
-        
-        <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" color="action" />
-                </InputAdornment>
-              ),
-              sx: {
-                backgroundColor: theme.palette.background.paper,
-                borderRadius: 2,
-              },
-            }}
-          />
-        </Box>
-        
-        <Box sx={{ overflowY: 'auto', flex: 1 }}>
-          <ConversationList
-            conversations={filteredConversations}
-            selectedConversationId={currentConversation?.id}
-            onSelectConversation={handleSelectConversation}
-            onDeleteConversation={handleDeleteConversation}
-            onCreateNew={() => handleSelectConversation(null)}
-            isLoading={isLoading}
-            isDeletingId={isDeletingId}
-          />
-        </Box>
-      </StyledDrawer>
+      <ConversationSidebar 
+        isMobileOpen={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+      />
 
-      {/* Main Content */}
-      <MainContent open={!isMobile}>
-        {currentConversation || isNewChat ? (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            height: '100%',
-            position: 'relative',
-            bgcolor: theme.palette.background.default,
-          }}>
-            {/* Messages Area */}
-            <Box
-              ref={messagesContainerRef}
-              onScroll={handleScroll}
-              sx={{
-                flex: 1,
-                overflowY: 'auto',
-                p: { xs: 2, sm: 3 },
-                '&::-webkit-scrollbar': {
-                  width: '6px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: 'transparent',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  backgroundColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
-                  borderRadius: '3px',
-                },
-              }}
-            >
-              {messages.length > 0 ? (
-                <Box sx={{ maxWidth: '900px', mx: 'auto', width: '100%' }}>
-                  {messages.map((message, index) => (
-                    <MessageBubble 
-                      key={message.id || index}
-                      message={message}
-                      isUser={message.role === 'user'}
-                      isLast={index === messages.length - 1}
-                      onDelete={handleDeleteMessage}
-                    />
-                  ))}
-                  <div ref={messagesEndRef} style={{ height: '1px' }} />
-                </Box>
-              ) : (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    textAlign: 'center',
-                    color: 'text.secondary',
-                    px: 2,
-                  }}
-                >
-                  <BotIcon sx={{ fontSize: 64, mb: 2, opacity: 0.2 }} />
-                  <Typography variant="h6" gutterBottom>
-                    How can I help you today?
-                  </Typography>
-                  <Typography variant="body2" sx={{ maxWidth: '500px' }}>
-                    Ask me anything, from creative ideas to technical explanations. 
-                    I'm here to assist you with your questions and tasks.
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-
-            {/* Scroll to bottom button */}
-            <Zoom in={false}>
-              <Box
-                onClick={scrollToBottom}
-                sx={{
-                  position: 'absolute',
-                  bottom: '100px',
-                  right: '24px',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  bgcolor: 'background.paper',
-                  boxShadow: theme.shadows[4],
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  zIndex: 10,
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  },
-                }}
-              >
-                <ArrowDropDownIcon />
-              </Box>
-            </Zoom>
-
-            {/* Input Area */}
-            <Box
-              component="form"
-              onSubmit={handleSendMessage}
-              sx={{
-                p: 2,
-                pt: 1.5,
-                borderTop: `1px solid ${theme.palette.divider}`,
-                bgcolor: 'background.paper',
-                position: 'sticky',
-                bottom: 0,
-                boxShadow: '0 -1px 3px rgba(0,0,0,0.05)',
-              }}
-            >
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 1.5, 
-                alignItems: 'center',
-                maxWidth: '900px',
-                mx: 'auto',
-                width: '100%',
-              }}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder="Type a message..."
-                  value={messageInput}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSending}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={handleSendMessage}
-                          disabled={!messageInput.trim() || isSending}
-                          color="primary"
-                        >
-                          {isSending ? <CircularProgress size={24} /> : <SendIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                    sx: {
-                      borderRadius: 2,
-                      backgroundColor: 'background.paper',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'divider',
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'primary.main',
-                      },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'primary.main',
-                        borderWidth: '1px',
-                      },
-                    }
-                  }}
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      padding: '12px 16px',
-                    },
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': {
-                        borderColor: 'divider',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                    },
-                  }}
-                />
-                <Tooltip 
-                  title={messageInput.trim() ? 'Send message' : 'Type a message to send'}
-                  placement="top"
-                >
-                  <span>
-                    <IconButton 
-                      type="submit" 
-                      color="primary"
-                      disabled={!messageInput.trim() || isSending}
-                      sx={{
-                        height: '48px',
-                        width: '48px',
-                        bgcolor: 'primary.main',
-                        color: 'primary.contrastText',
-                        borderRadius: 2,
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          bgcolor: 'primary.dark',
-                          transform: 'translateY(-1px)',
-                          boxShadow: theme.shadows[2],
-                        },
-                        '&:active': {
-                          transform: 'translateY(0)',
-                          boxShadow: 'none',
-                        },
-                        '&:disabled': {
-                          bgcolor: 'action.disabledBackground',
-                          color: 'action.disabled',
-                          transform: 'none',
-                          boxShadow: 'none',
-                        },
-                      }}
-                    >
-                      {isSending ? (
-                        <CircularProgress size={22} color="inherit" />
-                      ) : (
-                        <SendIcon />
-                      )}
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Box>
-              <Typography 
-                variant="caption" 
-                color="text.secondary"
-                sx={{
-                  display: 'block',
-                  textAlign: 'center',
-                  mt: 1,
-                  fontSize: '0.7rem',
-                }}
-              >
-                AI Companion may produce inaccurate information about people, places, or facts.
-              </Typography>
-            </Box>
-          </Box>
-        ) : (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              textAlign: 'center',
-              p: 3,
-              color: 'text.secondary',
-            }}
-          >
-            <Box
-              sx={{
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                bgcolor: 'action.hover',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 3,
-              }}
-            >
-              <MessageIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
-            </Box>
-            <Typography variant="h5" gutterBottom>
-              No conversation selected
-            </Typography>
-            <Typography color="textSecondary" paragraph sx={{ mb: 3, maxWidth: '400px' }}>
-              Select a conversation from the list or create a new one to get started.
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={handleNewChat}
-              sx={{ borderRadius: 2, px: 3, py: 1 }}
-            >
-              New Chat
-            </Button>
-          </Box>
-        )}
-      </MainContent>
-    </Box>
+      {/* Main content */}
+      <div className={`flex-1 flex flex-col h-full pt-12 md:pt-0`}>
+        <ConversationChatArea />
+      </div>
+    </div>
   );
 };
 

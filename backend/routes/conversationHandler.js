@@ -30,17 +30,29 @@ async function conversationHandler(req, res) {
       
       // POST / - Create a new conversation
       if (method === 'POST') {
-        const body = await parseRequestBody(req);
-        const { title = 'New Conversation', model = 'default', tags = [] } = body;
-        
-        const conversation = await FirestoreService.createConversation(userId, {
-          title,
-          model,
-          tags: tags || [],
-          messages: []
-        });
-        
-        return sendJsonResponse(res, 201, conversation);
+        try {
+          console.log('Received POST request to create conversation');
+          const body = await parseRequestBody(req);
+          console.log('Request body:', JSON.stringify(body, null, 2));
+          
+          const { title = 'New Conversation', model = 'default', tags = [] } = body;
+          
+          console.log('Creating conversation with data:', { title, model, tags });
+          
+          const conversation = await FirestoreService.createConversation(userId, {
+            title,
+            model,
+            tags: Array.isArray(tags) ? tags : [],
+            messages: []
+          });
+          
+          console.log('Successfully created conversation:', conversation.id);
+          return sendJsonResponse(res, 201, conversation);
+          
+        } catch (error) {
+          console.error('Error creating conversation:', error);
+          return sendErrorResponse(res, 500, `Failed to create conversation: ${error.message}`);
+        }
       }
       
       return sendErrorResponse(res, 405, 'Method not allowed');

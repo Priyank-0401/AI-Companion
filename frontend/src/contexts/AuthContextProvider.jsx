@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { onAuthStateChanged, signOut, getIdToken } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { AuthContext } from './AuthContext';
@@ -21,6 +21,15 @@ const getUserProfile = async (user) => {
     providerData: user.providerData?.[0]?.providerId || 'password',
     claims: token.claims || {}
   };
+};
+
+// Custom hook to use the auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
 
 export function AuthContextProvider({ children }) {
@@ -58,10 +67,7 @@ export function AuthContextProvider({ children }) {
         const [userProfile, token] = await Promise.all([
           getUserProfile(user),
           updateToken(user)
-        ]);
-        
-        console.log('User profile loaded:', userProfile);
-        
+        ]);        
         setState(prev => ({
           ...prev,
           user: userProfile,

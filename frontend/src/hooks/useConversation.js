@@ -102,31 +102,60 @@ export const useConversation = () => {
 
   // Create a new conversation
   const createConversation = useCallback(async (conversationData) => {
+    console.log('=== Starting createConversation ===');
+    console.log('Initial loading state:', isLoading);
+    
     setIsLoading(true);
     setError(null);
     
     try {
+      console.log('Calling createConversationApi with data:', {
+        title: conversationData.title || 'New Conversation',
+        model: conversationData.model || 'default',
+        tags: conversationData.tags || [],
+        messages: []
+      });
+      
       const newConversation = await createConversationApi({
         title: conversationData.title || 'New Conversation',
         model: conversationData.model || 'default',
-        tags: conversationData.tags || []
+        tags: conversationData.tags || [],
+        messages: []
       });
       
-      // Add the new conversation to the list
-      setConversations(prev => [newConversation, ...prev]);
+      console.log('Successfully created conversation:', newConversation);
       
-      // Load the new conversation
-      await loadConversation(newConversation.id);
+      // Update local state optimistically
+      console.log('Updating local state...');
+      setConversations(prev => {
+        console.log('Previous conversations:', prev);
+        const updated = [newConversation, ...prev];
+        console.log('Updated conversations:', updated);
+        return updated;
+      });
       
+      console.log('Setting current conversation...');
+      setCurrentConversation(newConversation);
+      setMessages([]);
+      
+      console.log('=== createConversation completed successfully ===');
       return newConversation;
     } catch (err) {
-      console.error('Failed to create conversation:', err);
+      console.error('=== ERROR in createConversation ===');
+      console.error('Error details:', {
+        name: err.name,
+        message: err.message,
+        status: err.status,
+        stack: err.stack
+      });
       setError(err.message || 'Failed to create conversation');
-      throw err;
+      throw err; // Re-throw to allow components to handle the error
     } finally {
+      console.log('Cleaning up loading state...');
       setIsLoading(false);
+      console.log('Final loading state:', false);
     }
-  }, [loadConversation, currentUser]);
+  }, [currentUser]);
 
   // Update a conversation
   const updateConversation = useCallback(async (conversationId, updates) => {

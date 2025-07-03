@@ -11,6 +11,8 @@ const ADD_MESSAGE = 'ADD_MESSAGE';
 const UPDATE_CONVERSATION = 'UPDATE_CONVERSATION';
 const SET_LOADING = 'SET_LOADING';
 const SET_ERROR = 'SET_ERROR';
+const SET_CONVERSATIONS = 'SET_CONVERSATIONS';
+const RESET_CONVERSATION_STATE = 'RESET_CONVERSATION_STATE';
 
 // Reducer function
 const conversationReducer = (state, action) => {
@@ -20,7 +22,11 @@ const conversationReducer = (state, action) => {
         ...state,
         currentConversation: action.payload,
         messages: action.payload?.messages || [],
-        isLoading: false,
+        loadingStates: {
+          ...state.loadingStates,
+          messages: false,
+          currentConversation: false
+        },
         error: null
       };
       
@@ -32,7 +38,11 @@ const conversationReducer = (state, action) => {
         currentConversation: state.currentConversation ? {
           ...state.currentConversation,
           updatedAt: new Date().toISOString()
-        } : null
+        } : null,
+        loadingStates: {
+          ...state.loadingStates,
+          sendingMessage: false
+        }
       };
     }
     
@@ -46,23 +56,66 @@ const conversationReducer = (state, action) => {
         } : null,
         conversations: state.conversations.map(conv => 
           conv.id === updates.id ? { ...conv, ...updates } : conv
-        )
+        ),
+        loadingStates: {
+          ...state.loadingStates,
+          updatingConversation: false
+        }
       };
     }
     
-    case SET_LOADING:
+    case SET_CONVERSATIONS: {
       return {
         ...state,
-        isLoading: action.payload,
-        error: action.payload ? state.error : null
+        conversations: action.payload.conversations,
+        loadingStates: {
+          ...state.loadingStates,
+          conversations: false
+        },
+        error: null
       };
+    }
+    
+    case SET_LOADING: {
+      const { key, isLoading } = action.payload;
+      return {
+        ...state,
+        loadingStates: {
+          ...state.loadingStates,
+          [key]: isLoading
+        },
+        error: isLoading ? state.error : null
+      };
+    }
       
-    case SET_ERROR:
+    case SET_ERROR: {
+      const { key, error } = action.payload;
       return {
         ...state,
-        error: action.payload,
-        isLoading: false
+        loadingStates: {
+          ...state.loadingStates,
+          [key]: false
+        },
+        error: error || 'An error occurred'
       };
+    }
+    
+    case RESET_CONVERSATION_STATE: {
+      return {
+        conversations: [],
+        currentConversation: null,
+        messages: [],
+        error: null,
+        loadingStates: {
+          conversations: false,
+          messages: false,
+          currentConversation: false,
+          sendingMessage: false,
+          updatingConversation: false,
+          deletingConversation: false
+        }
+      };
+    }
       
     default:
       return state;
@@ -75,8 +128,15 @@ export const ConversationProvider = ({ children }) => {
     conversations: [],
     currentConversation: null,
     messages: [],
-    isLoading: false,
-    error: null
+    error: null,
+    loadingStates: {
+      conversations: false,
+      messages: false,
+      currentConversation: false,
+      sendingMessage: false,
+      updatingConversation: false,
+      deletingConversation: false
+    }
   });
   
   const {
@@ -95,11 +155,12 @@ export const ConversationProvider = ({ children }) => {
   
   // Load conversations
   const loadConversationsList = useCallback(async () => {
-    dispatch({ type: SET_LOADING, payload: true });
+    dispatch({ type: SET_LOADING, payload: { key: 'conversations', isLoading: true } });
     try {
       await loadConversations();
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: error.message });
+      dispatch({ type: SET_ERROR, payload: { key: 'conversations', error: error.message } });
+      throw error;
     }
   }, [loadConversations]);
   
@@ -110,30 +171,67 @@ export const ConversationProvider = ({ children }) => {
       return;
     }
     
-    dispatch({ type: SET_LOADING, payload: true });
+    dispatch({ type: SET_LOADING, payload: { key: 'currentConversation', isLoading: true } });
     try {
-      await loadConversationFromHook(conversationId);
+      const conversation = await loadConversationFromHook(conversationId);
+      dispatch({ type: SET_CURRENT_CONVERSATION, payload: conversation });
+      return conversation;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: error.message });
+      dispatch({ type: SET_ERROR, payload: { key: 'currentConversation', error: error.message } });
+      throw error;
     }
   }, [loadConversationFromHook]);
   
   // Create a new conversation
   const createConversation = useCallback(async (conversationData) => {
-    dispatch({ type: SET_LOADING, payload: true });
+    const loadingKey = 'currentConversation';
+    
     try {
+      dispatch({ type: SET_LOADING, payload: { key: loadingKey, isLoading: true } });
+      
       const newConversation = await createConversationFromHook(conversationData);
-      dispatch({ type: SET_CURRENT_CONVERSATION, payload: newConversation });
+      
+      // Update the conversations list and set the current conversation
+      dispatch({ 
+        type: 'UPDATE_CONVERSATION',
+        payload: { 
+          updates: {
+            ...newConversation,
+            id: newConversation.id
+          }
+        }
+      });
+      
+      dispatch({ 
+        type: SET_CURRENT_CONVERSATION, 
+        payload: newConversation 
+      });
+      
       return newConversation;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: error.message });
+      console.error('Failed to create conversation:', error);
+      dispatch({ 
+        type: SET_ERROR, 
+        payload: { 
+          key: loadingKey, 
+          error: error.message || 'Failed to create conversation' 
+        } 
+      });
       throw error;
+    } finally {
+      // Ensure loading state is always reset
+      setTimeout(() => {
+        dispatch({ 
+          type: SET_LOADING, 
+          payload: { key: loadingKey, isLoading: false } 
+        });
+      }, 0);
     }
   }, [createConversationFromHook]);
   
   // Update a conversation
   const updateConversation = useCallback(async (conversationId, updates) => {
-    dispatch({ type: SET_LOADING, payload: true });
+    dispatch({ type: SET_LOADING, payload: { key: 'updatingConversation', isLoading: true } });
     try {
       const updatedConversation = await updateConversationFromHook(conversationId, updates);
       dispatch({ 
@@ -142,14 +240,14 @@ export const ConversationProvider = ({ children }) => {
       });
       return updatedConversation;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: error.message });
+      dispatch({ type: SET_ERROR, payload: { key: 'updatingConversation', error: error.message } });
       throw error;
     }
   }, [updateConversationFromHook]);
   
   // Delete a conversation
   const deleteConversation = useCallback(async (conversationId) => {
-    dispatch({ type: SET_LOADING, payload: true });
+    dispatch({ type: SET_LOADING, payload: { key: 'deletingConversation', isLoading: true } });
     try {
       await deleteConversationFromHook(conversationId);
       if (state.currentConversation?.id === conversationId) {
@@ -157,20 +255,20 @@ export const ConversationProvider = ({ children }) => {
       }
       return true;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: error.message });
+      dispatch({ type: SET_ERROR, payload: { key: 'deletingConversation', error: error.message } });
       throw error;
     }
   }, [deleteConversationFromHook, state.currentConversation]);
   
   // Add a message to the current conversation
   const addMessage = useCallback(async (messageData) => {
-    dispatch({ type: SET_LOADING, payload: true });
+    dispatch({ type: SET_LOADING, payload: { key: 'sendingMessage', isLoading: true } });
     try {
       const newMessage = await addMessageFromHook(messageData);
       dispatch({ type: ADD_MESSAGE, payload: { message: newMessage } });
       return newMessage;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: error.message });
+      dispatch({ type: SET_ERROR, payload: { key: 'sendingMessage', error: error.message } });
       throw error;
     }
   }, [addMessageFromHook]);
@@ -179,11 +277,16 @@ export const ConversationProvider = ({ children }) => {
   React.useEffect(() => {
     if (conversations) {
       dispatch({ 
-        type: 'SET_CONVERSATIONS', 
+        type: SET_CONVERSATIONS, 
         payload: { conversations } 
       });
     }
   }, [conversations]);
+  
+  // Helper function to get loading state
+  const getIsLoading = useCallback((key) => {
+    return state.loadingStates[key] || false;
+  }, [state.loadingStates]);
   
   // Effect to load conversations when user changes
   React.useEffect(() => {
@@ -200,8 +303,18 @@ export const ConversationProvider = ({ children }) => {
     conversations: state.conversations || conversations,
     currentConversation: state.currentConversation || currentConversation,
     messages: state.messages || messages,
-    isLoading: state.isLoading || isLoading,
     error: state.error || error,
+    
+    // Loading states
+    isLoading: Object.values(state.loadingStates).some(Boolean),
+    loadingStates: {
+      conversations: getIsLoading('conversations'),
+      messages: getIsLoading('messages'),
+      currentConversation: getIsLoading('currentConversation'),
+      sendingMessage: getIsLoading('sendingMessage'),
+      updatingConversation: getIsLoading('updatingConversation'),
+      deletingConversation: getIsLoading('deletingConversation')
+    },
     
     // Actions
     loadConversations: loadConversationsList,
@@ -212,7 +325,10 @@ export const ConversationProvider = ({ children }) => {
     addMessage,
     
     // Derived state
-    hasConversations: (state.conversations || conversations).length > 0
+    hasConversations: (state.conversations || conversations).length > 0,
+    
+    // Helper functions
+    getIsLoading
   };
   
   return (
@@ -231,7 +347,7 @@ export const useConversationContext = () => {
   return context;
 };
 
-// Export the context as a named export for better compatibility with Fast Refresh
+// Export the context as a named export
 export { ConversationContext };
 
 // Default export the provider for cleaner imports

@@ -142,19 +142,68 @@ export const signOutUser = async () => {
   }
 };
 
-// Get the current user's authentication token
+/**
+ * Get the current user's authentication token
+ * @returns {Promise<string>} The Firebase ID token
+ * @throws {Error} If no user is signed in or token retrieval fails
+ */
 export const getAuthToken = async () => {
   try {
+    console.log('Getting auth token...');
+    
+    // Get the current user
     const user = auth.currentUser;
+    
     if (!user) {
-      throw new Error('No user is currently signed in');
+      console.warn('No authenticated user found');
+      // Try to get the user from the auth state
+      return new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          unsubscribe(); // Remove the listener
+          
+          if (user) {
+            console.log('Retrieved user from auth state change');
+            user.getIdToken()
+              .then(resolve)
+              .catch(reject);
+          } else {
+            console.error('No user found even after auth state check');
+            reject(new Error('No user is currently signed in. Please sign in again.'));
+          }
+        }, (error) => {
+          console.error('Error in auth state observer:', error);
+          reject(new Error('Failed to check authentication status'));
+        });
+        
+        // Set a timeout in case the auth state change never resolves
+        setTimeout(() => {
+          unsubscribe();
+          reject(new Error('Authentication check timed out'));
+        }, 5000);
+      });
     }
     
-    // Get the ID token
-    const idToken = await user.getIdToken();
+    console.log('Getting ID token for user:', user.uid);
+    const idToken = await user.getIdToken(/* forceRefresh */ true);
+    
+    if (!idToken) {
+      throw new Error('Failed to retrieve authentication token');
+    }
+    
+    console.log('Successfully retrieved auth token');
     return idToken;
   } catch (error) {
-    console.error('Error getting auth token:', error);
+    console.error('Error in getAuthToken:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    
+    // Add more context to the error
+    if (error.message.includes('auth/network-request-failed')) {
+      throw new Error('Network error while authenticating. Please check your internet connection.');
+    }
+    
     throw error;
   }
 };

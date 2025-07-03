@@ -5,36 +5,67 @@ const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3
 
 // Helper function to handle API requests
 const fetchWithAuth = async (url, options = {}) => {
-  const token = await getAuthToken();
-  if (!token) {
-    throw new Error('Authentication required');
-  }
+  try {
+    console.log('Fetching auth token...');
+    const token = await getAuthToken();
+    
+    if (!token) {
+      console.error('No authentication token available');
+      throw new Error('Authentication required. Please sign in again.');
+    }
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers,
-    },
-    credentials: 'include',
-  });
+    console.log('Making authenticated request to:', url);
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+      credentials: 'include',
+    });
 
-  if (!response.ok) {
-    let errorMessage = 'Request failed';
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorMessage;
-    } catch (e) {
-      console.error('Failed to parse error response:', e);
+    if (!response.ok) {
+      let errorMessage = 'Request failed';
+      let errorData = null;
+      
+      try {
+        errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+        console.error('API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+      } catch (e) {
+        console.error('Failed to parse error response:', e);
+      }
+      
+      const error = new Error(errorMessage);
+      error.status = response.status;
+      error.data = errorData;
+      throw error;
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Error in fetchWithAuth:', {
+      message: error.message,
+      url,
+      status: error.status,
+      data: error.data
+    });
+    
+    // If it's an auth error, redirect to login
+    if (error.status === 401 || error.message.includes('No user is currently signed in')) {
+      // Store the current URL to redirect back after login
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+      // Redirect to login page
+      window.location.href = '/login';
     }
     
-    const error = new Error(errorMessage);
-    error.status = response.status;
     throw error;
   }
-
-  return response;
 };
 
 /**
@@ -93,14 +124,39 @@ export const getConversation = async (conversationId) => {
  * @returns {Promise<Object>} - The created conversation
  */
 export const createConversation = async (conversationData) => {
+  console.log('Sending conversation data to API:', conversationData);
   try {
     const response = await fetchWithAuth(`${API_BASE_URL}/conversations`, {
       method: 'POST',
-      body: JSON.stringify(conversationData)
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(conversationData),
+      credentials: 'include',
     });
-    return await response.json();
+
+    console.log('Received response status:', response.status);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Error response from server:', errorData);
+      const error = new Error(errorData.message || 'Failed to create conversation');
+      error.status = response.status;
+      error.data = errorData;
+      throw error;
+    }
+
+    const data = await response.json();
+    console.log('Successfully created conversation:', data);
+    return data;
+    
   } catch (error) {
-    console.error('Error in createConversation:', error);
+    console.error('Error in createConversation API call:', {
+      message: error.message,
+      status: error.status,
+      data: error.data,
+      stack: error.stack
+    });
     throw error;
   }
 };
