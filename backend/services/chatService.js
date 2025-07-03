@@ -1,5 +1,7 @@
-const { db } = require('../config/firebase-admin');
-const { v4: uuidv4 } = require('uuid');
+import admin, { db } from '../config/firebase-admin.js';
+import { v4 as uuidv4 } from 'uuid';
+
+const { FieldValue } = admin.firestore;
 
 const CONVERSATIONS_COLLECTION = 'conversations';
 
@@ -12,8 +14,8 @@ class ChatService {
       ...conversationData,
       id: conversationId,
       userId,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: conversationData.createdAt || admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: conversationData.createdAt || FieldValue.serverTimestamp()
     };
 
     await conversationRef.set(conversation, { merge: true });
@@ -53,4 +55,6 @@ class ChatService {
   }
 }
 
-module.exports = new ChatService();
+// Create and export a single instance of ChatService
+const chatService = new ChatService();
+export default chatService;

@@ -1,4 +1,4 @@
-    import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, MessageSquare, Brain, Heart, User, Smile, Coffee, 
   Trash2, MoreVertical, ChevronRight, ChevronDown,

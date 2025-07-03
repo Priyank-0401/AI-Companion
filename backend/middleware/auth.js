@@ -1,4 +1,4 @@
-const { admin } = require('../config/firebase-admin');
+import admin from '../config/firebase-admin.js';
 
 // CORS headers configuration
 const corsHeaders = {
@@ -145,9 +145,13 @@ const requireRole = (...roles) => {
   };
 };
 
-module.exports = { 
-  verifyToken, 
-  requireAuth, 
-  requireRole,
-  setupCors
+// Export the auth middleware functions and roles
+export { verifyToken, requireAuth, requireRole };
+
+export const ROLES = {
+  USER: 'user',
+  ADMIN: 'admin',
+  PREMIUM: 'premium'
 };
+
+export { setupCors };

@@ -21,6 +21,7 @@ const ChatPage = () => {
     conversationStyle,
     isLoading = false,
     isSending = false,
+    isLoadingSessions = false,
     resetChat,
     loadChatHistory,
     createNewSession,
@@ -33,6 +34,13 @@ const ChatPage = () => {
     activeChatDropdown = null,
     setActiveChatDropdown = () => {}
   } = useChat();
+  
+  // Ensure we have a conversation when the page loads
+  useEffect(() => {
+    if (!conversationId && !isLoadingSessions) {
+      createNewSession();
+    }
+  }, [conversationId, isLoadingSessions, createNewSession]);
 
   // Group chat history by date
   const groupedChatHistory = (chatHistory || []).reduce((groups, chat) => {

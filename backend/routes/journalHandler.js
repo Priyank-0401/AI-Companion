@@ -1,6 +1,10 @@
-const { parseRequestBody, sendJsonResponse, sendErrorResponse, readJsonFile, writeJsonFile } = require('../utils/helpers');
-const path = require('path');
-const url = require('url');
+import { parseRequestBody, sendJsonResponse, sendErrorResponse, readJsonFile, writeJsonFile } from '../utils/helpers.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory name in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const JOURNAL_DATA_FILE = path.join(__dirname, '../data/journal.json');
 
@@ -302,4 +306,5 @@ async function journalHandler(req, res) {
   }
 }
 
-module.exports = journalHandler;
+// Export the journalHandler as default
+export default journalHandler;

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { useConversationContext } from '../../contexts/ConversationContext.jsx';
+import { useConversationContext } from '../../contexts/ConversationContext';
 import { Card, CardContent, Typography, Box, IconButton, Tooltip, Chip, Stack } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon, Archive as ArchiveIcon } from '@mui/icons-material';
 

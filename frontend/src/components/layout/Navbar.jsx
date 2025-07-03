@@ -56,16 +56,33 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrolled]);
 
-  const navItems = [    
-    { path: '/', label: 'Home', icon: Home, public: true },
-    { path: '/dashboard', label: 'Dashboard', icon: BarChart3, public: false },
-    { path: '/avatar-call', label: 'Avatar', icon: User, public: false },
-    { path: '/chat', label: 'AI Chat', icon: MessageCircle, public: false },
-    { path: '/journal', label: 'Journal', icon: BookOpen, public: false },
-    { path: '/settings', label: 'Settings', icon: Settings, public: false },  
+  // Navigation items for authenticated users
+  const authNavItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+    { path: '/avatar-call', label: 'Seriva Call', icon: User },
+    { path: '/conversations', label: 'Conversations', icon: MessageSquareText },
+    { path: '/journal', label: 'Journal', icon: BookOpen },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
-  const isActive = (path) => location.pathname === path;
+  // Navigation items for non-authenticated users
+  const publicNavItems = [
+    { path: '/', label: 'Home', icon: Home },
+  ];
+  
+  // Show loading state while checking auth status
+  if (loading) {
+    return (
+      <div className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  const isActive = (path) => location.pathname.startsWith(path);
 
   const handleLogout = async () => {
     try {
@@ -76,11 +93,6 @@ const Navbar = () => {
       console.error('Failed to log out:', error);
     }
   };
-
-  // Filter navigation items based on authentication state
-  const filteredNavItems = !currentUser 
-    ? navItems.filter(item => item.public)
-    : navItems;
 
   return (
     <motion.nav 
@@ -116,47 +128,28 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            <NavLink 
-              to="/" 
-              icon={Home} 
-              label="Home" 
-              isActive={location.pathname === '/'} 
-            />
-            <NavLink 
-              to="/avatar-call" 
-              icon={User} 
-              label="Seriva Call" 
-              isActive={location.pathname === '/avatar-call'} 
-            />
-            <NavLink 
-              to="/conversations" 
-              icon={MessageSquareText} 
-              label="Conversations" 
-              isActive={location.pathname.startsWith('/conversations')} 
-            />
-            <NavLink 
-              to="/dashboard" 
-              icon={BarChart3} 
-              label="Dashboard" 
-              isActive={location.pathname === '/dashboard'} 
-            />
-            <NavLink 
-              to="/journal" 
-              icon={BookOpen} 
-              label="Journal" 
-              isActive={location.pathname === '/journal'} 
-            />
-            <NavLink 
-              to="/settings" 
-              icon={Settings} 
-              label="Settings" 
-              isActive={location.pathname === '/settings'} 
-            />
-          </div>
+          <div className="flex-1" />
 
-          <div className="hidden md:flex items-center space-x-2 ml-2">
+          <div className="hidden md:flex items-center space-x-1">
+            {/* Always show Home button */}
+            <NavLink
+              to="/"
+              icon={Home}
+              label="Home"
+              isActive={isActive('/')}
+            />
+            
+            {/* Show other navigation items when logged in */}
+            {currentUser && authNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                icon={item.icon}
+                label={item.label}
+                isActive={isActive(item.path)}
+              />
+            ))}
+            
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -169,19 +162,19 @@ const Navbar = () => {
                 <Moon className="w-5 h-5" />
               )}
             </button>
-
+            
             {/* Authentication Buttons */}
             {!loading && (
               <div className="flex items-center space-x-2">
-                {currentUser && !isRedirecting ? (
+                {currentUser ? (
                   <button
-                    onClick={handleLogout}
+                    onClick={logout}
                     className="group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-200 dark:border-red-900/30 hover:shadow-sm"
                   >
                     <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                     <span>Sign out</span>
                   </button>
-                ) : !currentUser ? (
+                ) : (
                   <>
                     <Link
                       to="/login"
@@ -196,7 +189,7 @@ const Navbar = () => {
                       Get Started
                     </Link>
                   </>
-                ) : null}
+                )}
               </div>
             )}
           </div>
@@ -221,29 +214,64 @@ const Navbar = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -20, height: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="md:hidden bg-white dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="md:hidden absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 shadow-lg rounded-b-lg overflow-hidden z-50"
           >
             <div className="space-y-1 px-2 pb-3 pt-2">
-              <NavLink 
-                to="/" 
-                icon={Home} 
-                label="Home" 
-                isActive={location.pathname === '/'} 
-                onClick={() => setIsOpen(false)}
-                className="w-full justify-start"
-              />
-              <NavLink 
-                to="/chat" 
-                icon={MessageCircle} 
-                label="Chat" 
-                isActive={location.pathname === '/chat'} 
-                onClick={() => setIsOpen(false)}
-                className="w-full justify-start"
-              />
+              {currentUser ? (
+                // Show all navigation items for authenticated users
+                <>
+                  {authNavItems.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      isActive={isActive(item.path)}
+                      onClick={() => setIsOpen(false)}
+                      className="w-full justify-start"
+                    />
+                  ))}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                  >
+                    <LogOut className="w-5 h-5 mr-2.5" />
+                    <span>Sign out</span>
+                  </button>
+                </>
+              ) : (
+                // Show only Home and auth buttons for non-authenticated users
+                <>
+                  <NavLink
+                    to="/"
+                    icon={Home}
+                    label="Home"
+                    isActive={isActive('/')}
+                    onClick={() => setIsOpen(false)}
+                    className="w-full justify-start"
+                  />
+                  <div className="px-4 py-2">
+                    <Link
+                      to="/login"
+                      className="block w-full text-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Log in
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className="block w-full text-center mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Get Started
+                    </Link>
+                  </div>
+                </>
+              )}
               <NavLink 
                 to="/conversations" 
                 icon={MessageSquareText} 

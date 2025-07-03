@@ -231,4 +231,8 @@ export const useConversationContext = () => {
   return context;
 };
 
-export default ConversationContext;
+// Export the context as a named export for better compatibility with Fast Refresh
+export { ConversationContext };
+
+// Default export the provider for cleaner imports
+export default ConversationProvider;

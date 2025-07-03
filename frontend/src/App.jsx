@@ -15,7 +15,7 @@ import Footer from './components/layout/Footer'
 import ChatProvider from './contexts/ChatContext/ChatProvider'
 import { AuthContextProvider } from './contexts/AuthContextProvider'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
-import { ConversationProvider } from './contexts/ConversationContext.jsx'
+import ConversationProvider from './contexts/ConversationContext'
 import ProtectedRoute from './components/ProtectedRoute'
 
 import './App.css'

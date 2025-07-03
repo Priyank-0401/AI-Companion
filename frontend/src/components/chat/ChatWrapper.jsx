@@ -282,6 +282,40 @@ const ChatWrapper = ({ mobileSidebarOpen, setMobileSidebarOpen }) => {
     }
   }, [isSpeaking, stopSpeaking]);
 
+  // Render loading state
+  if (isLoadingSessions) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-[calc(100vh-64px)] md:h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+        <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading conversations...</p>
+      </div>
+    );
+  }
+
+  // Render empty state if no messages and not loading
+  if (messages.length === 0 && !isLoading && !isSending) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-[calc(100vh-64px)] md:h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
+        <div className="text-center max-w-md">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 mb-4">
+            <MessageSquare className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No messages yet</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            Start a new conversation by sending a message below.
+          </p>
+          <button
+            onClick={handleSendMessage}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Start a new conversation
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}>
       {/* Messages Area - Takes up available space */}

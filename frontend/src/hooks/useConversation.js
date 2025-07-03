@@ -21,17 +21,23 @@ export const useConversation = () => {
 
   // Load user's conversations
   const loadConversations = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setConversations([]);
+      setCurrentConversation(null);
+      setMessages([]);
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
     
     try {
       const data = await getConversations();
-      setConversations(data);
+      setConversations(data || []);
     } catch (err) {
       console.error('Failed to load conversations:', err);
       setError(err.message || 'Failed to load conversations');
+      setConversations([]);
     } finally {
       setIsLoading(false);
     }
@@ -39,7 +45,7 @@ export const useConversation = () => {
 
   // Load a specific conversation
   const loadConversation = useCallback(async (conversationId) => {
-    if (!conversationId) {
+    if (!conversationId || !currentUser) {
       setCurrentConversation(null);
       setMessages([]);
       return;
@@ -58,29 +64,33 @@ export const useConversation = () => {
       // Load conversation data
       const conversation = await getConversation(conversationId);
       setCurrentConversation(conversation);
-      setMessages(conversation.messages || []);
+      setMessages(conversation?.messages || []);
       
-      // Subscribe to real-time updates
-      unsubscribeRef.current = subscribeToConversation(conversationId, (err, data) => {
-        if (err) {
-          console.error('Error in conversation subscription:', err);
-          setError('Connection to conversation lost. Please refresh the page.');
-          return;
-        }
-        
-        if (data) {
-          setCurrentConversation(prev => ({
-            ...prev,
-            ...data,
-            messages: data.messages || []
-          }));
-          setMessages(data.messages || []);
-        }
-      });
+      // Subscribe to real-time updates if we have a conversation
+      if (conversation) {
+        unsubscribeRef.current = subscribeToConversation(conversationId, (err, data) => {
+          if (err) {
+            console.error('Error in conversation subscription:', err);
+            setError('Connection to conversation lost. Please refresh the page.');
+            return;
+          }
+          
+          if (data) {
+            setCurrentConversation(prev => ({
+              ...prev,
+              ...data,
+              messages: data.messages || []
+            }));
+            setMessages(data.messages || []);
+          }
+        });
+      }
       
     } catch (err) {
       console.error('Failed to load conversation:', err);
       setError(err.message || 'Failed to load conversation');
+      setCurrentConversation(null);
+      setMessages([]);
     } finally {
       setIsLoading(false);
     }

@@ -220,7 +220,12 @@ export const chatApi = {
    */
   async getConversations() {
     try {
-      const response = await apiClient.get('chat/conversations');
+      const response = await apiClient.get('conversations', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       return response.data || [];
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -235,7 +240,12 @@ export const chatApi = {
    */
   async getConversation(conversationId) {
     try {
-      const response = await apiClient.get(`chat/conversations/${conversationId}`);
+      const response = await apiClient.get(`conversations/${conversationId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       return response.data || null;
     } catch (error) {
       console.error(`Error fetching conversation ${conversationId}:`, error);
@@ -250,7 +260,7 @@ export const chatApi = {
    */
   async deleteConversation(conversationId) {
     try {
-      await apiClient.delete(`chat/conversations/${conversationId}`);
+      await apiClient.delete(`conversations/${conversationId}`);
       return true;
     } catch (error) {
       console.error(`Error deleting conversation ${conversationId}:`, error);
@@ -264,12 +274,19 @@ export const chatApi = {
    * @returns {Promise<Object>} The saved conversation
    */
   async saveConversation(conversation) {
-    try {
-      const { id, ...conversationData } = conversation;
-      const response = id
-        ? await apiClient.put(`chat/conversations/${id}`, conversationData)
-        : await apiClient.post('chat/conversations', conversationData);
+    const isNew = !conversation.id;
+    const url = isNew 
+      ? 'conversations'
+      : `conversations/${conversation.id}`;
       
+    try {
+      const response = await apiClient.request(url, {
+        method: isNew ? 'POST' : 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(conversation),
+      });
       return response.data || null;
     } catch (error) {
       console.error('Error saving conversation:', error);
@@ -286,7 +303,7 @@ export const chatApi = {
   async exportConversation(conversationId, format = 'json') {
     try {
       const response = await apiClient.get(
-        `api/chat/conversations/${conversationId}/export?format=${format}`,
+        `conversations/${conversationId}/export?format=${format}`,
         { responseType: format === 'json' ? 'json' : 'blob' }
       );
       return response.data;

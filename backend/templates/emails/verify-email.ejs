@@ -1,0 +1,21 @@
+<%- include('base-email', { subject: 'Verify Your Email Address', to: data.email }) %>
+
+<h2>Verify Your Email Address</h2>
+
+<p>Hello<%= data.name ? ' ' + data.name : '' %>,</p>
+
+<p>Thank you for signing up with <%= appName %>! To complete your registration, please verify your email address by clicking the button below:</p>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="<%= data.verificationUrl %>" class="button">Verify Email Address</a>
+</div>
+
+<p>Or copy and paste this link into your browser:</p>
+<p style="word-break: break-all;"><%= data.verificationUrl %></p>
+
+<p>This verification link will expire in 24 hours. If you didn't create an account with us, you can safely ignore this email.</p>
+
+<p>If you're having trouble with the button above, copy and paste the URL below into your web browser:</p>
+<p><code><%= data.verificationUrl %></code></p>
+
+<p>Best regards,<br>The <%= appName %> Team</p>

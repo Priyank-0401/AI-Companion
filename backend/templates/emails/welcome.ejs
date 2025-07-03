@@ -1,0 +1,22 @@
+<%- include('base-email', { subject: 'Welcome to ' + appName, to: data.email }) %>
+
+<h2>Welcome to <%= appName %>, <%= data.name %>! 👋</h2>
+
+<p>We're thrilled to have you on board. Get ready to explore all the amazing features we have to offer.</p>
+
+<p>Here's what you can do next:</p>
+
+<ul>
+  <li>Complete your profile to personalize your experience</li>
+  <li>Start journaling your thoughts and feelings</li>
+  <li>Track your wellness journey with our tools</li>
+  <li>Connect with our AI companion for support and guidance</li>
+</ul>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="<%= data.dashboardUrl %>" class="button">Go to Dashboard</a>
+</div>
+
+<p>If you have any questions or need assistance, feel free to reply to this email or contact our support team.</p>
+
+<p>Best regards,<br>The <%= appName %> Team</p>

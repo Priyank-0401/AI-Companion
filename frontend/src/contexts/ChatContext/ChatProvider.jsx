@@ -44,11 +44,39 @@ const DEFAULT_MODEL_OPTIONS = [
 const ChatProvider = ({ children }) => {
   const { currentUser } = useAuth();
   
+  // Refs
+  const isMountedRef = useRef(true);
+  
   // State for conversations from Firestore
   const [sessions, setSessions] = useState([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [sessionsError, setSessionsError] = useState(null);
+  
+  // Format session data consistently
+  const formatSession = useCallback((session) => {
+    const parseDate = (dateValue, fallback = new Date()) => {
+      if (!dateValue) return fallback;
+      if (dateValue instanceof Date) return dateValue;
+      if (typeof dateValue === 'string') return new Date(dateValue);
+      if (dateValue.toDate) return dateValue.toDate();
+      return fallback;
+    };
+    
+    const createdAt = parseDate(session.createdAt);
+    const updatedAt = parseDate(session.updatedAt, createdAt);
+    
+    return {
+      id: session.id || uuidv4(),
+      title: session.title || 'New Chat',
+      messages: Array.isArray(session.messages) ? session.messages : [],
+      model: session.model || 'default',
+      style: session.style || 'supportive',
+      userId: session.userId || currentUser?.uid,
+      createdAt,
+      updatedAt
+    };
+  }, [currentUser?.uid]);
 
   const [currentSessionId, setCurrentSessionId] = useState(() => {
     try {
@@ -70,6 +98,37 @@ const ChatProvider = ({ children }) => {
   const [conversationStyle, setConversationStyle] = useState('supportive');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Group sessions by date
+  const groupedSessions = useMemo(() => {
+    const today = [];
+    const yesterday = [];
+    const last7Days = [];
+    const older = [];
+    const now = new Date();
+    
+    sessions.forEach(session => {
+      const sessionDate = session.updatedAt || session.createdAt;
+      const date = sessionDate instanceof Date ? sessionDate : new Date(sessionDate);
+      
+      if (isToday(date)) {
+        today.push(session);
+      } else if (isYesterday(date)) {
+        yesterday.push(session);
+      } else if (date > subDays(now, 7)) {
+        last7Days.push(session);
+      } else {
+        older.push(session);
+      }
+    });
+    
+    return [
+      { title: 'Today', sessions: today },
+      { title: 'Yesterday', sessions: yesterday },
+      { title: 'Previous 7 Days', sessions: last7Days },
+      { title: 'Older', sessions: older }
+    ].filter(group => group.sessions.length > 0);
+  }, [sessions]);
   const [isTyping, setIsTyping] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [activeChatDropdown, setActiveChatDropdown] = useState(null);
@@ -78,43 +137,30 @@ const ChatProvider = ({ children }) => {
   const abortControllerRef = useRef(null);
   const modelButtonRef = useRef(null);
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (force = false) => {
+    // If we're already loading and not forcing, return current sessions
+    if (isLoadingSessions && !force) {
+      console.log('Returning existing sessions - already loading');
+      return [...sessions]; // Return a copy of current sessions
+    }
+    
+    // If no user ID, set empty sessions and return
     if (!currentUser?.uid) {
-      console.log('No user ID, skipping fetch');
+      console.log('No user ID available, returning empty sessions');
       setSessions([]);
-      setIsLoadingSessions(false);
       return [];
     }
-  
+    
+    console.log('Fetching conversations for user:', currentUser.uid);
+    
     try {
-      console.log('Fetching conversations...');
+      setIsLoadingSessions(true);
       const data = await chatApi.getConversations();
       console.log('Fetched conversations:', data);
       
-      const formattedSessions = (Array.isArray(data) ? data : []).map(session => {
-        // Handle different date formats
-        const parseDate = (dateValue, fallback = new Date()) => {
-          if (!dateValue) return fallback;
-          if (dateValue instanceof Date) return dateValue;
-          if (typeof dateValue === 'string') return new Date(dateValue);
-          if (dateValue.toDate) return dateValue.toDate();
-          return fallback;
-        };
-        
-        const createdAt = parseDate(session.createdAt);
-        const updatedAt = parseDate(session.updatedAt, createdAt);
-        
-        return {
-          id: session.id || uuidv4(),
-          title: session.title || 'New Chat',
-          messages: Array.isArray(session.messages) ? session.messages : [],
-          model: session.model || 'default',
-          style: session.style || 'supportive',
-          userId: session.userId || currentUser.uid,
-          createdAt,
-          updatedAt
-        };
-      });
+      const formattedSessions = (Array.isArray(data) ? data : [])
+        .filter(session => session.userId === currentUser.uid)
+        .map(formatSession);
   
       const sortedSessions = formattedSessions.sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
@@ -126,29 +172,27 @@ const ChatProvider = ({ children }) => {
     } catch (error) {
       console.error('Error in fetchConversations:', error);
       setSessionsError(error);
-      setSessions([]);
-      return [];
+      // Don't clear sessions on error to prevent UI flicker
+      return sessions; // Return current sessions on error
     } finally {
-      setIsLoadingSessions(false);
+      if (isMountedRef.current) {
+        setIsLoadingSessions(false);
+      }
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, isLoadingSessions, sessions]);
 
-  // Load a session
   const loadSession = useCallback(async (sessionId) => {
-    if (!currentUser?.uid) {
-      console.warn('No user authenticated, cannot load session');
-      return false;
-    }
+    if (!sessionId || !currentUser?.uid) return false;
+    
+    console.log(`Loading session: ${sessionId}`);
+    setIsLoadingSession(true);
+    setSessionError(null);
     
     try {
-      setIsLoadingSession(true);
-      setSessionError(null);
-      
-      console.log(`Loading session ${sessionId}...`);
       const session = await chatApi.getConversation(sessionId);
       
       if (!session) {
-        console.warn(`Session ${sessionId} not found`);
+        console.warn(`Session not found: ${sessionId}`);
         setSessionError(new Error('Session not found'));
         return false;
       }
@@ -225,21 +269,6 @@ const ChatProvider = ({ children }) => {
     }
   }, [currentUser?.uid]);
 
-  // Switch to a different session
-  const switchSession = useCallback((sessionId) => {
-    const session = sessions.find(s => s.id === sessionId);
-    if (!session) return false;
-    
-    setCurrentSessionId(session.id);
-    
-    // Update URL with session ID
-    window.history.pushState({}, '', `/chat/${sessionId}`);
-    
-    return true;
-  }, [sessions]);
-
-  // Clear all chat sessions
-
   // Create a new session
   const createNewSession = useCallback(async () => {
     if (!currentUser?.uid) {
@@ -305,6 +334,107 @@ const ChatProvider = ({ children }) => {
     }
   }, [currentUser?.uid]);
 
+  // Track previous user ID to prevent unnecessary reloads
+  const prevUserIdRef = useRef(null);
+  const isInitialLoad = useRef(true);
+
+  const loadData = useCallback(async () => {
+    const currentUserId = currentUser?.uid;
+    
+    // If no user ID or same as previous, just return without loading
+    if (!currentUserId || currentUserId === prevUserIdRef.current) {
+      if (!currentUserId) {
+        console.log('No user ID, skipping session load');
+        setSessions([]);
+      }
+      return;
+    }
+    
+    // Update the previous user ID
+    prevUserIdRef.current = currentUserId;
+    
+    console.log('Starting to load chat data...');
+    
+    try {
+      const sessions = await fetchConversations();
+      
+      if (!isMountedRef.current) return;
+      
+      console.log(`Loaded ${sessions.length} sessions for user: ${currentUser.uid}`);
+      
+      // Only auto-load or create sessions when on the chat page
+      if (window.location.pathname === '/chat') {
+        if (sessions.length > 0) {
+          // If we have a current session ID, try to load it
+          if (currentSessionId) {
+            const sessionExists = sessions.some(s => s.id === currentSessionId);
+            if (sessionExists) {
+              console.log('Loading existing session:', currentSessionId);
+              await loadSession(currentSessionId);
+              return;
+            }
+          }
+          
+          // Otherwise load the most recent session
+          if (sessions.length > 0) {
+            console.log('Loading most recent session:', sessions[0].id);
+            await loadSession(sessions[0].id);
+          }
+        } else if (isInitialLoad.current) {
+          // Only create a new session on initial load
+          console.log('No sessions found, creating new session');
+          await createNewSession();
+        }
+      }
+    } catch (error) {
+      console.error('Error loading chat data:', error);
+      
+      // Only create a new session on initial load if we're on the chat page
+      if (isMountedRef.current && isInitialLoad.current && window.location.pathname === '/chat') {
+        console.log('Error loading sessions, creating new session');
+        await createNewSession();
+      }
+    } finally {
+      if (isMountedRef.current) {
+        console.log('Finished loading chat data');
+        isInitialLoad.current = false;
+      }
+    }
+  }, [currentUser?.uid, fetchConversations, loadSession, createNewSession, currentSessionId]);
+
+  // Load data effect - only run when currentUser changes
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Only load if we have a user and it's different from previous
+    if (currentUser?.uid && currentUser.uid !== prevUserIdRef.current) {
+      loadData();
+    }
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [currentUser?.uid, loadData]);
+
+
+
+  // Switch to a different session
+  const switchSession = useCallback((sessionId) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return false;
+    
+    setCurrentSessionId(session.id);
+    
+    // Update URL with session ID
+    window.history.pushState({}, '', `/chat/${sessionId}`);
+    
+    return true;
+  }, [sessions]);
+
+  // Clear all chat sessions
+
+
+
   const clearAllSessions = useCallback(async () => {
     if (!currentUser) return false;
     
@@ -331,153 +461,6 @@ const ChatProvider = ({ children }) => {
     }
   },[sessions, currentUser, createNewSession]);
 
-
-  // Load conversations on mount and when currentUser changes
-  // Track if we've already attempted to load data
-  const hasLoadedData = useRef(false);
-  const isInitialLoad = useRef(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadData = async () => {
-      // Skip if no user or we've already loaded data
-      if (!currentUser?.uid || hasLoadedData.current) {
-        return;
-      }
-      
-      console.log('Loading chat data...');
-      hasLoadedData.current = true;
-      
-      try {
-        setIsLoadingSessions(true);
-        const sessions = await fetchConversations();
-        
-        if (!isMounted) return;
-        
-        console.log(`Loaded ${sessions.length} sessions`);
-        
-        // Only create a new session on initial load if there are no sessions
-        if (isInitialLoad.current) {
-          isInitialLoad.current = false;
-          
-          if (sessions.length > 0) {
-            // If we have sessions, load the first one
-            if (!currentSessionId) {
-              console.log('Loading first session:', sessions[0].id);
-              await loadSession(sessions[0].id);
-            }
-          } else {
-            // If no sessions, create a new one
-            console.log('No sessions found, creating new session');
-            await createNewSession();
-          }
-        }
-      } catch (error) {
-        console.error('Error loading chat data:', error);
-        // Only create a new session on initial load if we encounter an error
-        if (isMounted && isInitialLoad.current) {
-          console.log('Error loading sessions, creating new session');
-          await createNewSession();
-          isInitialLoad.current = false;
-        }
-      } finally {
-        if (isMounted) {
-          console.log('Finished loading chat data');
-          setIsLoadingSessions(false);
-        }
-      }
-    };
-    
-    loadData();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUser?.uid, currentSessionId]); // Removed dependencies that could cause loops
-  
-  // Group chats by date for the sidebar
-  const groupedSessions = useMemo(() => {
-    const now = new Date();
-    const today = [];
-    const yesterday = [];
-    const last7Days = [];
-    const older = [];
-    
-    sessions.forEach(session => {
-      const sessionDate = new Date(session.updatedAt || session.createdAt);
-      
-      if (isToday(sessionDate)) {
-        today.push(session);
-      } else if (isYesterday(sessionDate)) {
-        yesterday.push(session);
-      } else if (sessionDate > subDays(now, 7)) {
-        last7Days.push(session);
-      } else {
-        older.push(session);
-      }
-    });
-    
-    return { today, yesterday, last7Days, older };
-  }, [sessions]);
-
-  // Update messages when session changes
-  useEffect(() => {
-    if (!currentSessionId) {
-      const welcomeMessage = getInitialBotMessage();
-      setMessages([welcomeMessage]);
-      return;
-    }
-    
-    const currentSession = sessions.find(s => s.id === currentSessionId);
-    if (currentSession) {
-      // If the session has no messages, add the welcome message
-      if (!currentSession.messages || currentSession.messages.length === 0) {
-        const welcomeMessage = getInitialBotMessage();
-        const updatedSession = {
-          ...currentSession,
-          messages: [welcomeMessage],
-          lastMessage: welcomeMessage.content
-        };
-        
-        setMessages([welcomeMessage]);
-        
-        // Update the session in the sessions list
-        setSessions(prev => 
-          prev.map(s => s.id === currentSessionId ? updatedSession : s)
-        );
-      } else {
-        // If the session already has messages, use them
-        setMessages(currentSession.messages);
-      }
-    } else {
-      // If no session is found, show the welcome message
-      const welcomeMessage = getInitialBotMessage();
-      setMessages([welcomeMessage]);
-    }
-  }, [currentSessionId, sessions]);
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modelButtonRef.current && !modelButtonRef.current.contains(event.target)) {
-        setShowModelDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Abort any ongoing requests when needed
-  const abortCurrentRequest = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  }, []);
 
   // Update a session with new data
   const updateSession = useCallback(async (sessionId, updates) => {

@@ -1,6 +1,6 @@
-const { parseRequestBody, sendJsonResponse, sendErrorResponse } = require('../utils/helpers');
-const url = require('url');
-const chatService = require('../services/chatService');
+import { parseRequestBody, sendJsonResponse, sendErrorResponse } from '../utils/helpers.js';
+import { URL } from 'url';
+import chatService from '../services/chatService.js';
 
 // CORS headers configuration
 const corsHeaders = {
@@ -338,4 +338,5 @@ async function chatHandler(req, res) {
   }
 }
 
-module.exports = chatHandler;
+// Export the chatHandler as default
+export default chatHandler;

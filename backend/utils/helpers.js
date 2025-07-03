@@ -1,8 +1,13 @@
 /**
  * Helper utilities for the server
  */
-const fs = require('fs').promises;
-const path = require('path');
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory name in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Read JSON file
@@ -149,7 +154,22 @@ async function safeFileOperation(operation) {
   }
 }
 
-module.exports = {
+// Export all helper functions
+export const parseRequestBody = parseBody;
+export const sendJsonResponse = sendJSON;
+export const sendErrorResponse = sendError;
+export { 
+  readJsonFile,
+  writeJsonFile,
+  corsHeaders,
+  validateRequiredFields,
+  generateId,
+  formatDate,
+  safeFileOperation
+};
+
+// Export default object with all helpers for backward compatibility
+const helpers = {
   parseRequestBody: parseBody,
   sendJsonResponse: sendJSON,
   sendErrorResponse: sendError,
@@ -160,4 +180,6 @@ module.exports = {
   generateId,
   formatDate,
   safeFileOperation
-}
+};
+
+export default helpers;

@@ -8,38 +8,42 @@ import {
   CircularProgress,
   Paper,
   Divider,
+  useTheme,
+  useMediaQuery,
+  Avatar,
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
-  useTheme,
-  useMediaQuery
+  Fade,
+  Zoom
 } from '@mui/material';
 import { 
   Send as SendIcon, 
+  ArrowBack as BackIcon,
   MoreVert as MoreIcon, 
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Archive as ArchiveIcon,
-  Unarchive as UnarchiveIcon,
-  Tag as TagIcon,
   ContentCopy as CopyIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Person as PersonIcon,
+  SmartToy as BotIcon
 } from '@mui/icons-material';
-import { useConversationContext } from '../../contexts/ConversationContext.jsx';
-import { format } from 'date-fns';
+import { useChat } from '../../contexts/ChatContext';
+import { format, formatDistanceToNow } from 'date-fns';
 
-const MessageBubble = ({ message, isUser, isLast }) => {
+const MessageBubble = ({ message, isUser, isLast, onDelete }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [anchorEl, setAnchorEl] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
   
-  const handleMenuOpen = (e) => {
-    e.stopPropagation();
-    setAnchorEl(e.currentTarget);
+  const handleMenuClick = (event) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
   };
-  
+
   const handleMenuClose = () => {
     setAnchorEl(null);
   };
@@ -49,415 +53,586 @@ const MessageBubble = ({ message, isUser, isLast }) => {
     handleMenuClose();
   };
   
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(message.id);
+    }
+    handleMenuClose();
+  };
+  
+  // Format timestamp if available
+  const formattedTime = message.timestamp 
+    ? formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })
+    : null;
+
   return (
     <Box
-      sx={{
-        display: 'flex',
-        justifyContent: isUser ? 'flex-end' : 'flex-start',
-        mb: isLast ? 0 : 2,
-        px: isMobile ? 1 : 2,
-      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: isUser ? 'flex-end' : 'flex-start',
+        mb: isLast ? 2 : 1,
+        position: 'relative',
+        px: 2,
+        '&:hover': {
+          '& .message-actions': {
+            opacity: 1,
+            transform: 'translateY(0)',
+          },
+        },
+      }}
     >
+      {/* Message content */}
       <Box
         sx={{
-          maxWidth: isMobile ? '90%' : '80%',
-          minWidth: '120px',
-          position: 'relative',
+          display: 'flex',
+          flexDirection: isUser ? 'row-reverse' : 'row',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          maxWidth: { xs: '100%', sm: '85%', md: '75%' },
         }}
       >
-        <Paper
-          elevation={isHovered ? 2 : 0}
+        {/* Avatar */}
+        <Box
           sx={{
-            p: 2,
-            borderRadius: 2,
-            backgroundColor: isUser 
-              ? theme.palette.primary.light 
-              : theme.palette.grey[100],
-            color: isUser 
-              ? theme.palette.primary.contrastText 
-              : theme.palette.text.primary,
-            borderTopLeftRadius: isUser ? 12 : 4,
-            borderTopRightRadius: isUser ? 4 : 12,
-            position: 'relative',
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            bgcolor: isUser ? theme.palette.primary.main : theme.palette.grey[300],
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            mt: 0.5,
           }}
         >
-          {!isUser && (
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                display: 'block', 
-                mb: 0.5,
-                fontWeight: 'bold',
-                color: isUser 
-                  ? theme.palette.primary.contrastText 
-                  : theme.palette.primary.main,
-              }}
-            >
-              {message.role === 'assistant' ? 'AI Assistant' : 'User'}
-            </Typography>
+          {isUser ? (
+            <PersonIcon sx={{ color: 'white', fontSize: 18 }} />
+          ) : (
+            <BotIcon sx={{ color: 'text.primary', fontSize: 18 }} />
           )}
-          
+        </Box>
+
+        {/* Message bubble */}
+        <Box
+          sx={{
+            position: 'relative',
+            p: 2,
+            borderRadius: 3,
+            bgcolor: isUser ? 'primary.main' : 'background.paper',
+            color: isUser ? 'primary.contrastText' : 'text.primary',
+            boxShadow: theme.shadows[1],
+            border: `1px solid ${
+              isUser ? 'transparent' : theme.palette.divider
+            }`,
+            maxWidth: '100%',
+            '&:hover': {
+              boxShadow: theme.shadows[2],
+            },
+          }}
+        >
           <Typography 
             variant="body1" 
             sx={{ 
-              whiteSpace: 'pre-wrap',
+              whiteSpace: 'pre-wrap', 
               wordBreak: 'break-word',
+              lineHeight: 1.6,
+              fontSize: '0.95rem',
               '& a': {
-                color: isUser 
-                  ? theme.palette.primary.contrastText 
-                  : theme.palette.primary.main,
-                textDecoration: 'underline',
-              }
+                color: isUser ? '#90caf9' : theme.palette.primary.main,
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline',
+                },
+              },
+              '& pre': {
+                backgroundColor: isUser ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.03)',
+                borderRadius: 1,
+                p: 1.5,
+                overflowX: 'auto',
+                fontSize: '0.9em',
+                margin: '0.8em 0',
+                '& code': {
+                  fontFamily: 'monospace',
+                  fontSize: '0.9em',
+                },
+              },
+              '& code': {
+                fontFamily: 'monospace',
+                fontSize: '0.9em',
+                backgroundColor: isUser ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                padding: '0.2em 0.4em',
+                borderRadius: '0.3em',
+              },
             }}
             dangerouslySetInnerHTML={{ 
-              __html: message.content.replace(/\n/g, '<br />')
+              __html: message.content
+                .replace(/\n/g, '<br />')
+                .replace(/```([\s\S]*?)```/gs, (_, code) => {
+                  // Handle multi-line code blocks with syntax highlighting
+                  return `<pre><code>${code}</code></pre>`;
+                })
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
             }}
           />
           
-          <Box 
-            sx={{ 
-              display: 'flex', 
+          {/* Timestamp */}
+          <Box
+            sx={{
+              display: 'flex',
               justifyContent: 'flex-end',
+              alignItems: 'center',
               mt: 0.5,
-              opacity: isHovered ? 1 : 0.5,
-              transition: 'opacity 0.2s',
+              gap: 0.5,
+              opacity: isHovered ? 1 : 0.7,
+              transition: 'opacity 0.2s ease',
             }}
           >
-            <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
-              {message.timestamp ? format(new Date(message.timestamp), 'h:mm a') : 'Just now'}
-            </Typography>
-          </Box>
-          
-          {isHovered && (
+            {formattedTime && (
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.7rem',
+                  color: isUser ? 'rgba(255, 255, 255, 0.8)' : 'text.secondary',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {formattedTime}
+              </Typography>
+            )}
+            
+            {/* Message actions */}
             <Box 
-              sx={{ 
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                bgcolor: 'rgba(0,0,0,0.1)',
-                borderRadius: '50%',
+              className="message-actions"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                opacity: 0,
+                transform: 'translateY(2px)',
+                transition: 'all 0.2s ease',
+                ml: 1,
               }}
             >
-              <IconButton 
-                size="small" 
-                onClick={handleMenuOpen}
-                sx={{ p: 0.5 }}
-              >
-                <MoreIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title="Copy">
+                <IconButton
+                  size="small"
+                  onClick={handleCopy}
+                  sx={{
+                    p: 0.5,
+                    color: isUser ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                    '&:hover': {
+                      color: isUser ? '#fff' : 'text.primary',
+                      bgcolor: isUser ? 'rgba(255, 255, 255, 0.15)' : 'action.hover',
+                    },
+                  }}
+                >
+                  <CopyIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+              
+              {isUser && (
+                <Tooltip title="Delete">
+                  <IconButton
+                    size="small"
+                    onClick={handleMenuClick}
+                    sx={{
+                      p: 0.5,
+                      color: isUser ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                      '&:hover': {
+                        color: 'error.main',
+                        bgcolor: isUser ? 'rgba(255, 255, 255, 0.15)' : 'action.hover',
+                      },
+                    }}
+                  >
+                    <DeleteIcon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
-          )}
-        </Paper>
-        
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MenuItem onClick={handleCopy}>
-            <ListItemIcon>
-              <CopyIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Copy</ListItemText>
-          </MenuItem>
-        </Menu>
+          </Box>
+        </Box>
       </Box>
+      
+      {/* Message menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleMenuClose}
+        TransitionComponent={Fade}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={handleCopy}>
+          <ListItemIcon>
+            <CopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDelete}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText primaryTypographyProps={{ color: 'error' }}>
+            Delete
+          </ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
 
-const ConversationView = ({ conversation, onBack, onUpdate }) => {
+const ConversationView = ({ onBack }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { 
-    messages, 
-    isLoading, 
-    addMessage, 
-    updateConversation, 
-    deleteConversation 
-  } = useConversationContext();
+    currentSession: conversation, 
+    sendMessage, 
+    isSending, 
+    deleteMessage 
+  } = useChat();
   
-  const [newMessage, setNewMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [message, setMessage] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
   const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-  
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-  
-  // Focus input when conversation changes
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [conversation?.id]);
-  
-  const handleSendMessage = useCallback(async (e) => {
+  const messagesContainerRef = useRef(null);
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
+    if (!message.trim() || isSending) return;
     
-    if (!newMessage.trim() || isSubmitting) return;
-    
-    const messageContent = newMessage.trim();
-    setNewMessage('');
-    setIsSubmitting(true);
+    const content = message.trim();
+    setMessage('');
     
     try {
-      // Add user message
-      await addMessage({
+      await sendMessage({
+        content,
         role: 'user',
-        content: messageContent,
+        timestamp: new Date().toISOString(),
       });
-      
-      // Add AI response (this would be handled by the server in a real app)
-      // For now, we'll just add a placeholder
-      await addMessage({
-        role: 'assistant',
-        content: 'I\'m an AI assistant. In a real implementation, I would generate a response based on your message.',
-      });
-      
     } catch (error) {
       console.error('Failed to send message:', error);
-    } finally {
-      setIsSubmitting(false);
+      // Show error to user
     }
-  }, [newMessage, isSubmitting, addMessage]);
-  
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage(e);
     }
   };
-  
-  const handleMenuOpen = (e) => {
-    setAnchorEl(e.currentTarget);
+
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop <= clientHeight + 100; // 100px threshold
+    setIsScrolled(!isAtBottom);
   };
-  
-  const handleMenuClose = () => {
-    setAnchorEl(null);
+
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+      setIsScrolled(false);
+    }
   };
-  
-  const handleArchive = async () => {
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversation?.messages]);
+
+  const handleDeleteMessage = async (messageId) => {
     try {
-      await updateConversation(conversation.id, { isArchived: !conversation.isArchived });
-      handleMenuClose();
+      await deleteMessage(conversation.id, messageId);
     } catch (error) {
-      console.error('Failed to update conversation:', error);
+      console.error('Failed to delete message:', error);
     }
   };
-  
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
-      try {
-        await deleteConversation(conversation.id);
-        onBack();
-      } catch (error) {
-        console.error('Failed to delete conversation:', error);
-      }
-    }
-    handleMenuClose();
-  };
-  
+
   if (!conversation) {
     return (
       <Box 
         sx={{ 
           display: 'flex', 
-          flexDirection: 'column', 
+          justifyContent: 'center', 
           alignItems: 'center', 
-          justifyContent: 'center',
           height: '100%',
-          textAlign: 'center',
-          p: 3
+          bgcolor: 'background.default',
         }}
       >
-        <Typography variant="h6" color="text.secondary" gutterBottom>
-          No conversation selected
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Select a conversation from the list or create a new one to get started.
-        </Typography>
+        <CircularProgress />
       </Box>
     );
   }
-  
+
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        height: '100%',
-        bgcolor: 'background.default',
-      }}
-    >
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100%',
+      bgcolor: 'background.default',
+      position: 'relative',
+    }}>
       {/* Header */}
       <Box 
         sx={{ 
           p: 2, 
-          borderBottom: 1, 
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
+          borderBottom: `1px solid ${theme.palette.divider}`,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: 2,
+          bgcolor: 'background.paper',
+          zIndex: 1,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          position: 'sticky',
+          top: 0,
         }}
       >
-        <Box display="flex" alignItems="center">
-          {isMobile && (
+        {isMobile && (
+          <Tooltip title="Back to conversations">
             <IconButton 
-              onClick={onBack}
-              edge="start"
-              sx={{ mr: 1 }}
+              onClick={onBack} 
+              size="small"
+              sx={{
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+              }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <BackIcon />
             </IconButton>
-          )}
-          
-          <Box>
-            <Typography variant="h6" noWrap>
-              {conversation.title || 'Untitled Conversation'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {conversation.updatedAt 
-                ? `Updated ${format(new Date(conversation.updatedAt), 'MMM d, yyyy h:mm a')}`
-                : 'Just now'}
-            </Typography>
-          </Box>
-        </Box>
-        
-        <Box>
-          <IconButton onClick={handleMenuOpen}>
-            <MoreIcon />
-          </IconButton>
-          
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
+          </Tooltip>
+        )}
+        <Typography 
+          variant="h6" 
+          noWrap
+          sx={{
+            fontWeight: 600,
+            fontSize: '1.1rem',
+            color: 'text.primary',
+          }}
+        >
+          {conversation.title || 'New Chat'}
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title="Refresh conversation">
+          <IconButton 
+            size="small" 
+            onClick={() => window.location.reload()}
+            sx={{
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
           >
-            <MenuItem onClick={handleArchive}>
-              <ListItemIcon>
-                {conversation.isArchived ? <UnarchiveIcon fontSize="small" /> : <ArchiveIcon fontSize="small" />}
-              </ListItemIcon>
-              <ListItemText>
-                {conversation.isArchived ? 'Unarchive' : 'Archive'}
-              </ListItemText>
-            </MenuItem>
-            
-            <MenuItem onClick={handleDelete}>
-              <ListItemIcon>
-                <DeleteIcon fontSize="small" color="error" />
-              </ListItemIcon>
-              <ListItemText primaryTypographyProps={{ color: 'error' }}>
-                Delete
-              </ListItemText>
-            </MenuItem>
-          </Menu>
-        </Box>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
-      
+
       {/* Messages */}
       <Box 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
         sx={{ 
           flex: 1, 
           overflowY: 'auto', 
-          p: isMobile ? 1 : 2,
+          p: { xs: 1, sm: 2 },
           bgcolor: 'background.default',
+          '&::-webkit-scrollbar': {
+            width: '6px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+            borderRadius: '3px',
+            '&:hover': {
+              background: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)',
+            },
+          },
+          scrollBehavior: 'smooth',
         }}
       >
-        {isLoading && messages.length === 0 ? (
-          <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-            <CircularProgress />
-          </Box>
-        ) : messages.length === 0 ? (
-          <Box 
-            display="flex" 
-            flexDirection="column" 
-            alignItems="center" 
-            justifyContent="center" 
-            height="100%"
-            textAlign="center"
-            p={3}
-          >
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              Start a new conversation
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Type a message below to begin chatting with the AI assistant.
-            </Typography>
-          </Box>
-        ) : (
-          <Box>
-            {messages.map((message, index) => (
-              <MessageBubble
-                key={message.id || index}
-                message={message}
-                isUser={message.role === 'user'}
-                isLast={index === messages.length - 1}
+        {conversation.messages?.length > 0 ? (
+          <Box sx={{ maxWidth: '900px', mx: 'auto', width: '100%' }}>
+            {conversation.messages.map((msg, index) => (
+              <MessageBubble 
+                key={msg.id || index}
+                message={msg}
+                isUser={msg.role === 'user'}
+                isLast={index === conversation.messages.length - 1}
+                onDelete={handleDeleteMessage}
               />
             ))}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} style={{ height: '1px' }} />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              textAlign: 'center',
+              px: 2,
+              color: 'text.secondary',
+            }}
+          >
+            <BotIcon sx={{ fontSize: 64, mb: 2, opacity: 0.2 }} />
+            <Typography variant="h6" gutterBottom>
+              How can I help you today?
+            </Typography>
+            <Typography variant="body2" sx={{ maxWidth: '500px' }}>
+              Ask me anything, from creative ideas to technical explanations. 
+              I'm here to assist you with your questions and tasks.
+            </Typography>
           </Box>
         )}
       </Box>
-      
+
+      {/* Scroll to bottom button */}
+      <Zoom in={isScrolled}>
+        <Box
+          onClick={scrollToBottom}
+          sx={{
+            position: 'absolute',
+            bottom: '100px',
+            right: '24px',
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            bgcolor: 'background.paper',
+            boxShadow: theme.shadows[4],
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 10,
+            '&:hover': {
+              bgcolor: 'action.hover',
+            },
+          }}
+        >
+          <ArrowDropDownIcon />
+        </Box>
+      </Zoom>
+
       {/* Input area */}
       <Box 
         component="form" 
         onSubmit={handleSendMessage}
         sx={{ 
           p: 2, 
-          borderTop: 1, 
-          borderColor: 'divider',
+          pt: 1.5,
+          borderTop: `1px solid ${theme.palette.divider}`,
           bgcolor: 'background.paper',
+          position: 'sticky',
+          bottom: 0,
+          boxShadow: '0 -1px 3px rgba(0,0,0,0.05)',
         }}
       >
-        <Box display="flex" alignItems="flex-end">
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            gap: 1.5, 
+            alignItems: 'flex-end',
+            maxWidth: '900px',
+            mx: 'auto',
+            width: '100%',
+          }}
+        >
           <TextField
-            inputRef={inputRef}
             fullWidth
             multiline
-            maxRows={4}
+            maxRows={8}
             variant="outlined"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Message..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isSubmitting}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 4,
+            disabled={isSending}
+            InputProps={{
+              sx: {
+                borderRadius: 2,
                 bgcolor: 'background.paper',
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+                '&.Mui-focused': {
+                  bgcolor: 'background.paper',
+                  boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`,
+                },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'divider',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'divider',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.main',
+                  borderWidth: '1px',
+                },
               },
-              '& textarea': {
-                resize: 'vertical',
-                minHeight: '40px',
-                maxHeight: '200px',
-                overflowY: 'auto !important',
+            }}
+            sx={{
+              '& .MuiInputBase-input': {
+                py: 1.5,
+                px: 2,
+                fontSize: '0.95rem',
+                lineHeight: 1.5,
               },
             }}
           />
-          
-          <Tooltip title="Send">
-            <span> {/* Wrapper for tooltip on disabled button */}
+          <Tooltip 
+            title={message.trim() ? 'Send message' : 'Type a message to send'}
+            placement="top"
+          >
+            <span>
               <IconButton 
                 type="submit" 
-                color="primary" 
-                disabled={!newMessage.trim() || isSubmitting}
-                sx={{ ml: 1, height: '48px', width: '48px' }}
+                color="primary"
+                disabled={!message.trim() || isSending}
+                sx={{
+                  height: '48px',
+                  width: '48px',
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  borderRadius: 2,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                    transform: 'translateY(-1px)',
+                    boxShadow: theme.shadows[2],
+                  },
+                  '&:active': {
+                    transform: 'translateY(0)',
+                    boxShadow: 'none',
+                  },
+                  '&:disabled': {
+                    bgcolor: 'action.disabledBackground',
+                    color: 'action.disabled',
+                    transform: 'none',
+                    boxShadow: 'none',
+                  },
+                }}
               >
-                {isSubmitting ? (
-                  <CircularProgress size={24} />
+                {isSending ? (
+                  <CircularProgress size={22} color="inherit" />
                 ) : (
                   <SendIcon />
                 )}
@@ -465,12 +640,18 @@ const ConversationView = ({ conversation, onBack, onUpdate }) => {
             </span>
           </Tooltip>
         </Box>
-        
-        <Box mt={1} textAlign="center">
-          <Typography variant="caption" color="text.secondary">
-            {isMobile ? 'Tap to send' : 'Press Enter to send, Shift+Enter for new line'}
-          </Typography>
-        </Box>
+        <Typography 
+          variant="caption" 
+          color="text.secondary"
+          sx={{
+            display: 'block',
+            textAlign: 'center',
+            mt: 1,
+            fontSize: '0.7rem',
+          }}
+        >
+          AI Companion may produce inaccurate information about people, places, or facts.
+        </Typography>
       </Box>
     </Box>
   );

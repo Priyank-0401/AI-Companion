@@ -1,5 +1,7 @@
-const { db } = require('../config/firebase-admin');
-const { v4: uuidv4 } = require('uuid');
+import admin, { db } from '../config/firebase-admin.js';
+
+const { FieldValue } = admin.firestore;
+import { v4 as uuidv4 } from 'uuid';
 
 const CONVERSATIONS_COLLECTION = 'conversations';
 const MESSAGES_SUBCOLLECTION = 'messages';
@@ -45,16 +47,31 @@ class FirestoreService {
 
   // List user's conversations
   static async listConversations(userId, options = {}) {
-    let query = db.collection(CONVERSATIONS_COLLECTION)
-      .where('userId', '==', userId)
-      .orderBy('updatedAt', 'desc');
-
-    if (options.limit) {
-      query = query.limit(options.limit);
+    try {
+      // First get by userId
+      let query = db.collection(CONVERSATIONS_COLLECTION)
+        .where('userId', '==', userId);
+      
+      const snapshot = await query.get();
+      let conversations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort in memory
+      conversations.sort((a, b) => {
+        const dateA = a.updatedAt?.toDate ? a.updatedAt.toDate() : new Date(a.updatedAt);
+        const dateB = b.updatedAt?.toDate ? b.updatedAt.toDate() : new Date(b.updatedAt);
+        return dateB - dateA; // Sort by updatedAt descending
+      });
+      
+      // Apply limit if specified
+      if (options.limit) {
+        conversations = conversations.slice(0, options.limit);
+      }
+      
+      return conversations;
+    } catch (error) {
+      console.error('Error listing conversations:', error);
+      throw error;
     }
-
-    const snapshot = await query.get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
   // Update conversation
@@ -182,4 +199,5 @@ class FirestoreService {
   }
 }
 
-module.exports = FirestoreService;
+// Export the FirestoreService class as default
+export default FirestoreService;

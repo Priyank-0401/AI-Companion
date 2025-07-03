@@ -1,6 +1,6 @@
-const http = require('http')
-const https = require('https')
-const url = require('url')
+import http from 'http';
+import https from 'https';
+import { URL } from 'url';
 
 /**
  * Ollama Client for interacting with local Ollama server
@@ -439,4 +439,4 @@ class OllamaClient {
   }
 }
 
-module.exports = OllamaClient
+export default OllamaClient;

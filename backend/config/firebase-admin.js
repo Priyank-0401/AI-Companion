@@ -1,5 +1,5 @@
-require('dotenv').config();
-const admin = require('firebase-admin');
+import 'dotenv/config';
+import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 function initializeFirebase() {
@@ -58,8 +58,12 @@ function initializeFirebase() {
 // Initialize Firebase and get the instances
 const firebaseInstances = initializeFirebase();
 
-// Export the initialization function and instances
-module.exports = { 
-  ...firebaseInstances, // Spread the instances directly
-  initializeFirebase // Export the function for explicit initialization if needed
-};
+// Export the instances
+export const db = firebaseInstances.db;
+export const auth = firebaseInstances.auth;
+
+// Export initializeFirebase function
+export { initializeFirebase };
+
+// Export the admin instance as default
+export default firebaseInstances.admin;

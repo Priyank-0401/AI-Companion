@@ -1,6 +1,10 @@
-const { parseRequestBody, sendJsonResponse, sendErrorResponse, readJsonFile, writeJsonFile } = require('../utils/helpers');
-const path = require('path');
-const url = require('url');
+import { parseRequestBody, sendJsonResponse, sendErrorResponse, readJsonFile, writeJsonFile } from '../utils/helpers.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory name in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const SETTINGS_DATA_FILE = path.join(__dirname, '../data/settings.json');
 
@@ -292,4 +296,5 @@ async function settingsHandler(req, res) {
   }
 }
 
-module.exports = settingsHandler;
+// Export the settingsHandler as default
+export default settingsHandler;
