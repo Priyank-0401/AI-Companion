@@ -10,14 +10,10 @@ import {
   Menu, 
   X,
   User,
-  LogIn,  
-  LogOut,
-  UserPlus,
   Sun,
-  Moon,
-  MessageSquareText
+  Moon
 } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../auth/hooks/useAuth';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const NavLink = ({ to, icon: Icon, label, isActive, onClick, className = '' }) => (
@@ -30,7 +26,7 @@ const NavLink = ({ to, icon: Icon, label, isActive, onClick, className = '' }) =
         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50'
     } ${className}`}
   >
-    <Icon className="w-5 h-5 mr-2.5" />
+    <Icon className="w-5 h-5 mr-3" />
     <span>{label}</span>
   </Link>
 );
@@ -39,117 +35,98 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { currentUser, logout, loading, isRedirecting } = useAuth();
+  const navigate = useNavigate();  const { user, signOut, loading } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   // Handle scroll effect for navbar
   useEffect(() => {
     const handleScroll = () => {
-      const isScrolled = window.scrollY > 10;
-      if (isScrolled !== scrolled) {
-        setScrolled(isScrolled);
-      }
+      setScrolled(window.scrollY > 10);
     };
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [scrolled]);
+  }, []);
 
   // Navigation items for authenticated users
   const authNavItems = [
+    { path: '/', label: 'Home', icon: Home },
+    { path: '/avatar-call', label: 'Avatar Call', icon: User },
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-    { path: '/avatar-call', label: 'Seriva Call', icon: User },
-    { path: '/conversations', label: 'Conversations', icon: MessageSquareText },
+    { path: '/chat', label: 'Chat', icon: MessageCircle },
+    { path: '/conversations', label: 'Conversations', icon: MessageCircle },
     { path: '/journal', label: 'Journal', icon: BookOpen },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Navigation items for non-authenticated users
+  // Navigation items for public users
   const publicNavItems = [
     { path: '/', label: 'Home', icon: Home },
+    { path: '/login', label: 'Login', icon: User },
+    { path: '/signup', label: 'Sign Up', icon: User },
   ];
-  
-  // Show loading state while checking auth status
-  if (loading) {
-    return (
-      <div className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
-          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        </div>
-      </div>
-    );
-  }
 
-  const isActive = (path) => location.pathname.startsWith(path);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Failed to log out:', error);
+  const isActive = (path) => {
+    if (path === '/') {
+      return location.pathname === path;
     }
+    return location.pathname.startsWith(path);
   };
+
+
 
   return (
     <motion.nav 
-      className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-gray-200 dark:border-gray-800 backdrop-blur-md bg-white/80 dark:bg-gray-900/80 transition-all duration-300 ${
-        scrolled ? 'shadow-sm border-b border-gray-200 dark:border-gray-800' : ''
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
+        scrolled 
+          ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-gray-200 dark:border-gray-800 shadow-sm' 
+          : 'bg-transparent border-transparent'
       }`}
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3 group">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="relative h-10 w-10"
-            >
-              <img 
-                src="/logo.svg" 
-                alt="Seriva" 
-                className="h-full w-full object-contain"
-                onError={(e) => {
-                  // Fallback to PNG if SVG fails to load
-                  e.target.onerror = null;
-                  e.target.src = '/logo.png';
-                }}
-              />
-            </motion.div>
-            <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-500 bg-clip-text text-transparent">
-              Seriva
-            </span>
-          </Link>
+          <div className="flex-shrink-0">
+              <Link to="/" className="flex items-center">
+              <img src="/logo.svg" alt="Seriva Logo" className="h-8 w-8" />
+              <span className="ml-2 text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Seriva
+              </span>
+            </Link>
+          </div>
 
-          <div className="flex-1" />
-
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {/* Always show Home button */}
-            <NavLink
-              to="/"
-              icon={Home}
-              label="Home"
-              isActive={isActive('/')}
-            />
-            
-            {/* Show other navigation items when logged in */}
-            {currentUser && authNavItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                icon={item.icon}
-                label={item.label}
-                isActive={isActive(item.path)}
-              />
-            ))}
-            
+            {user ? (
+              // Show all navigation items for authenticated users
+              <div className="flex space-x-1">
+                {authNavItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    icon={item.icon}
+                    label={item.label}
+                    isActive={isActive(item.path)}
+                  />
+                ))}
+              </div>
+            ) : (
+              // Show only public navigation items for non-authenticated users
+              <div className="flex space-x-1">
+                {publicNavItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    icon={item.icon}
+                    label={item.label}
+                    isActive={isActive(item.path)}
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -162,53 +139,65 @@ const Navbar = () => {
                 <Moon className="w-5 h-5" />
               )}
             </button>
-            
+
             {/* Authentication Buttons */}
-            {!loading && (
-              <div className="flex items-center space-x-2">
-                {currentUser ? (
-                  <button
-                    onClick={logout}
-                    className="group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-200 dark:border-red-900/30 hover:shadow-sm"
-                  >
-                    <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                    <span>Sign out</span>
-                  </button>
+            <div className="flex items-center space-x-2 ml-2">
+              {!loading && (
+                user ? (
+                  <div className="flex items-center">
+                    <button
+                      onClick={signOut}
+                      className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      disabled={loading}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
                 ) : (
-                  <>
+                  <div className="flex items-center space-x-2">
                     <Link
                       to="/login"
-                      className="px-4 py-2.5 rounded-xl text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border border-indigo-200 dark:border-indigo-900/30 hover:shadow-sm"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                     >
                       Log in
                     </Link>
                     <Link
                       to="/signup"
-                      className="px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                      className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
                     >
                       Get Started
                     </Link>
-                  </>
-                )}
-              </div>
-            )}
+                  </div>
+                )
+              )}
+            </div>
           </div>
 
-          {/* Mobile Menu Button - Only show if there are navigation items */}
-          {(currentUser || publicNavItems.length > 1) && (
+          {/* Mobile Menu Button */}
+          <div className="flex md:hidden items-center space-x-2">
             <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-              aria-label="Toggle menu"
-              aria-expanded={isOpen}
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
-              {isOpen ? (
-                <X className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5" />
               ) : (
-                <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+                <Moon className="w-5 h-5" />
               )}
             </button>
-          )}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {isOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -220,20 +209,13 @@ const Navbar = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg rounded-b-xl overflow-hidden z-50"
+            className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg"
           >
             <div className="px-2 pt-2 pb-3 space-y-1">
-              {currentUser ? (
+              {user ? (
+
                 // Show all navigation items for authenticated users
                 <>
-                  <NavLink
-                    to="/"
-                    icon={Home}
-                    label="Home"
-                    isActive={isActive('/')}
-                    onClick={() => setIsOpen(false)}
-                    className="w-full justify-start"
-                  />
                   {authNavItems.map((item) => (
                     <NavLink
                       key={item.path}
@@ -245,95 +227,48 @@ const Navbar = () => {
                       className="w-full justify-start"
                     />
                   ))}
-                  <button
-                    onClick={handleLogout}
+                  <button                    onClick={() => {
+                      signOut();
+                      setIsOpen(false);
+                    }}
+
                     className="w-full flex items-center px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
                   >
-                    <LogOut className="w-5 h-5 mr-2.5" />
-                    <span>Sign out</span>
+                    <LogOut className="w-5 h-5 mr-3" />
+                    <span>Sign Out</span>
                   </button>
                 </>
               ) : (
-                // Show only Home and auth buttons for non-authenticated users
+                // Show only public navigation items for non-authenticated users
                 <>
-                  <NavLink
-                    to="/"
-                    icon={Home}
-                    label="Home"
-                    isActive={isActive('/')}
-                    onClick={() => setIsOpen(false)}
-                    className="w-full justify-start"
-                  />
-                  <div className="px-4 py-2">
+                  {publicNavItems.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      isActive={isActive(item.path)}
+                      onClick={() => setIsOpen(false)}
+                      className="w-full justify-start"
+                    />
+                  ))}
+                  <div className="px-2 pt-2 space-y-2">
                     <Link
                       to="/login"
-                      className="block w-full text-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                       onClick={() => setIsOpen(false)}
+                      className="block w-full text-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                     >
                       Log in
                     </Link>
                     <Link
                       to="/signup"
-                      className="block w-full text-center mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
                       onClick={() => setIsOpen(false)}
+                      className="block w-full text-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       Get Started
                     </Link>
                   </div>
                 </>
-              )}
-            </div>
-
-            <div className="pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">
-              <div className="px-2 py-2">
-                {/* Theme Toggle */}
-                <button
-                  onClick={toggleTheme}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-                >
-                  <div className="flex items-center">
-                    {theme === 'dark' ? (
-                      <Sun className="w-5 h-5 mr-2.5" />
-                    ) : (
-                      <Moon className="w-5 h-5 mr-2.5" />
-                    )}
-                    {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                  </div>
-                </button>
-              </div>
-
-              {/* Authentication Buttons */}
-              {!loading && (
-                <div className="px-2 pb-2">
-                  {currentUser ? (
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <LogOut className="w-5 h-5 mr-2.5" />
-                        Sign out
-                      </div>
-                    </button>
-                  ) : (
-                    <>
-                      <Link
-                        to="/login"
-                        onClick={() => setIsOpen(false)}
-                        className="block w-full px-4 py-3 rounded-xl text-sm font-medium text-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors mb-2"
-                      >
-                        Log in
-                      </Link>
-                      <Link
-                        to="/signup"
-                        onClick={() => setIsOpen(false)}
-                        className="block w-full px-4 py-3 rounded-xl text-sm font-medium text-center text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all"
-                      >
-                        Get Started
-                      </Link>
-                    </>
-                  )}
-                </div>
               )}
             </div>
           </motion.div>

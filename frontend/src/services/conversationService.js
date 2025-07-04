@@ -1,65 +1,116 @@
 import { auth } from '../config/firebase';
-import { getAuthToken } from './authService';
+import { getAuthToken } from '../auth/services/authService';
+import { getApiUrl } from './api';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api`;
 
-// Helper function to handle API requests
+// Helper function to handle API requests with authentication
 const fetchWithAuth = async (url, options = {}) => {
   try {
-    console.log('Fetching auth token...');
-    const token = await getAuthToken();
+    console.log('Preparing authenticated request to:', url);
     
-    if (!token) {
-      console.error('No authentication token available');
+    // Get authentication token
+    let token;
+    try {
+      token = await getAuthToken();
+      console.log('Successfully retrieved auth token');
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
       throw new Error('Authentication required. Please sign in again.');
     }
 
-    console.log('Making authenticated request to:', url);
-    const response = await fetch(url, {
+    // Prepare headers
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+    headers.set('Accept', 'application/json');
+    
+    // Always set the Authorization header with the token
+    headers.set('Authorization', `Bearer ${token}`);
+    
+    // For debugging
+    console.log('Using token in Authorization header:', token ? 'Token exists' : 'No token');
+    
+    // Prepare fetch options
+    const fetchOptions = {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers,
-      },
+      headers,
+      mode: 'cors',
       credentials: 'include',
+      cache: 'no-store',
+    };
+
+    console.log('Sending request with options:', {
+      method: fetchOptions.method || 'GET',
+      headers: Object.fromEntries(headers.entries()),
+      hasBody: !!fetchOptions.body
     });
 
+    // Make the request
+    const response = await fetch(url, fetchOptions);
+
+    // Log response details for debugging
+    console.log('Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    // Handle non-successful responses
     if (!response.ok) {
-      let errorMessage = 'Request failed';
+      let errorMessage = `Request failed with status ${response.status}`;
       let errorData = null;
       
       try {
-        errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-        console.error('API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-      } catch (e) {
-        console.error('Failed to parse error response:', e);
+        // Try to parse error response as JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+          console.error('API Error Response:', errorData);
+        } else {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+          console.error('API Error Text:', text);
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
       }
       
       const error = new Error(errorMessage);
       error.status = response.status;
       error.data = errorData;
+      error.statusText = response.statusText;
+      error.headers = Object.fromEntries(response.headers.entries());
       throw error;
     }
 
-    return response;
+    // Parse and return successful response
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      }
+      return await response.text();
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      throw new Error('Invalid response from server');
+    }
   } catch (error) {
-    console.error('Error in fetchWithAuth:', {
+    console.error('Request failed:', {
       message: error.message,
       url,
       status: error.status,
-      data: error.data
+      data: error.data,
+      stack: error.stack
     });
     
     // If it's an auth error, redirect to login
     if (error.status === 401 || error.message.includes('No user is currently signed in')) {
       // Store the current URL to redirect back after login
       sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+      // Clear any existing auth state
+      localStorage.removeItem('token');
       // Redirect to login page
       window.location.href = '/login';
     }
@@ -70,25 +121,58 @@ const fetchWithAuth = async (url, options = {}) => {
 
 /**
  * Get all conversations for the current user
- * @param {Object} options - Options for the request
- * @param {number} options.limit - Maximum number of conversations to return
+ * @param {Object} options - Options object
+ * @param {number} [options.limit] - Maximum number of conversations to return
+ * @returns {Promise<Array>} - Array of conversations
+ */
+/**
+ * Get all conversations for the current user
+ * @param {Object} options - Options object
+ * @param {number} [options.limit] - Maximum number of conversations to return
  * @returns {Promise<Array>} - Array of conversations
  */
 export const getConversations = async ({ limit } = {}) => {
   try {
-    const url = new URL(`${API_BASE_URL}/conversations`);
+    const url = new URL(getApiUrl('conversations'));
     if (limit) {
       url.searchParams.append('limit', limit);
     }
     
-    const response = await fetchWithAuth(url.toString());
+    const token = await getAuthToken();
+    console.log('Token for request:', token ? 'Token exists' : 'No token found');
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error = new Error(errorData.message || 'Failed to fetch conversations');
+      error.status = response.status;
+      error.data = errorData;
+      throw error;
+    }
+    
     return await response.json();
   } catch (error) {
-    console.error('Error in getConversations:', error);
-    if (error.status === 401) {
-      // Handle unauthorized (e.g., redirect to login)
+    console.error('Error in getConversations:', {
+      message: error.message,
+      status: error.status,
+      stack: error.stack
+    });
+    
+    if (error.status === 401 || error.message.includes('No user is currently signed in')) {
+      // Store the current URL to redirect back after login
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+      // Redirect to login page
       window.location.href = '/login';
     }
+    
     throw error;
   }
 };
@@ -137,7 +221,8 @@ export const createConversation = async (conversationData) => {
 
     console.log('Received response status:', response.status);
     
-    if (!response.ok) {
+    // Handle both 200 and 201 as success statuses
+    if (response.status !== 200 && response.status !== 201) {
       const errorData = await response.json().catch(() => ({}));
       console.error('Error response from server:', errorData);
       const error = new Error(errorData.message || 'Failed to create conversation');
@@ -166,19 +251,35 @@ export const createConversation = async (conversationData) => {
  * @param {string} conversationId - ID of the conversation to update
  * @param {Object} updates - Fields to update
  * @param {string} [updates.title] - New title for the conversation
- * @param {Array<string>} [updates.tags] - New tags for the conversation
+ * @param {string} [updates.model] - Model used for the conversation
+ * @param {Array<string>} [updates.tessages] - Messages in the conversation
  * @param {boolean} [updates.isArchived] - Whether the conversation is archived
  * @returns {Promise<Object>} - The updated conversation
  */
 export const updateConversation = async (conversationId, updates) => {
   try {
+    // First get the current conversation
+    const currentConversation = await getConversation(conversationId);
+    
+    // Merge updates with current conversation data
+    const updatedConversation = {
+      ...currentConversation,
+      ...updates,
+      id: conversationId,
+      updatedAt: new Date().toISOString()
+    };
+
+    console.log('Updating conversation with full object:', updatedConversation);
+    
     const response = await fetchWithAuth(`${API_BASE_URL}/conversations/${conversationId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates)
+      method: 'PUT',
+      body: JSON.stringify(updatedConversation)
     });
-    return await response.json();
+    
+    console.log('Update response:', response);
+    return response;
   } catch (error) {
-    console.error('Error in updateConversation:', error);
+    console.error('Error updating conversation:', error);
     throw error;
   }
 };

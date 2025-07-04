@@ -1,4 +1,4 @@
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../auth/context/AuthContext';
 import { format } from 'date-fns';
 
 const DashboardHeader = () => {

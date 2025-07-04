@@ -20,7 +20,7 @@ import {
   Clock,
   MessageSquare
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../auth/context/AuthContext';
 import { format } from 'date-fns';
 
 // Memoized message component to prevent unnecessary re-renders

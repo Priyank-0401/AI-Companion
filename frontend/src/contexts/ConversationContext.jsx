@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
-import { useAuth } from './AuthContext';
-import { useConversation } from '../hooks/useConversation';
+import React, { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
+import { useAuth } from '../auth/context/AuthContext';
+import { useFirestoreConversations } from '../hooks/useFirestoreConversations';
 
 // Create context
 const ConversationContext = createContext();
@@ -124,6 +124,7 @@ const conversationReducer = (state, action) => {
 
 export const ConversationProvider = ({ children }) => {
   const { currentUser } = useAuth();
+  
   const [state, dispatch] = useReducer(conversationReducer, {
     conversations: [],
     currentConversation: null,
@@ -140,65 +141,118 @@ export const ConversationProvider = ({ children }) => {
   });
   
   const {
-    conversations,
-    currentConversation,
-    messages,
-    isLoading,
-    error,
-    loadConversations,
-    loadConversation: loadConversationFromHook,
-    createConversation: createConversationFromHook,
-    updateConversation: updateConversationFromHook,
-    deleteConversation: deleteConversationFromHook,
-    addMessage: addMessageFromHook
-  } = useConversation();
+    conversations: hookConversations,
+    currentConversation: hookCurrentConversation,
+    messages: hookMessages,
+    loading: hookLoading,
+    error: hookError,
+    loadConversations: hookLoadConversations,
+    loadConversation: hookLoadConversation,
+    createConversation: hookCreateConversation,
+    updateConversation: hookUpdateConversation,
+    deleteConversation: hookDeleteConversation,
+    addMessage: hookAddMessage,
+    sendMessage: hookSendMessage,
+  } = useFirestoreConversations();
+  
+  // Sync hook state with context state
+  useEffect(() => {
+    if (hookConversations) {
+      dispatch({ 
+        type: SET_CONVERSATIONS, 
+        payload: { conversations: hookConversations } 
+      });
+    }
+    
+    if (hookCurrentConversation) {
+      dispatch({ 
+        type: SET_CURRENT_CONVERSATION, 
+        payload: hookCurrentConversation 
+      });
+    }
+    
+    if (hookError) {
+      dispatch({ 
+        type: SET_ERROR, 
+        payload: { 
+          key: 'general', 
+          error: typeof hookError === 'string' ? hookError : hookError?.message || 'An error occurred' 
+        } 
+      });
+    }
+    
+    // Sync loading states
+    if (hookLoading) {
+      Object.entries(hookLoading).forEach(([key, value]) => {
+        if (key === 'sending') {
+          dispatch({ 
+            type: SET_LOADING, 
+            payload: { 
+              key: 'sendingMessage', 
+              isLoading: value 
+            } 
+          });
+        } else if (['conversations', 'messages', 'currentConversation'].includes(key)) {
+          dispatch({ 
+            type: SET_LOADING, 
+            payload: { 
+              key, 
+              isLoading: value 
+            } 
+          });
+        }
+      });
+    }
+  }, [hookConversations, hookCurrentConversation, hookError, hookLoading]);
   
   // Load conversations
   const loadConversationsList = useCallback(async () => {
     dispatch({ type: SET_LOADING, payload: { key: 'conversations', isLoading: true } });
     try {
-      await loadConversations();
+      await hookLoadConversations();
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: { key: 'conversations', error: error.message } });
-      throw error;
+      const errorMessage = error?.message || 'Failed to load conversations';
+      dispatch({ type: SET_ERROR, payload: { key: 'conversations', error: errorMessage } });
+      throw new Error(errorMessage);
     }
-  }, [loadConversations]);
+  }, [hookLoadConversations]);
   
   // Load a specific conversation
-  const loadConversation = useCallback(async (conversationId) => {
+  const loadConversationById = useCallback(async (conversationId) => {
     if (!conversationId) {
       dispatch({ type: SET_CURRENT_CONVERSATION, payload: null });
-      return;
+      return null;
     }
     
     dispatch({ type: SET_LOADING, payload: { key: 'currentConversation', isLoading: true } });
     try {
-      const conversation = await loadConversationFromHook(conversationId);
+      const conversation = await hookLoadConversation(conversationId);
       dispatch({ type: SET_CURRENT_CONVERSATION, payload: conversation });
       return conversation;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: { key: 'currentConversation', error: error.message } });
-      throw error;
+      const errorMessage = error?.message || 'Failed to load conversation';
+      console.error('Error loading conversation:', errorMessage);
+      dispatch({ type: SET_ERROR, payload: { key: 'currentConversation', error: errorMessage } });
+      throw new Error(errorMessage);
+    } finally {
+      dispatch({ type: SET_LOADING, payload: { key: 'currentConversation', isLoading: false } });
     }
-  }, [loadConversationFromHook]);
+  }, [hookLoadConversation]);
   
   // Create a new conversation
-  const createConversation = useCallback(async (conversationData) => {
+  const createNewConversation = useCallback(async (conversationData) => {
     const loadingKey = 'currentConversation';
     
     try {
       dispatch({ type: SET_LOADING, payload: { key: loadingKey, isLoading: true } });
       
-      const newConversation = await createConversationFromHook(conversationData);
+      const newConversation = await hookCreateConversation(conversationData);
       
       // Update the conversations list and set the current conversation
       dispatch({ 
-        type: 'UPDATE_CONVERSATION',
+        type: UPDATE_CONVERSATION,
         payload: { 
-          updates: {
-            ...newConversation,
-            id: newConversation.id
-          }
+          updates: newConversation
         }
       });
       
@@ -209,79 +263,113 @@ export const ConversationProvider = ({ children }) => {
       
       return newConversation;
     } catch (error) {
-      console.error('Failed to create conversation:', error);
+      const errorMessage = error?.message || 'Failed to create conversation';
+      console.error('Failed to create conversation:', errorMessage);
       dispatch({ 
         type: SET_ERROR, 
         payload: { 
           key: loadingKey, 
-          error: error.message || 'Failed to create conversation' 
+          error: errorMessage
         } 
       });
-      throw error;
+      throw new Error(errorMessage);
     } finally {
-      // Ensure loading state is always reset
-      setTimeout(() => {
-        dispatch({ 
-          type: SET_LOADING, 
-          payload: { key: loadingKey, isLoading: false } 
-        });
-      }, 0);
+      dispatch({ 
+        type: SET_LOADING, 
+        payload: { key: loadingKey, isLoading: false } 
+      });
     }
-  }, [createConversationFromHook]);
+  }, [hookCreateConversation]);
   
   // Update a conversation
   const updateConversation = useCallback(async (conversationId, updates) => {
     dispatch({ type: SET_LOADING, payload: { key: 'updatingConversation', isLoading: true } });
     try {
-      const updatedConversation = await updateConversationFromHook(conversationId, updates);
+      const updatedConversation = await hookUpdateConversation(conversationId, updates);
       dispatch({ 
         type: UPDATE_CONVERSATION, 
         payload: { updates: { ...updates, id: conversationId } } 
       });
       return updatedConversation;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: { key: 'updatingConversation', error: error.message } });
-      throw error;
+      const errorMessage = error?.message || 'Failed to update conversation';
+      dispatch({ 
+        type: SET_ERROR, 
+        payload: { 
+          key: 'updatingConversation', 
+          error: errorMessage 
+        } 
+      });
+      throw new Error(errorMessage);
+    } finally {
+      dispatch({ 
+        type: SET_LOADING, 
+        payload: { key: 'updatingConversation', isLoading: false } 
+      });
     }
-  }, [updateConversationFromHook]);
+  }, [hookUpdateConversation]);
   
   // Delete a conversation
   const deleteConversation = useCallback(async (conversationId) => {
     dispatch({ type: SET_LOADING, payload: { key: 'deletingConversation', isLoading: true } });
     try {
-      await deleteConversationFromHook(conversationId);
+      await hookDeleteConversation(conversationId);
       if (state.currentConversation?.id === conversationId) {
         dispatch({ type: SET_CURRENT_CONVERSATION, payload: null });
       }
       return true;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: { key: 'deletingConversation', error: error.message } });
-      throw error;
+      const errorMessage = error?.message || 'Failed to delete conversation';
+      dispatch({ 
+        type: SET_ERROR, 
+        payload: { 
+          key: 'deletingConversation', 
+          error: errorMessage 
+        } 
+      });
+      throw new Error(errorMessage);
+    } finally {
+      dispatch({ 
+        type: SET_LOADING, 
+        payload: { key: 'deletingConversation', isLoading: false } 
+      });
     }
-  }, [deleteConversationFromHook, state.currentConversation]);
+  }, [hookDeleteConversation, state.currentConversation]);
   
   // Add a message to the current conversation
   const addMessage = useCallback(async (messageData) => {
     dispatch({ type: SET_LOADING, payload: { key: 'sendingMessage', isLoading: true } });
     try {
-      const newMessage = await addMessageFromHook(messageData);
+      const newMessage = await hookAddMessage(messageData);
       dispatch({ type: ADD_MESSAGE, payload: { message: newMessage } });
       return newMessage;
     } catch (error) {
-      dispatch({ type: SET_ERROR, payload: { key: 'sendingMessage', error: error.message } });
-      throw error;
+      const errorMessage = error?.message || 'Failed to add message';
+      dispatch({ 
+        type: SET_ERROR, 
+        payload: { 
+          key: 'sendingMessage', 
+          error: errorMessage 
+        } 
+      });
+      throw new Error(errorMessage);
+    } finally {
+      dispatch({ 
+        type: SET_LOADING, 
+        payload: { key: 'sendingMessage', isLoading: false } 
+      });
     }
-  }, [addMessageFromHook]);
+  }, [hookAddMessage]);
   
   // Effect to sync with hook state
   React.useEffect(() => {
-    if (conversations) {
+    if (hookConversations) {
       dispatch({ 
         type: SET_CONVERSATIONS, 
-        payload: { conversations } 
+        payload: { conversations: hookConversations } 
       });
     }
-  }, [conversations]);
+  }, [hookConversations]);
   
   // Helper function to get loading state
   const getIsLoading = useCallback((key) => {
@@ -298,41 +386,32 @@ export const ConversationProvider = ({ children }) => {
   }, [currentUser, loadConversationsList]);
   
   // Context value
-  const value = {
+  const contextValue = {
     // State
-    conversations: state.conversations || conversations,
-    currentConversation: state.currentConversation || currentConversation,
-    messages: state.messages || messages,
-    error: state.error || error,
+    conversations: state.conversations,
+    currentConversation: state.currentConversation,
+    messages: state.messages,
+    error: state.error,
     
     // Loading states
     isLoading: Object.values(state.loadingStates).some(Boolean),
-    loadingStates: {
-      conversations: getIsLoading('conversations'),
-      messages: getIsLoading('messages'),
-      currentConversation: getIsLoading('currentConversation'),
-      sendingMessage: getIsLoading('sendingMessage'),
-      updatingConversation: getIsLoading('updatingConversation'),
-      deletingConversation: getIsLoading('deletingConversation')
-    },
+    loadingStates: state.loadingStates,
     
     // Actions
     loadConversations: loadConversationsList,
-    loadConversation,
-    createConversation,
+    loadConversation: loadConversationById,
+    createConversation: createNewConversation,
     updateConversation,
     deleteConversation,
     addMessage,
+    sendMessage: hookSendMessage,
     
     // Derived state
-    hasConversations: (state.conversations || conversations).length > 0,
-    
-    // Helper functions
-    getIsLoading
+    hasConversations: state.conversations?.length > 0,
   };
-  
+
   return (
-    <ConversationContext.Provider value={value}>
+    <ConversationContext.Provider value={contextValue}>
       {children}
     </ConversationContext.Provider>
   );

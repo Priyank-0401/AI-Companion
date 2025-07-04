@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { chatApi } from '../../services/api';
 import ChatContext from './ChatContext';
 import { format, isToday, isYesterday, subDays, parseISO } from 'date-fns';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../../auth/context/AuthContext';
 
 // Helper function to create the initial bot message with a fresh Date object
 const getInitialBotMessage = () => ({

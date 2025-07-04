@@ -1,18 +1,21 @@
 // API Base URL from environment variable
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
+// Import auth functions
+import { getAuthToken } from '../auth/services/authService';
 
 /**
  * Helper function to construct API URLs consistently
  * @param {string} path - The API endpoint path
  * @returns {string} The full URL
  */
-function getApiUrl(path) {
+export function getApiUrl(path) {
   // Remove any trailing slashes from base URL and leading/trailing slashes from path
   const cleanBase = API_BASE_URL.replace(/\/+$/, '');
   const cleanPath = path.replace(/^\/+|\/+$/g, '');
   
-  // Only add /api/ if it's not already in the base URL or path
-  if (!cleanBase.includes('/api') && !cleanPath.startsWith('api/')) {
+  // Always add /api/ unless it's already in the base URL
+  if (!cleanBase.includes('/api')) {
     return `${cleanBase}/api/${cleanPath}`;
   }
   return `${cleanBase}/${cleanPath}`;
@@ -35,23 +38,61 @@ class ApiClient {
   async request(endpoint, options = {}) {
     const url = getApiUrl(endpoint);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(new Error('Request timeout')), 15000); // 15 second timeout
     
-    // Get the auth token from localStorage or cookies
-    let token = localStorage.getItem('token');
-    
-    // If no token in localStorage, try to get it from cookies
-    if (!token && typeof document !== 'undefined' && document.cookie) {
-      const match = document.cookie.match(/(?:^|;\s*)token=([^;]*)/);
-      if (match) token = decodeURIComponent(match[1]);
+    try {
+      // Always get a fresh token from Firebase
+      let token;
+      try {
+        token = await getAuthToken();
+        console.log('Using token for request to', endpoint);
+      } catch (error) {
+        console.error('Failed to get auth token:', error);
+        throw new Error('Authentication required');
+      }
+
+      // Ensure headers exist
+      const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+      };
+
+      // Make the fetch request
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+        credentials: 'include' // Important for cookies if using them
+      });
+
+      clearTimeout(timeoutId); // Clear the timeout
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(errorData.message || 'API request failed');
+        error.status = response.status;
+        error.data = errorData;
+        throw error;
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      // Don't throw here, let the request proceed without token
+      // The server will return 401 if auth is required
     }
     
-    const headers = new Headers();
-    headers.append('Content-Type', 'application/json');
+    const headers = new Headers(options.headers || {});
+    
+    // Set default headers if not already set
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
     
     // Include authorization header if token exists
     if (token) {
-      headers.append('Authorization', `Bearer ${token}`);
+      headers.set('Authorization', `Bearer ${token}`);
     }
     
     // Log the request for debugging

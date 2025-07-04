@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useConversationContext } from '../../contexts/ConversationContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../auth/context/AuthContext';
 import MessageList from '../chat/MessageList';
 import ChatInput from '../chat/ChatInput';
 import { Loader2, Mic, Paperclip, Smile, AlertCircle, RefreshCw, MessageSquare } from 'lucide-react';

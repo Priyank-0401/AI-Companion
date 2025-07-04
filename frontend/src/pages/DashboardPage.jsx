@@ -16,7 +16,7 @@ import {
   RefreshCw,
   Activity as ActivityIcon
 } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../auth/context/AuthContext';
 import { journalApi, chatApi } from '../services/api';
 import { useMoodTracking } from '../hooks/useMoodTracking';
 

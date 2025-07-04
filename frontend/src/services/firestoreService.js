@@ -28,68 +28,70 @@ const getCurrentUserId = () => {
   return user.uid;
 };
 
+// Helper functions for conversation operations
+const createConversation = async (title = 'New Chat', model = 'gpt-3.5-turbo') => {
+  const userID = getCurrentUserId();
+  const conversationData = {
+    userID,
+    title,
+    model,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(collection(db, CONVERSATIONS_COLLECTION), conversationData);
+  return { id: docRef.id, ...conversationData };
+};
+
+const getConversations = async (limit = 20) => {
+  const userID = getCurrentUserId();
+  const q = query(
+    collection(db, CONVERSATIONS_COLLECTION),
+    where('userID', '==', userID),
+    orderBy('updatedAt', 'desc'),
+    firestoreLimit(limit)
+  );
+
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+};
+
+const getConversation = async (conversationId) => {
+  const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
+  const docSnap = await getDoc(docRef);
+  
+  if (!docSnap.exists()) {
+    throw new Error('Conversation not found');
+  }
+  
+  return { id: docSnap.id, ...docSnap.data() };
+};
+
+const updateConversation = async (conversationId, updates) => {
+  const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: serverTimestamp()
+  });
+  return getConversation(conversationId);
+};
+
+const deleteConversation = async (conversationId) => {
+  const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
+  await deleteDoc(docRef);
+  // Note: Firestore will automatically delete subcollections in the background
+};
+
 // Conversation operations
 export const conversationService = {
-  // Create a new conversation
-  async createConversation(title = 'New Chat', model = 'gpt-3.5-turbo') {
-    const userID = getCurrentUserId();
-    const conversationData = {
-      userID,
-      title,
-      model,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    const docRef = await addDoc(collection(db, CONVERSATIONS_COLLECTION), conversationData);
-    return { id: docRef.id, ...conversationData };
-  },
-
-  // Get all conversations for current user
-  async getConversations(limit = 20) {
-    const userID = getCurrentUserId();
-    const q = query(
-      collection(db, CONVERSATIONS_COLLECTION),
-      where('userID', '==', userID),
-      orderBy('updatedAt', 'desc'),
-      firestoreLimit(limit)
-    );
-
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-  },
-
-  // Get a single conversation
-  async getConversation(conversationId) {
-    const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
-    const docSnap = await getDoc(docRef);
-    
-    if (!docSnap.exists()) {
-      throw new Error('Conversation not found');
-    }
-    
-    return { id: docSnap.id, ...docSnap.data() };
-  },
-
-  // Update conversation
-  async updateConversation(conversationId, updates) {
-    const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
-    await updateDoc(docRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
-    return this.getConversation(conversationId);
-  },
-
-  // Delete conversation
-  async deleteConversation(conversationId) {
-    const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
-    await deleteDoc(docRef);
-    // Note: Firestore will automatically delete subcollections in the background
-  },
+  createConversation,
+  getConversations,
+  getConversation,
+  updateConversation,
+  deleteConversation,
 
   // Subscribe to conversation updates
   subscribeToConversations(callback) {

@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ChatInterface from '../components/chat/ChatInterface';
 import ThemeContext from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContextProvider';
+import { useAuth } from '../auth/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 // Simple loading component

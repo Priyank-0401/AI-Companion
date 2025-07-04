@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmail, signInWithGoogle } from '../services/authService';
+import { useAuth } from '../auth/context/AuthContext';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Chrome, ArrowRight } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -16,25 +16,27 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
+  const { signIn, signInWithGoogle } = useAuth();
+
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     
     try {
-      const result = await signInWithEmail(email, password);
-      
-      if (result.success) {
-        navigate('/');
-      } else {
-        setError(result.error || 'Failed to sign in. Please check your credentials.');
-      }
+      await signIn(email, password);
+      navigate('/');
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError(err.message || 'An error occurred. Please try again.');
       console.error('Login error:', err);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const handleGoogleLogin = async () => {
@@ -42,13 +44,8 @@ const LoginPage = () => {
     setError('');
     
     try {
-      const result = await signInWithGoogle();
-      
-      if (result.success) {
-        navigate('/');
-      } else {
-        setError(result.error || 'Failed to sign in with Google.');
-      }
+      await signInWithGoogle();
+      navigate('/');
     } catch (err) {
       setError('An error occurred. Please try again.');
       console.error('Google sign in error:', err);

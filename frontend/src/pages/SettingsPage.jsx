@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, HelpCircle, AlertTriangle, Lock, FileText } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../auth/context/AuthContext';
 
 // Import components
 import ProfileSettings from '../components/settings/ProfileSettings';

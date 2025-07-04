@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { conversationService, messageService } from '../services/firestoreService';
-import { useAuth } from '../contexts/AuthContextProvider';
+import { useAuth } from '../auth/context/AuthContext';
 
 export const useFirestoreConversations = () => {
   const { currentUser } = useAuth();
@@ -45,29 +45,6 @@ export const useFirestoreConversations = () => {
   }, [currentUser]);
 
   // Load messages for current conversation
-  const loadMessages = useCallback(async (conversationId) => {
-    if (!conversationId) {
-      setMessages([]);
-      return;
-    }
-    
-    setLoading(prev => ({ ...prev, messages: true }));
-    setError(null);
-    
-    try {
-      // Set up real-time listener for messages
-      const unsubscribe = messageService.subscribeToMessages(conversationId, (updatedMessages) => {
-        setMessages(updatedMessages);
-        setLoading(prev => ({ ...prev, messages: false }));
-      });
-      
-      return unsubscribe;
-    } catch (err) {
-      console.error('Error loading messages:', err);
-      setError('Failed to load messages');
-      setLoading(prev => ({ ...prev, messages: false }));
-    }
-  }, []);
 
   // Create a new conversation
   const createConversation = async (title = 'New Chat', model = 'gpt-3.5-turbo') => {
@@ -151,6 +128,26 @@ export const useFirestoreConversations = () => {
     };
   }, [loadConversations]);
   
+  // Load messages for the current conversation
+  const loadMessages = useCallback((conversationId) => {
+    setLoading(prev => ({ ...prev, messages: true }));
+    setError(null);
+    
+    try {
+      const unsubscribe = messageService.subscribeToMessages(conversationId, (messages) => {
+        setMessages(messages);
+        setLoading(prev => ({ ...prev, messages: false }));
+      });
+      
+      return unsubscribe;
+    } catch (err) {
+      console.error('Error loading messages:', err);
+      setError('Failed to load messages');
+      setLoading(prev => ({ ...prev, messages: false }));
+      return () => {}; // Return empty cleanup function
+    }
+  }, []);
+
   // Load messages when conversation changes
   useEffect(() => {
     if (!currentConversation?.id) {
@@ -158,10 +155,12 @@ export const useFirestoreConversations = () => {
       return;
     }
     
-    const unsubscribeMessages = loadMessages(currentConversation.id);
+    const unsubscribe = loadMessages(currentConversation.id);
     
     return () => {
-      if (unsubscribeMessages) unsubscribeMessages();
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, [currentConversation?.id, loadMessages]);
 
@@ -169,6 +168,7 @@ export const useFirestoreConversations = () => {
     conversations,
     currentConversation,
     messages,
+    setMessages, // Expose setMessages to allow optimistic updates
     loading,
     error,
     createConversation,

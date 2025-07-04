@@ -7,7 +7,7 @@ import {
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useChat } from '../../contexts/ChatContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../auth/context/AuthContext';
 import { format, isToday, isYesterday, subDays, parseISO } from 'date-fns';
 
 // Group chats by date

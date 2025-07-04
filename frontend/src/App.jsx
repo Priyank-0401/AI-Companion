@@ -1,37 +1,44 @@
-import { BrowserRouter as Router, Routes, Route, useLocation, createBrowserRouter, RouterProvider } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { useEffect } from 'react'
-import Navbar from './components/layout/Navbar'
-import HomePage from './pages/HomePage'
-import ChatPage from './pages/ChatPage'
-import DashboardPage from './pages/DashboardPage'
-import JournalPage from './pages/JournalPage'
-import SettingsPage from './pages/SettingsPage'
-import AvatarCallPage from './pages/AvatarCallPage'
-import Conversations from './pages/Conversations'
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
-import Footer from './components/layout/Footer'
-import ChatProvider from './contexts/ChatContext/ChatProvider'
-import { AuthContextProvider } from './contexts/AuthContextProvider'
-import { ThemeProvider, useTheme } from './contexts/ThemeContext'
-import ConversationProvider from './contexts/ConversationContext'
-import ProtectedRoute from './components/ProtectedRoute'
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+
+// Components
+import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Pages
+import HomePage from './pages/HomePage';
+import ChatPage from './pages/ChatPage';
+import DashboardPage from './pages/DashboardPage';
+import JournalPage from './pages/JournalPage';
+import SettingsPage from './pages/SettingsPage';
+import AvatarCallPage from './pages/AvatarCallPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+
+// Contexts
+import { AuthProvider, useAuth } from './auth/context/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import ChatProvider from './contexts/ChatContext/ChatProvider';
+import { ConversationProvider } from './contexts/ConversationContext';
 
 import './App.css'
 
 function AppContent() {
   const location = useLocation();
+  const { user, loading } = useAuth();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isHomePage = location.pathname === '/';
-  const isChatPage = location.pathname === '/chat';
+  const hideNavbar = false;
   const isDashboardPage = location.pathname === '/dashboard';
   const isSettingsPage = location.pathname === '/settings';
   
-  // Prevent body scrolling on all pages except HomePage and Dashboard
+  // Prevent body scrolling on specific pages
   useEffect(() => {
-    if (!isHomePage && !isDashboardPage && !isSettingsPage && !isChatPage) {
+    const isChatRoute = location.pathname.startsWith('/chat');
+    if (!isHomePage && !isDashboardPage && !isSettingsPage && !isChatRoute) {
       document.body.style.overflow = 'hidden';
       document.body.style.height = '100vh';
     } else {
@@ -44,85 +51,67 @@ function AppContent() {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     };
-  }, [isHomePage, isDashboardPage, isSettingsPage, isChatPage]);
+  }, [isHomePage, isDashboardPage, isSettingsPage, location.pathname]);
+
+  // Redirect authenticated users away from auth pages
+  if (isAuthPage && user && !loading) {
+    return <Navigate to="/" replace />;
+  }
   
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
-      {!isChatPage && <Navbar />}
+      <Toaster position="top-right" />
+      {!hideNavbar && <Navbar />}
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className={`transition-colors duration-200 ${
-          isAuthPage 
-            ? "pt-16 flex-grow" 
-            : isDashboardPage 
-              ? "pt-16 w-full flex-grow" 
-              : location.pathname === '/chat' || location.pathname.startsWith('/conversations')
-                ? "pt-16 w-full flex-grow" 
-                : "pt-16 w-full py-4 flex-grow"
-        }`}
+        className="flex-1"
       >
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          
+          {/* Auth Pages */}
           <Route 
-            path="/chat" 
-            element={
-              <ProtectedRoute>
-                <ChatPage />
-              </ProtectedRoute>
-            } 
+            path="/login" 
+            element={!user ? <LoginPage /> : <Navigate to="/" replace />} 
           />
           <Route 
-            path="/conversations" 
-            element={
-              <ProtectedRoute>
-                <Conversations />
-              </ProtectedRoute>
-            } 
+            path="/signup" 
+            element={!user ? <SignupPage /> : <Navigate to="/" replace />} 
           />
-          <Route 
-            path="/conversations/:conversationId" 
-            element={
-              <ProtectedRoute>
-                <Conversations />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/avatar-call" 
-            element={
-              <ProtectedRoute>
-                <AvatarCallPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/journal" 
-            element={
-              <ProtectedRoute>
-                <JournalPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/settings" 
-            element={
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            } 
-          />
+          
+          {/* Protected Routes */}
+          <Route path="/chat" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/journal" element={
+            <ProtectedRoute>
+              <JournalPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/avatar-call" element={
+            <ProtectedRoute>
+              <AvatarCallPage />
+            </ProtectedRoute>
+          } />
+          
           <Route 
             path="/settings/:tab" 
             element={
@@ -131,7 +120,6 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
-
         </Routes>
       </motion.main>
       {!isAuthPage && isHomePage && <Footer />}
@@ -157,35 +145,26 @@ const ThemeWrapper = ({ children }) => {
 };
 
 function App() {
-  // Create router with future flags
-  const router = createBrowserRouter([
-    {
-      path: '/*',
-      element: (
-        <AuthContextProvider>
-          <ChatProvider>
-            <ConversationProvider>
-              <ThemeProvider>
-                <ThemeWrapper>
-                  <AppContent />
-                </ThemeWrapper>
-              </ThemeProvider>
-            </ConversationProvider>
-          </ChatProvider>
-        </AuthContextProvider>
-      ),
-    },
-  ], {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true,
-      v7_fetcherPersist: true,
-      v7_normalizeFormMethod: true,
-    },
-  });
-
-
-  return <RouterProvider router={router} future={{ v7_startTransition: true }} />;
+  return (
+    <Router>
+      <AuthProvider>
+        <ThemeProvider>
+          <ThemeWrapper>
+            <ChatProvider>
+              <ConversationProvider>
+                <AppContent />
+              </ConversationProvider>
+            </ChatProvider>
+          </ThemeWrapper>
+        </ThemeProvider>
+      </AuthProvider>
+    </Router>
+  );
 }
 
-export default App
+// HMR support
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}
+
+export default App;

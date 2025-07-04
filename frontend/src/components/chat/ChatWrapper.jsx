@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { useChat } from '../../contexts/ChatContext';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../auth/context/AuthContext';
 import ThemeContext from '../../contexts/ThemeContext';
 import { chatApi } from '../../services/api';
 import MessageList from './MessageList';

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
-import { auth, googleProvider } from '../config/firebase';
+import { useAuth } from '../auth/context/AuthContext';
 import { motion } from 'framer-motion';
 import { User, Mail, Lock, Chrome, Check, ArrowRight } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -9,6 +8,8 @@ import AuthInput from '../components/auth/AuthInput';
 import AuthButton from '../components/auth/AuthButton';
 
 const SignupPage = () => {
+  const { signUp, signInWithGoogle } = useAuth();
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,6 +24,21 @@ const SignupPage = () => {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [passwordSuggestions, setPasswordSuggestions] = useState([]);
   const navigate = useNavigate();
+
+  const handleGoogleSignup = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      await signInWithGoogle();
+      navigate('/');
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+      console.error('Google sign up error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -76,65 +92,52 @@ const SignupPage = () => {
     return 'Strong';
   };
 
-  const validateForm = () => {
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords don't match");
-      return false;
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return false;
-    }
-    if (!agreedToTerms) {
-      setError('Please agree to the Terms of Service and Privacy Policy');
-      return false;
-    }
-    return true;
-  };
-
-  const handleSignup = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     
-    if (!validateForm()) return;
+    // Validate form
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    if (passwordStrength < 3) {
+      setError('Please choose a stronger password');
+      return;
+    }
+    
+    if (!agreedToTerms) {
+      setError('You must agree to the Terms of Service and Privacy Policy');
+      return;
+    }
     
     setIsLoading(true);
     
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        formData.email, 
-        formData.password
-      );
-      
-      await updateProfile(userCredential.user, {
-        displayName: formData.name
-      });
-      
+      await signUp(formData.email, formData.password, formData.name);
       navigate('/');
-    } catch (err) {
-      setError(err.message.includes('auth/email-already-in-use') 
-        ? 'An account with this email already exists.' 
-        : 'Failed to create account. Please try again.');
-      console.error("Signup error:", err);
+    } catch (error) {
+      console.error('Signup error:', error);
+      setError(error.message || 'Failed to create an account. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
-  const handleGoogleSignup = async () => {
+  const handleGoogleSignUp = async () => {
     setIsLoading(true);
     setError('');
     
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithGoogle();
       navigate('/');
-    } catch (err) {
-      setError('Failed to sign up with Google. Please try again.');
-      console.error("Google sign up error:", err);
+    } catch (error) {
+      console.error('Google signup error:', error);
+      setError(error.message || 'Failed to sign up with Google. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
