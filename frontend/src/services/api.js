@@ -335,30 +335,89 @@ export const chatApi = {
    */
   async deleteConversation(conversationId) {
     try {
-      await apiClient.delete(`conversations/${conversationId}`);
+      console.log(`Attempting to delete conversation ${conversationId}`);
+      const response = await apiClient.delete(`conversations/${conversationId}`);
+      console.log(`Delete response for conversation ${conversationId}:`, response);
       return true;
     } catch (error) {
       console.error(`Error deleting conversation ${conversationId}:`, error);
-      return false;
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+      }
+      throw error; // Re-throw to let the caller handle it
     }
   },
 
   /**
    * Save or update a conversation
    * @param {Object} conversation - The conversation object to save
-   * @returns {Promise<Object>} The saved conversation
+   * @returns {Promise<Object>} The saved conversation with server response
    */
   async saveConversation(conversation) {
     const isNew = !conversation.id;
-    const url = isNew 
-      ? 'conversations'
-      : `conversations/${conversation.id}`;
-      
+    const url = isNew ? 'conversations' : `conversations/${conversation.id}`;
+    
+    console.log(`Saving conversation (${isNew ? 'new' : 'update'}):`, conversation);
+    
     try {
-      return await apiClient[isNew ? 'post' : 'put'](url, conversation);
+      // For new conversations, ensure we only send the fields the backend expects
+      const requestData = isNew 
+        ? {
+            title: conversation.title || 'New Chat',
+            model: conversation.model || 'llama3:latest',
+            style: conversation.style || 'supportive'
+          }
+        : conversation;
+      
+      console.log('Sending conversation data:', requestData);
+      
+      const response = await apiClient[isNew ? 'post' : 'put'](url, requestData);
+      
+      console.log('Save conversation response:', response);
+      
+      // Ensure we have a successful response
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+      
+      // If the response already has a success flag and data, return it as is
+      if (response.success !== undefined && response.data) {
+        return response;
+      }
+      
+      // Otherwise, format the response to match our expected structure
+      return {
+        success: true,
+        data: response,
+        message: isNew ? 'Conversation created successfully' : 'Conversation updated successfully'
+      };
     } catch (error) {
       console.error(`Error ${isNew ? 'creating' : 'updating'} conversation:`, error);
-      throw error;
+      
+      // If this is a validation error, include the validation details
+      if (error.response?.data?.errors) {
+        const validationErrors = error.response.data.errors
+          .map(err => `${err.param}: ${err.msg}`)
+          .join('\n');
+        throw new Error(`Validation error: ${validationErrors}`);
+      }
+      
+      // For other errors, include the status code if available
+      const statusMessage = error.response?.status 
+        ? ` (Status: ${error.response.status})` 
+        : '';
+      
+      throw new Error(`${error.message || 'Failed to save conversation'}${statusMessage}`);
     }
   },
 
