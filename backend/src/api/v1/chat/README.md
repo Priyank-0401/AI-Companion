@@ -16,7 +16,7 @@ POST /api/v1/chat/conversations
 {
   "title": "My First Chat",
   "model": "llama3:latest",
-  "style": "supportive"
+  "style": "empathetic"
 }
 ```
 
@@ -29,7 +29,7 @@ POST /api/v1/chat/conversations
     "userId": "user-id",
     "title": "My First Chat",
     "model": "llama3:latest",
-    "style": "supportive",
+    "style": "empathetic",
     "createdAt": "2023-01-01T00:00:00.000Z",
     "updatedAt": "2023-01-01T00:00:00.000Z",
     "isArchived": false,
@@ -56,7 +56,7 @@ GET /api/v1/chat/conversations?limit=20&startAfter=last-conversation-id
       "userId": "user-id",
       "title": "My First Chat",
       "model": "llama3:latest",
-      "style": "supportive",
+      "style": "empathetic",
       "createdAt": "2023-01-01T00:00:00.000Z",
       "updatedAt": "2023-01-01T00:00:05.000Z",
       "isArchived": false,
@@ -197,7 +197,7 @@ GET /api/v1/chat/conversations/:conversationId/messages?limit=50&startAfter=last
 - `userId` (string): ID of the user who owns the conversation
 - `title` (string): Title of the conversation
 - `model` (string): AI model used for the conversation (e.g., 'llama2')
-- `style` (string): Conversation style (e.g., 'supportive', 'creative')
+- `style` (string): Conversation style (e.g., 'empathetic', 'coach', 'playful', 'mindful')
 - `createdAt` (Date): When the conversation was created
 - `updatedAt` (Date): When the conversation was last updated
 - `isArchived` (boolean): Whether the conversation is archived

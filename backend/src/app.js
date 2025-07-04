@@ -44,8 +44,30 @@ app.use(hpp({
   whitelist: [] // Add any parameters that should be allowed to have duplicate values
 }));
 
-// Enable CORS
-app.use(cors(config.cors));
+// Configure CORS with preflight handling
+app.options('*', cors(config.cors)); // Enable preflight for all routes
+
+// Enable CORS for all routes
+app.use((req, res, next) => {
+  // Set CORS headers
+  if (config.cors.origin.includes('*')) {
+    res.header('Access-Control-Allow-Origin', '*');
+  } else if (Array.isArray(config.cors.origin) && config.cors.origin.includes(req.headers.origin)) {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', config.cors.methods.join(','));
+  res.header('Access-Control-Allow-Headers', config.cors.allowedHeaders.join(','));
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', config.cors.maxAge);
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Compress all responses
 app.use(compression());

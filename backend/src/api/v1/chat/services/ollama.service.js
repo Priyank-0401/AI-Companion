@@ -1,13 +1,22 @@
 import axios from 'axios';
 import config from '../../../../config/index.js';
 import { logger } from '../../../../utils/logger.js';
+import http from 'http';
+import https from 'https';
 
 class OllamaService {
   constructor() {
-    this.baseUrl = config.ollama.baseUrl || 'http://localhost:11434';
+    this.baseUrl = config.ollama.baseUrl || 'http://127.0.0.1:11434';
     this.defaultModel = config.ollama.defaultModel || 'llama3:latest';
-    this.timeout = config.ollama.timeout || 30000; // 30 seconds
-    this.maxRetries = config.ollama.maxRetries || 3;
+    this.timeout = config.ollama.timeout || 300000; // 5 minutes
+    this.maxRetries = config.ollama.maxRetries || 2;
+    this.agentOptions = {
+      keepAlive: true,
+      timeout: 60000, // 1 minute
+      maxSockets: 20,
+      maxFreeSockets: 10,
+      keepAliveMsecs: 60000 // 1 minute
+    };
   }
 
   /**
@@ -156,52 +165,87 @@ class OllamaService {
    * @private
    */
   async _makeRequest(endpoint, data) {
-    let lastError;
+    const url = `${this.baseUrl}${endpoint}`;
+    console.log('Making request to Ollama:', { url, data });
     
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+    let lastError;
+    let attempt = 0;
+    const maxRetries = this.maxRetries;
+    
+    while (attempt < maxRetries) {
+      attempt++;
       try {
-        const response = await axios.post(
-          `${this.baseUrl}${endpoint}`,
+        console.log(`Sending request to Ollama (attempt ${attempt}/${maxRetries})...`);
+        const response = await axios({
+          method: 'post',
+          url,
           data,
-          {
-            timeout: this.timeout,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            responseType: data.stream ? 'stream' : 'json',
-          }
-        );
-
-        // For streaming responses, return the response stream directly
-        if (data.stream) {
-          return response.data;
-        }
-
+          timeout: this.timeout,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Connection': 'keep-alive'
+          },
+          // Force IPv4 to avoid IPv6 issues
+          family: 4,
+          httpAgent: new http.Agent(this.agentOptions),
+          httpsAgent: new https.Agent(this.agentOptions),
+          // Add timeout for the entire request including download
+          timeout: 300000, // 5 minutes
+          // Add timeout for the connection phase
+          connectTimeout: 30000, // 30 seconds
+          // Add timeout for the response headers
+          responseTimeout: 300000, // 5 minutes
+          // Don't throw on non-2xx status codes
+          validateStatus: null
+        });
+        
+        console.log('Ollama response received:', {
+          status: response.status,
+          data: response.data ? 'Received data' : 'No data'
+        });
+        
         return response.data;
       } catch (error) {
         lastError = error;
+        const errorDetails = {
+          attempt,
+          url,
+          error: error.message,
+          code: error.code,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          responseData: error.response?.data,
+          config: {
+            method: error.config?.method,
+            timeout: error.config?.timeout,
+            headers: error.config?.headers
+          }
+        };
         
-        // Log the error
-        logger.error(
-          `Attempt ${attempt}/${this.maxRetries} failed for ${endpoint}:`,
-          error.message
-        );
-
-        // If this is the last attempt, rethrow the error
-        if (attempt === this.maxRetries) {
-          break;
+        console.error(`Ollama API attempt ${attempt}/${maxRetries} failed:`, JSON.stringify(errorDetails, null, 2));
+        
+        if (attempt < maxRetries) {
+          // Exponential backoff with jitter
+          const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+          const jitter = Math.random() * 1000;
+          const delay = baseDelay + jitter;
+          console.log(`Retrying in ${Math.round(delay)}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
-
-        // Wait before retrying (exponential backoff)
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     // If we get here, all retries failed
-    throw new Error(
-      `Failed to complete request to Ollama after ${this.maxRetries} attempts: ${lastError.message}`
-    );
+    if (lastError.code === 'ECONNREFUSED') {
+      throw new Error(`Cannot connect to Ollama at ${url}. Make sure Ollama is running and accessible.`);
+    } else if (lastError.code === 'ETIMEDOUT') {
+      throw new Error(`Request to Ollama timed out after ${this.timeout}ms`);
+    } else if (lastError.response) {
+      throw new Error(`Ollama API error: ${lastError.response.status} - ${lastError.response.statusText}`);
+    } else {
+      throw new Error(`Failed after ${maxRetries} attempts: ${lastError.message}`);
+    }
   }
 }
 

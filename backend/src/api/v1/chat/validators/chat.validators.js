@@ -29,8 +29,8 @@ export const validateCreateConversation = [
     .optional()
     .isString()
     .withMessage('Style must be a string')
-    .isIn(['supportive', 'creative', 'concise', 'professional'])
-    .withMessage('Invalid conversation style'),
+    .isIn(['empathetic', 'coach', 'playful', 'mindful'])
+    .withMessage('Invalid conversation style. Must be one of: empathetic, coach, playful, mindful'),
 ];
 
 export const validateGetConversations = [

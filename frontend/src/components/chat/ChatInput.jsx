@@ -1,17 +1,29 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { FiSend, FiPaperclip, FiMic } from 'react-icons/fi';
 import { motion } from 'framer-motion';
-import { FiSend } from 'react-icons/fi';
 import { useTheme } from '../../contexts/useTheme';
 
 const ChatInput = ({ onSendMessage, isSending = false }) => {
   const [message, setMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const textareaRef = useRef(null);
+  const containerRef = useRef(null);
   const { theme } = useTheme();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (message.trim() && !isSending) {
-      onSendMessage(message.trim());
+    const trimmedMessage = message.trim();
+    
+    // Check if message is not empty after trimming and not just whitespace
+    if (trimmedMessage.length > 0 && !isSending) {
+      console.log('ChatInput - Sending message:', {
+        content: trimmedMessage,
+        type: typeof trimmedMessage,
+        length: trimmedMessage.length
+      });
+      
+      onSendMessage(trimmedMessage);
       setMessage('');
       
       // Reset textarea height
@@ -37,10 +49,44 @@ const ChatInput = ({ onSendMessage, isSending = false }) => {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
+    
+    // Show typing indicator
+    if (!isTyping && e.target.value.length > 0) {
+      setIsTyping(true);
+    } else if (isTyping && e.target.value.length === 0) {
+      setIsTyping(false);
+    }
+  };
+  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsActive(false);
+        setIsTyping(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleFocus = () => {
+    setIsActive(true);
+    if (message.length > 0) {
+      setIsTyping(true);
+    }
+  };
+
+  const handleBlur = () => {
+    if (message.length === 0) {
+      setIsTyping(false);
+    }
   };
 
   return (
-    <div className="px-4 py-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
+    <div ref={containerRef} className="px-4 py-3 bg-white dark:bg-gray-900">
       <div className="max-w-3xl mx-auto">
         <form onSubmit={handleSubmit} className="relative">
           <div className="relative">
@@ -49,8 +95,14 @@ const ChatInput = ({ onSendMessage, isSending = false }) => {
               value={message}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               placeholder="Message AI Companion..."
-              className="w-full pl-5 pr-14 py-3.5 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-hidden min-h-[56px] max-h-48 shadow-sm transition-all duration-200"
+              className={`w-full pl-5 pr-14 py-3.5 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50 border ${
+                isTyping || isActive
+                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-100 dark:ring-blue-900/30' 
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none resize-none overflow-hidden min-h-[56px] max-h-48 shadow-sm transition-all duration-200`}
               rows={1}
               disabled={isSending}
               style={{
@@ -87,12 +139,6 @@ const ChatInput = ({ onSendMessage, isSending = false }) => {
                 )}
               </motion.button>
             </div>
-          </div>
-          
-          <div className="mt-2 text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              AI Companion may produce inaccurate information. Consider verifying important details.
-            </p>
           </div>
         </form>
       </div>

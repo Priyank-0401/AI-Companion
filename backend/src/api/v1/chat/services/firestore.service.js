@@ -72,7 +72,7 @@ class FirestoreService {
         userId: conversationData.userId,
         title: conversationData.title || 'New Chat',
         model: conversationData.model || 'llama3:latest',
-        style: conversationData.style || 'supportive',
+        style: conversationData.style || 'empathetic',
         messages: conversationData.messages || [],
         isArchived: conversationData.isArchived || false,
         createdAt: now,
@@ -261,17 +261,33 @@ class FirestoreService {
    */
   static async createMessage(messageData) {
     try {
+      // Create message without timestamp first
       const message = new Message({
         ...messageData,
-        timestamp: FieldValue.serverTimestamp(),
+        timestamp: new Date() // Set a default timestamp that will be overridden by serverTimestamp
       });
       
-      const docRef = await getFirestoreDb().collection(MESSAGES_COLLECTION).add(message.toJSON());
+      // Convert to plain object and add server timestamp
+      const messageDataWithTimestamp = {
+        ...message.toJSON(),
+        timestamp: FieldValue.serverTimestamp()
+      };
+      
+      // Add to Firestore
+      const docRef = await getFirestoreDb().collection(MESSAGES_COLLECTION).add(messageDataWithTimestamp);
+      
+      // Get the newly created document
       const docSnap = await docRef.get();
-      return new Message({ id: docRef.id, ...convertTimestamps(docSnap.data()) });
+      if (!docSnap.exists) {
+        throw new Error('Failed to create message: Document not found after creation');
+      }
+      
+      // Convert Firestore timestamp to Date and return
+      const messageDoc = convertTimestamps(docSnap.data());
+      return new Message({ id: docRef.id, ...messageDoc });
     } catch (error) {
       console.error('Error creating message:', error);
-      throw new Error('Failed to create message');
+      throw new Error(`Failed to create message: ${error.message}`);
     }
   }
 

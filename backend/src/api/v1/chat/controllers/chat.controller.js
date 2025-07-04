@@ -45,7 +45,7 @@ class ChatController {
         userId,
         title: title?.trim() || 'New Chat',
         model: model?.trim() || 'llama3:latest',
-        style: style?.trim() || 'supportive',
+        style: style?.trim() || 'empathetic',
       });
 
       logger.info('Successfully created conversation', { 
@@ -220,10 +220,10 @@ class ChatController {
               userId: userId,
               title: req.body.title || 'New Chat',
               model: req.body.model || 'llama3:latest',
-              style: req.body.style || 'supportive',
+              style: req.body.style || 'empathetic',
               messages: []
             });
-            
+            console.log('New conversation created:', newConversation);
             return res.json({
               success: true,
               data: newConversation,
@@ -365,8 +365,17 @@ class ChatController {
         },
       });
 
-      // Prepare conversation history
-      const messages = await FirestoreService.getMessages(conversationId, 10);
+      // Get recent messages for conversation history
+      console.log('Getting messages for conversation:', conversationId);
+      const messagesResponse = await FirestoreService.getMessages(conversationId, 10);
+      console.log('Messages response type:', typeof messagesResponse);
+      console.log('Messages response keys:', messagesResponse ? Object.keys(messagesResponse) : []);
+
+      // Extract messages from the response
+      const messages = messagesResponse && messagesResponse.messages ? messagesResponse.messages : [];
+      console.log('Number of messages found:', messages.length);
+
+      // Prepare conversation history for the AI
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content,

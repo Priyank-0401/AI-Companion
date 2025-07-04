@@ -10,7 +10,7 @@ class Conversation {
     userId,
     title = 'New Chat',
     model = 'llama3:latest',
-    style = 'supportive',
+    style = 'empathetic',
     createdAt = new Date(),
     updatedAt = new Date(),
     isArchived = false,

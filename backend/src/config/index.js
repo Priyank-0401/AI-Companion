@@ -49,11 +49,30 @@ const config = {
 
   // CORS Configuration
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || '*',
-    methods: process.env.CORS_METHODS?.split(',') || ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: process.env.CORS_ALLOWED_HEADERS?.split(',') || ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: process.env.CORS_CREDENTIALS === 'true',
-    maxAge: parseInt(process.env.CORS_MAX_AGE) || 86400
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    methods: process.env.CORS_METHODS?.split(',') || ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: process.env.CORS_ALLOWED_HEADERS?.split(',') || [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With',
+      'x-request-start',
+      'X-Request-Start',
+      'X-Requested-With',
+      'Accept',
+      'Accept-Encoding',
+      'Accept-Language',
+      'Cache-Control',
+      'Connection',
+      'DNT',
+      'Origin',
+      'Referer',
+      'User-Agent'
+    ],
+    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'x-request-start'],
+    credentials: true,
+    maxAge: parseInt(process.env.CORS_MAX_AGE) || 86400,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   },
 
   // Rate Limiting

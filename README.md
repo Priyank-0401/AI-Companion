@@ -8,7 +8,7 @@ Seriva is your personal AI companion designed to support your mental wellness jo
 
 ### 🤖 Intelligent Conversations
 - Engage in natural, flowing conversations with an AI that understands and responds to your emotions
-- Multiple conversation styles to match your needs - from supportive to creative
+- Multiple conversation styles to match your needs - from empathetic to creative
 - Context-aware responses that remember your previous interactions
 
 ### 📔 Smart Journaling

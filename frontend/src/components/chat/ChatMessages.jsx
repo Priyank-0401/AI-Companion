@@ -82,7 +82,7 @@ export const ChatMessages = ({ messages = [], isLoading = false }) => {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pt-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
       <div className="max-w-3xl mx-auto w-full">
         <AnimatePresence initial={false}>
           {groupedMessages.map((message, index) => (

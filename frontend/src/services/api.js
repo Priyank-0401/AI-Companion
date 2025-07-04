@@ -13,27 +13,16 @@ export function getApiUrl(path) {
   const cleanBase = API_BASE_URL.replace(/\/+$/, '');
   const cleanPath = path.replace(/^\/+|\/+$/g, '');
   
-  // Check if this is a chat endpoint
-  const isChatEndpoint = cleanPath.startsWith('conversations') || 
-                        cleanPath.startsWith('models') ||
-                        cleanPath.startsWith('chat/');
+  // Check if this is a chat endpoint (already starts with chat/)
+  const isChatEndpoint = cleanPath.startsWith('chat/');
   
   let finalUrl;
   
-  // For development with default localhost URL
-  if (cleanBase.endsWith('3001')) {
-    if (isChatEndpoint) {
-      finalUrl = `${cleanBase}/api/chat/${cleanPath}`;
-    } else {
-      finalUrl = `${cleanBase}/api/${cleanPath}`;
-    }
+  if (isChatEndpoint) {
+    // For chat endpoints, use /api/ as the base since the path already includes 'chat/'
+    finalUrl = `${cleanBase}/api/${cleanPath}`;
   } else {
-    // For production or custom base URLs
-    if (isChatEndpoint) {
-      finalUrl = `${cleanBase}/chat/${cleanPath}`;
-    } else {
-      finalUrl = `${cleanBase}/${cleanPath}`;
-    }
+    finalUrl = `${cleanBase}/api/${cleanPath}`;
   }
   
   console.log('Constructed API URL:', {
@@ -62,11 +51,32 @@ class ApiClient {
    * @returns {Promise<Response>} The fetch response
    */
   async request(endpoint, options = {}) {
-    const url = getApiUrl(endpoint);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(new Error('Request timeout')), 15000);
+    // Extract query params and body from options
+    const { params, body: requestBody, ...fetchOptions } = options;
     
-    console.log(`[API] ${options.method || 'GET'} ${endpoint}`, { options });
+    // Build URL with query parameters
+    let url = getApiUrl(endpoint);
+    if (params) {
+      const queryString = new URLSearchParams(params).toString();
+      url += (url.includes('?') ? '&' : '?') + queryString;
+    }
+    
+    const controller = new AbortController();
+    
+    // Set a longer timeout for chat endpoints (5 minutes)
+    const isChatEndpoint = endpoint.includes('chat/');
+    const timeoutDuration = isChatEndpoint ? 300000 : 60000; // 5 minutes for chat, 1 minute for others
+    const timeoutId = setTimeout(
+      () => controller.abort(new Error(`Request timed out after ${timeoutDuration/1000} seconds`)), 
+      timeoutDuration
+    );
+    
+    console.log(`[API] ${fetchOptions.method || 'GET'} ${url}`, { 
+      ...fetchOptions,
+      timeout: `${timeoutDuration/1000}s`,
+      params,
+      body: requestBody
+    });
     
     try {
       // Get auth token from Firebase Auth
@@ -93,82 +103,201 @@ class ApiClient {
       }
       
       // Set up headers
-      const headers = new Headers(options.headers || {});
-      headers.set('Content-Type', 'application/json');
+      const headers = new Headers(fetchOptions.headers || {});
       
+      // Set default headers if not already set
+      if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      
+      if (!headers.has('Accept')) {
+        headers.set('Accept', 'application/json');
+      }
+      
+      // Add auth token if available
       if (token) {
         console.log('Adding Authorization header with token');
         headers.set('Authorization', `Bearer ${token}`);
-      } else {
-        console.warn('No auth token available for request');
       }
-
-      // Log minimal request details in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] ${options.method || 'GET'} ${url}`);
-      }
-
-      // Make the fetch request
-      const response = await fetch(url, {
-        ...options,
+      
+      // Log the final headers for debugging
+      console.log('Request headers:', Object.fromEntries(headers.entries()));
+      
+      // Prepare the request options
+      const requestOptions = {
+        method: (fetchOptions.method || 'GET').toUpperCase(),
         headers,
         signal: controller.signal,
-        credentials: 'include'
-      });
-
-      clearTimeout(timeoutId);
-
-      // Handle non-OK responses
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.error('API Error Response:', {
-            status: response.status,
-            statusText: response.statusText,
-            url: response.url,
-            errorData
-          });
-        } catch (e) {
-          errorData = { 
-            status: response.status,
-            message: response.statusText || 'An unknown error occurred',
-            isAuthError: response.status === 401
-          };
+      };
+      
+      // Add body if present (for POST, PUT, PATCH)
+      const isBodyAllowed = ['POST', 'PUT', 'PATCH'].includes(requestOptions.method);
+      if (isBodyAllowed && requestBody) {
+        requestOptions.body = JSON.stringify(requestBody);
+        console.log('Request body:', requestOptions.body);
+      }
+      
+      // Log the request details for debugging
+      console.group(`[API] ${requestOptions.method} ${url}`);
+      console.log('Headers:', Object.fromEntries(requestOptions.headers.entries()));
+      if (fetchOptions.body) {
+        console.log('Body:', fetchOptions.body);
+      }
+      console.groupEnd();
+      
+      // Make the fetch request with the updated options
+      let response;
+      try {
+        console.log('Sending request to:', url, requestOptions);
+        
+        // Ensure we have a valid URL
+        if (!url) {
+          throw new Error('Invalid URL: URL is empty');
         }
         
-        const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        error.status = response.status;
-        error.data = errorData;
-        error.isAuthError = response.status === 401 || errorData.isAuthError;
+        // Make the request with a timeout
+        const fetchPromise = fetch(url, requestOptions);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timed out')), 30000)
+        );
         
-        // If this is an auth error, clear any stored auth data
-        if (error.isAuthError && typeof window !== 'undefined') {
-          console.log('Authentication error detected, clearing local storage');
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('authUser');
+        response = await Promise.race([fetchPromise, timeoutPromise]);
+        console.log('Received response:', response.status, response.statusText);
+        
+        // Log response headers for debugging
+        console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
+        
+      } catch (networkError) {
+        console.error('Network error details:', {
+          error: networkError,
+          message: networkError.message,
+          name: networkError.name,
+          stack: networkError.stack,
+          url: url,
+          method: requestOptions.method,
+          timestamp: new Date().toISOString()
+        });
+        
+        let errorMessage = 'Network error. Please check your connection and try again.';
+        if (networkError.message === 'Failed to fetch') {
+          errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+        } else if (networkError.message === 'Request timed out') {
+          errorMessage = 'The request took too long. Please try again.';
         }
         
+        const error = new Error(errorMessage);
+        error.name = 'NetworkError';
+        error.originalError = networkError;
         throw error;
       }
-
+      
+      // Clone the response for potential multiple reads
+      const responseClone = response.clone();
+      
+      let responseData;
+      const contentType = response.headers.get('content-type') || '';
+      
+      try {
+        // Read the response body only once
+        const responseText = await responseClone.text();
+        
+        // Log raw response for debugging
+        console.log('Raw response text:', responseText);
+        
+        // Try to parse as JSON if content type suggests it or if it looks like JSON
+        const isLikelyJson = contentType.includes('application/json') || 
+                            (responseText.trim().startsWith('{') || responseText.trim().startsWith('['));
+        
+        if (isLikelyJson && responseText) {
+          try {
+            responseData = JSON.parse(responseText);
+          } catch (jsonError) {
+            console.warn('Failed to parse JSON response, falling back to text');
+            responseData = responseText;
+          }
+        } else {
+          responseData = responseText;
+        }
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        // If we get here, we've already tried to read the response
+        // Just return a generic error to avoid trying to read the body again
+        responseData = { 
+          error: 'Failed to parse server response',
+          details: parseError.message,
+          status: response.status,
+          statusText: response.statusText
+        };
+        
+        // Log additional debug info
+        console.error('Response parsing failed with status:', response.status, response.statusText);
+        console.error('Response headers:', Object.fromEntries([...response.headers.entries()]));
+      }
+      
+      // Log the response for debugging
+      console.group(`[API] Response from ${requestOptions.method} ${url}`);
+      console.log('Status:', response.status, response.statusText);
+      console.log('Headers:', Object.fromEntries([...response.headers.entries()]));
+      console.log('Response data:', responseData);
+      console.groupEnd();
+      
+      // Handle non-2xx responses
+      if (!response.ok) {
+        // Extract error message from response
+        let errorMessage = `Request failed with status ${response.status}: ${response.statusText}`;
+        let errorDetails = [];
+        
+        if (responseData) {
+          if (typeof responseData === 'string') {
+            errorMessage = responseData;
+          } else if (responseData.message) {
+            errorMessage = responseData.message;
+          } else if (responseData.errors && Array.isArray(responseData.errors)) {
+            errorDetails = responseData.errors.map(e => 
+              `${e.msg || e.message || JSON.stringify(e)} (${e.path || 'unknown'})`
+            );
+            errorMessage = errorDetails.join('; ');
+          } else if (typeof responseData === 'object') {
+            errorMessage = Object.entries(responseData)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join('; ');
+          }
+        }
+        
+        console.error(`[API] Request failed: ${errorMessage}`, {
+          endpoint: url,
+          method: requestOptions.method,
+          status: response.status,
+          statusText: response.statusText,
+          response: responseData,
+          errorDetails
+        });
+        
+        const error = new Error(errorMessage);
+        error.status = response.status;
+        error.response = responseData;
+        error.details = errorDetails;
+        throw error;
+      }
+      
+      clearTimeout(timeoutId);
+      
       // Parse and return the response
       try {
         const contentType = response.headers.get('content-type');
-        let data;
-        
         if (contentType && contentType.includes('application/json')) {
-          data = await response.json();
-          console.log(`[API] ${options.method || 'GET'} ${endpoint} response:`, data);
+          const data = await response.json();
+          console.log(`[API] ${fetchOptions.method || 'GET'} ${endpoint} response:`, data);
           return data;
         }
         
-        data = await response.text();
-        console.log(`[API] ${options.method || 'GET'} ${endpoint} response (text):`, data);
-        return data;
-      } catch (error) {
-        console.error('[API] Error parsing response:', error);
-        throw new Error(`Failed to parse response: ${error.message}`);
+        // Handle non-JSON responses
+        const text = await response.text();
+        console.log(`[API] ${fetchOptions.method || 'GET'} ${endpoint} response (text):`, text);
+        return text;
+      } catch (e) {
+        console.error('Error parsing response:', e);
+        throw new Error('Failed to parse server response');
       }
     } catch (error) {
       // Clear the timeout in case of error
@@ -212,14 +341,34 @@ class ApiClient {
    */
   async post(endpoint, data = {}, options = {}) {
     try {
+      // Ensure data is a plain object
+      const requestData = { ...data };
+      
+      // Log the request for debugging
+      console.log('POST request to', endpoint, 'with data:', requestData);
+      
+      // Set default headers if not provided
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      };
+      
+      // Make the request with the data as the body
+      // The request method will handle the JSON stringification
       const response = await this.request(endpoint, {
         method: 'POST',
-        body: JSON.stringify(data),
-        ...options,
+        headers,
+        body: requestData, // Don't stringify here, it's done in the request method
+        ...options
       });
+      
       return response;
     } catch (error) {
       console.error('POST request failed:', error);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
       throw error;
     }
   }
@@ -227,7 +376,7 @@ class ApiClient {
   /**
    * Make a PUT request
    */
-  async put(endpoint, data = {}, options = {}) {
+  async put(endpoint, data = {}, options = {}) {  
     try {
       const response = await this.request(endpoint, {
         method: 'PUT',
@@ -268,20 +417,70 @@ export const chatApi = {
   /**
    * Send a message to the chat API
    * @param {Object} params - Message parameters
-   * @param {string} params.message - The message text
+   * @param {string} params.content - The message text
    * @param {string} [params.model='llama3'] - The model to use
-   * @param {string} [params.style='supportive'] - The conversation style
-   * @param {string} [params.conversationId] - Optional conversation ID for continuing
+   * @param {string} [params.style='empathetic'] - The conversation style (empathetic, coach, playful, or mindful)
+   * @param {string} [params.conversationId] - Conversation ID (required)
    * @returns {Promise<Object>} The AI response
    */
-  async sendMessage({ message, model = 'llama3', style = 'supportive', conversationId }) {
+  async sendMessage({ content, conversationId, model = 'llama3', style = 'empathetic', stream = false }) {
+    const startTime = Date.now();
+    const requestId = `msg_${Math.random().toString(36).substr(2, 9)}`;
+    
     try {
-      return await apiClient.post('chat/messages', {
-        message,
+      // Ensure content is a string
+      const messageContent = String(content || '').trim();
+      
+      console.log(`[${requestId}] chatApi.sendMessage called`, { 
+        conversationId,
+        contentLength: messageContent.length,
+        contentType: typeof messageContent,
         model,
         style,
+        stream
+      });
+      
+      if (!conversationId) {
+        const error = new Error('No conversation ID provided');
+        console.error(`[${requestId}] Validation error:`, error.message);
+        throw error;
+      }
+      
+      // Ensure content is not empty
+      if (!messageContent) {
+        const error = new Error('Message content cannot be empty');
+        console.error(`[${requestId}] Validation error:`, error.message);
+        throw error;
+      }
+      
+      // Create payload with content and optional parameters
+      const payload = {
+        content: messageContent,  // Ensure this is a non-empty string
+        model: model,
+        style: style,
+        stream: stream
+      };
+      
+      console.log(`[${requestId}] Prepared message payload:`, {
+        contentLength: trimmedContent.length,
+        model,
+        style,
+        stream
+      });
+      
+      const endpoint = `chat/conversations/${conversationId}/messages`;
+      console.log(`[${requestId}] Sending POST request to:`, endpoint);
+      
+      const response = await apiClient.post(endpoint, payload);
+      const duration = Date.now() - startTime;
+      
+      console.log(`[${requestId}] Message sent successfully in ${duration}ms`, {
+        response: response ? 'Received response' : 'No response data',
+        status: response?.status,
         conversationId
       });
+      
+      return response;
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
@@ -371,13 +570,25 @@ export const chatApi = {
     
     try {
       // For new conversations, ensure we only send the fields the backend expects
+      // Ensure model has the correct format (add :latest if needed for llama3)
+      const sanitizeModel = (model) => {
+        if (!model) return 'llama3:latest';
+        if (model === 'llama3' || model.startsWith('llama3:')) {
+          return 'llama3:latest';
+        }
+        return model;
+      };
+
       const requestData = isNew 
         ? {
             title: conversation.title || 'New Chat',
-            model: conversation.model || 'llama3:latest',
-            style: conversation.style || 'supportive'
+            model: sanitizeModel(conversation.model),
+            style: conversation.style || 'empathetic'
           }
-        : conversation;
+        : {
+            ...conversation,
+            model: sanitizeModel(conversation.model)
+          };
       
       console.log('Sending conversation data:', requestData);
       
