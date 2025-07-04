@@ -34,95 +34,142 @@ console.log('Initializing Firebase with configuration:', {
 
 // Initialize Firebase
 const initializeFirebase = async () => {
-  try {
-    // Check if Firebase app is already initialized
-    if (admin.apps.length === 0) {
-      firebaseApp = admin.initializeApp(firebaseConfig);
-      console.log('Firebase Admin SDK initialized successfully');
-    } else {
-      firebaseApp = admin.app();
-      console.log('Using existing Firebase app instance');
-    }
-    
-    // Initialize Firestore
-    db = admin.firestore();
-    try {
-      await db.listCollections(); // Test the connection
-      console.log('Firestore initialized successfully');
-    } catch (dbError) {
-      console.error('Firestore initialization error:', dbError);
-      throw new Error(`Firestore initialization failed: ${dbError.message}`);
-    }
-    
-    // Initialize Auth
-    auth = admin.auth();
-    console.log('Firebase Auth initialized successfully');
-    
-    // Mark as initialized
-    isInitialized = true;
-    
+  // If already initialized, return the existing instances
+  if (isInitialized) {
     return { firebaseApp, db, auth };
-  } catch (error) {
-    console.error('Firebase initialization error:', {
-      message: error.message,
-      code: error.code,
-      stack: error.stack,
-      errorInfo: error.errorInfo || 'No additional error info'
-    });
-    
-    // If there's an error, try to delete the app if it was created
-    if (firebaseApp) {
-      try {
-        await firebaseApp.delete();
-        console.log('Cleaned up Firebase app after error');
-      } catch (cleanupError) {
-        console.error('Error cleaning up Firebase app:', cleanupError);
-      }
-    }
-    
-    throw new Error(`Failed to initialize Firebase: ${error.message}`);
   }
+
+  // If initialization is in progress, return the promise
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  // Create a new promise for initialization
+  initializationPromise = (async () => {
+    try {
+      // Check if Firebase app is already initialized
+      if (admin.apps.length === 0) {
+        firebaseApp = admin.initializeApp(firebaseConfig);
+        console.log('Firebase Admin SDK initialized successfully');
+      } else {
+        firebaseApp = admin.app();
+        console.log('Using existing Firebase app instance');
+      }
+      
+      // Initialize Firestore
+      db = admin.firestore();
+      try {
+        await db.listCollections(); // Test the connection
+        console.log('Firestore initialized successfully');
+      } catch (dbError) {
+        console.error('Firestore initialization error:', dbError);
+        throw new Error(`Firestore initialization failed: ${dbError.message}`);
+      }
+      
+      // Initialize Auth
+      auth = admin.auth();
+      console.log('Firebase Auth initialized successfully');
+      
+      // Mark as initialized
+      isInitialized = true;
+      
+      return { firebaseApp, db, auth };
+    } catch (error) {
+      console.error('Firebase initialization error:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        errorInfo: error.errorInfo || 'No additional error info'
+      });
+      
+      // Reset initialization state
+      isInitialized = false;
+      initializationPromise = null;
+      
+      // If there's an error, try to delete the app if it was created
+      if (firebaseApp) {
+        try {
+          await firebaseApp.delete();
+          console.log('Cleaned up Firebase app after error');
+        } catch (cleanupError) {
+          console.error('Error cleaning up Firebase app:', cleanupError);
+        }
+      }
+      
+      throw new Error(`Failed to initialize Firebase: ${error.message}`);
+    }
+  })();
+
+  return initializationPromise;
 };
 
 // Initialize Firebase services
 let isInitialized = false;
+let initializationPromise = null;
 
-// Export initialization function and getters for services
+// Getter functions
 const getDb = () => {
   if (!isInitialized) {
-    throw new Error('Firebase not initialized. Call initializeFirebase() first.');
+    throw new Error('Firebase has not been initialized. Call initializeFirebase() first.');
+  }
+  if (!db) {
+    throw new Error('Firestore instance is not available');
   }
   return db;
 };
 
 const getAuth = () => {
   if (!isInitialized) {
-    throw new Error('Firebase not initialized. Call initializeFirebase() first.');
+    throw new Error('Firebase has not been initialized. Call initializeFirebase() first.');
   }
   return auth;
 };
 
 const getFirebaseApp = () => {
   if (!isInitialized) {
-    throw new Error('Firebase not initialized. Call initializeFirebase() first.');
+    throw new Error('Firebase has not been initialized. Call initializeFirebase() first.');
   }
   return firebaseApp;
 };
 
-// Named exports
-export { 
-  admin, 
-  getDb, 
-  getAuth, 
-  getFirebaseApp, 
-  initializeFirebase 
+// Single export object
+const firebase = {
+  // Direct access to instances (read-only)
+  get admin() { return admin; },
+  get db() { return db; },
+  get auth() { return auth; },
+  get firebaseApp() { return firebaseApp; },
+  
+  // Methods
+  getDb,
+  getAuth,
+  getFirebaseApp,
+  initializeFirebase
 };
 
-// Default export for backward compatibility
+// Export as both default and named exports
 export default {
+  ...firebase,
+  initializeFirebase,
+  // Add direct access to instances for backward compatibility
   get admin() { return admin; },
-  get db() { return getDb(); },
-  get auth() { return getAuth(); },
-  get firebaseApp() { return getFirebaseApp(); },
+  get db() { return db; },
+  get auth() { return auth; },
+  get firebaseApp() { return firebaseApp; }
+};
+
+export {
+  // Core Firebase services
+  admin,
+  db,
+  auth,
+  firebaseApp,
+  
+  // Utility functions
+  getDb,
+  getAuth,
+  getFirebaseApp,
+  
+  // Initialization
   initializeFirebase
 };

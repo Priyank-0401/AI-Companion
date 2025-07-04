@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getAuth } from '../config/firebase.js';
+import { getAuth, getDb } from '../config/firebase.js';
 import AppError from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import config from '../config/index.js';
@@ -18,17 +18,15 @@ const getAuthInstance = () => {
   return authInstance;
 };
 
-// Helper function to verify JWT token
-const verifyJwtToken = (token) => {
-  return new Promise((resolve, reject) => {
-    jwt.verify(token, config.jwt.secret, (err, decoded) => {
-      if (err) {
-        reject(new AppError('Invalid token. Please log in again!', 401));
-      } else {
-        resolve(decoded);
-      }
-    });
-  });
+// Helper function to verify Firebase ID token
+const verifyFirebaseToken = async (token) => {
+  try {
+    const auth = getAuthInstance();
+    return await auth.verifyIdToken(token);
+  } catch (error) {
+    logger.error(`Firebase token verification failed: ${error.message}`);
+    throw new AppError('Invalid or expired token. Please log in again!', 401);
+  }
 };
 
 // Protect routes - require authentication
@@ -48,27 +46,44 @@ const protect = async (req, res, next) => {
       );
     }
 
-    // 2) Verify token
-    const decoded = await verifyJwtToken(token);
+    // 2) Verify Firebase ID token
+    const firebaseUser = await verifyFirebaseToken(token);
     
-    // 3) Get Firebase Auth instance and verify the token
-    try {
-      const auth = getAuthInstance();
-      await auth.verifyIdToken(token);
-    } catch (firebaseError) {
-      logger.error(`Firebase token verification failed: ${firebaseError.message}`);
-      return next(new AppError('Invalid or expired token. Please log in again!', 401));
+    if (!firebaseUser || !firebaseUser.uid) {
+      return next(new AppError('Invalid user data in token', 401));
     }
 
-    // 3) Check if user still exists (if using database)
-    // This is optional if you're using Firebase Auth only
-    // If you have a users collection, you can add a check here
+    // 4) Get Firestore instance
+    const db = getDb();
+    const usersRef = db.collection('users');
+    
+    // 5) Check if user exists in Firestore
+    const userDoc = await usersRef.doc(firebaseUser.uid).get();
+    
+    let userData;
+    if (!userDoc.exists) {
+      // Create new user document if it doesn't exist
+      userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.name || firebaseUser.email?.split('@')[0] || 'User',
+        photoURL: firebaseUser.picture || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await usersRef.doc(firebaseUser.uid).set(userData);
+    } else {
+      userData = userDoc.data();
+    }
 
-    // GRANT ACCESS TO PROTECTED ROUTE
+    // 6) Attach user to request object
+    req.user = { ...userData, uid: firebaseUser.uid };
+    
+    // 6) GRANT ACCESS TO PROTECTED ROUTE
     next();
   } catch (error) {
     logger.error(`Authentication error: ${error.message}`);
-    return next();
+    return next(new AppError('Authentication failed. Please log in again.', 401));
   }
 };
 
@@ -90,13 +105,20 @@ const isLoggedIn = async (req, res, next) => {
   try {
     // 1) Get token from cookies
     if (req.cookies.jwt) {
-      // 2) Verify JWT token
-      const decoded = await verifyJwtToken(req.cookies.jwt);
-
-      // 3) Verify Firebase token
+      // 2) Verify Firebase token
       try {
-        const auth = getAuthInstance();
-        await auth.verifyIdToken(req.cookies.jwt);
+        const firebaseUser = await verifyFirebaseToken(req.cookies.jwt);
+        
+        // 3) Get Firestore instance
+        const db = getDb();
+        const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
+        
+        if (!userDoc.exists) {
+          return next();
+        }
+
+        // 4) Attach user to request
+        req.user = { ...userDoc.data(), uid: firebaseUser.uid };
       } catch (firebaseError) {
         logger.warn(`Firebase token verification in isLoggedIn failed: ${firebaseError.message}`);
         return next();

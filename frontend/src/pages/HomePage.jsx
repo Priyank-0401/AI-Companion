@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useAuth } from '../auth/context/AuthContext';
+import useAuth from '../auth/hooks/useAuth';
 
 // Import components
 import Hero from '../components/home/Hero';

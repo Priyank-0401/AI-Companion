@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/context/AuthContext';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import useAuth from '../auth/hooks/useAuth';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Chrome, ArrowRight } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -15,8 +15,30 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/';
 
-  const { signIn, signInWithGoogle } = useAuth();
+  const { user, loading, initialized, signIn, signInWithGoogle } = useAuth();
+
+  // Handle redirect if user is already authenticated
+  useEffect(() => {
+    if (initialized && user) {
+      // Small delay to ensure any state updates are processed
+      const timer = setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [user, initialized, navigate, from]);
+
+  // Show loading state while checking auth
+  if (loading || !initialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -29,11 +51,22 @@ const LoginPage = () => {
     setError('');
     
     try {
-      await signIn(email, password);
-      navigate('/');
+      const user = await signIn(email, password);
+      console.log('Login successful, user:', user);
+      
+      // Check if token is stored
+      const token = localStorage.getItem('authToken');
+      console.log('Stored auth token:', token ? 'Token exists' : 'No token found');
+      
+      // Get the redirect path from location state or default to '/'
+      const fromPath = location.state?.from?.pathname || '/';
+      console.log('Redirecting to:', fromPath);
+      
+      // The useEffect will handle the redirect when the user state updates
     } catch (err) {
-      setError(err.message || 'An error occurred. Please try again.');
-      console.error('Login error:', err);
+      const errorMessage = err.message || 'An error occurred. Please try again.';
+      console.error('Login error:', errorMessage, err);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -44,14 +77,22 @@ const LoginPage = () => {
     setError('');
     
     try {
-      await signInWithGoogle();
-      navigate('/');
+      console.log('Initiating Google sign in...');
+      const user = await signInWithGoogle();
+      console.log('Google sign in successful, user:', user);
+      
+      // Check if token is stored
+      const token = localStorage.getItem('authToken');
+      console.log('Stored auth token after Google sign in:', token ? 'Token exists' : 'No token found');
+      
+      // The useEffect will handle the redirect when the user state updates
     } catch (err) {
-      setError('An error occurred. Please try again.');
-      console.error('Google sign in error:', err);
+      const errorMessage = err.message || 'An error occurred. Please try again.';
+      console.error('Google sign in error:', errorMessage, err);
+      setError(errorMessage);
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
+
   };
 
   return (

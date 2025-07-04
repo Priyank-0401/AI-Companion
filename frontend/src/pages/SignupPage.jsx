@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/context/AuthContext';
+import useAuth from '../auth/hooks/useAuth';
 import { motion } from 'framer-motion';
 import { User, Mail, Lock, Chrome, Check, ArrowRight } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -156,7 +156,7 @@ const SignupPage = () => {
         </motion.div>
       )}
 
-      <form onSubmit={handleSignup} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <AuthInput
           type="text"
           label="Full Name"

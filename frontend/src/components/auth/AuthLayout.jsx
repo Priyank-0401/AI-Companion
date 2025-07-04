@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/useTheme';
 
 const AuthLayout = ({ children, title, subtitle }) => {
   const { isDark } = useTheme();

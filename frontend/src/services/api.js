@@ -1,8 +1,7 @@
 // API Base URL from environment variable
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
-// Import auth functions
-import { getAuthToken } from '../auth/services/authService';
+import { auth } from '../config/firebase';
 
 /**
  * Helper function to construct API URLs consistently
@@ -14,11 +13,38 @@ export function getApiUrl(path) {
   const cleanBase = API_BASE_URL.replace(/\/+$/, '');
   const cleanPath = path.replace(/^\/+|\/+$/g, '');
   
-  // Always add /api/ unless it's already in the base URL
-  if (!cleanBase.includes('/api')) {
-    return `${cleanBase}/api/${cleanPath}`;
+  // Check if this is a chat endpoint
+  const isChatEndpoint = cleanPath.startsWith('conversations') || 
+                        cleanPath.startsWith('models') ||
+                        cleanPath.startsWith('chat/');
+  
+  let finalUrl;
+  
+  // For development with default localhost URL
+  if (cleanBase.endsWith('3001')) {
+    if (isChatEndpoint) {
+      finalUrl = `${cleanBase}/api/chat/${cleanPath}`;
+    } else {
+      finalUrl = `${cleanBase}/api/${cleanPath}`;
+    }
+  } else {
+    // For production or custom base URLs
+    if (isChatEndpoint) {
+      finalUrl = `${cleanBase}/chat/${cleanPath}`;
+    } else {
+      finalUrl = `${cleanBase}/${cleanPath}`;
+    }
   }
-  return `${cleanBase}/${cleanPath}`;
+  
+  console.log('Constructed API URL:', {
+    originalPath: path,
+    cleanBase,
+    cleanPath,
+    isChatEndpoint,
+    finalUrl
+  });
+  
+  return finalUrl;
 }
 
 /**
@@ -38,106 +64,149 @@ class ApiClient {
   async request(endpoint, options = {}) {
     const url = getApiUrl(endpoint);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(new Error('Request timeout')), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(new Error('Request timeout')), 15000);
+    
+    console.log(`[API] ${options.method || 'GET'} ${endpoint}`, { options });
     
     try {
-      // Always get a fresh token from Firebase
-      let token;
-      try {
-        token = await getAuthToken();
-        console.log('Using token for request to', endpoint);
-      } catch (error) {
-        console.error('Failed to get auth token:', error);
-        throw new Error('Authentication required');
+      // Get auth token from Firebase Auth
+      let token = null;
+      const currentUser = auth.currentUser;
+      
+      if (currentUser) {
+        try {
+          // Force token refresh to ensure it's valid
+          token = await currentUser.getIdToken(true);
+          console.log('Auth token retrieved successfully');
+        } catch (tokenError) {
+          console.error('Error getting auth token:', tokenError);
+          // Clear any stale auth data
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('authUser');
+          }
+          throw new Error('Authentication required. Please sign in again.');
+        }
+      } else {
+        console.warn('No authenticated user found for API request');
+        throw new Error('Authentication required. Please sign in.');
+      }
+      
+      // Set up headers
+      const headers = new Headers(options.headers || {});
+      headers.set('Content-Type', 'application/json');
+      
+      if (token) {
+        console.log('Adding Authorization header with token');
+        headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        console.warn('No auth token available for request');
       }
 
-      // Ensure headers exist
-      const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-        'Authorization': `Bearer ${token}`
+      // Log request details
+      const requestDetails = {
+        url,
+        method: options.method || 'GET',
+        headers: Object.fromEntries(headers.entries()),
+        hasAuthHeader: headers.has('Authorization'),
+        token: headers.get('Authorization')?.substring(0, 20) + '...'
       };
+      console.log('API Request:', requestDetails);
 
       // Make the fetch request
+      console.log(`Making ${options.method || 'GET'} request to:`, url);
       const response = await fetch(url, {
         ...options,
         headers,
         signal: controller.signal,
-        credentials: 'include' // Important for cookies if using them
+        credentials: 'include'
       });
 
-      clearTimeout(timeoutId); // Clear the timeout
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.message || 'API request failed');
-        error.status = response.status;
-        error.data = errorData;
-        throw error;
+      clearTimeout(timeoutId);
+      
+      // Clone the response to read it without consuming the stream
+      const responseClone = response.clone();
+      
+      // Log response details
+      console.log(`Response status: ${response.status} ${response.statusText}`);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      // Try to log response body for debugging
+      try {
+        const text = await responseClone.text();
+        console.log('Response body:', text);
+      } catch (e) {
+        console.log('Could not read response body:', e);
       }
 
-      return response;
-    } catch (error) {
-      console.error('Failed to get auth token:', error);
-      // Don't throw here, let the request proceed without token
-      // The server will return 401 if auth is required
-    }
-    
-    const headers = new Headers(options.headers || {});
-    
-    // Set default headers if not already set
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-    
-    // Include authorization header if token exists
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    
-    // Log the request for debugging
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('API Request:', {
-        url,
-        method: options.method || 'GET',
-        headers: Object.fromEntries(headers.entries())
-      });
-    }
-    
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        credentials: 'include', // Important for sending/receiving cookies
-        signal: controller.signal
-      });
-      
-      console.log('Received response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-      
+      // Handle non-OK responses
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('API Error Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url,
+            errorData
+          });
+        } catch (e) {
+          errorData = { 
+            status: response.status,
+            message: response.statusText || 'An unknown error occurred',
+            isAuthError: response.status === 401
+          };
+        }
+        
         const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
         error.status = response.status;
         error.data = errorData;
+        error.isAuthError = response.status === 401 || errorData.isAuthError;
+        
+        // If this is an auth error, clear any stored auth data
+        if (error.isAuthError && typeof window !== 'undefined') {
+          console.log('Authentication error detected, clearing local storage');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('authUser');
+        }
+        
         throw error;
       }
-      
-      // Clear the timeout since the request completed successfully
+
+      // Parse and return the response
       try {
-        return await response.json();
+        const contentType = response.headers.get('content-type');
+        let data;
+        
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+          console.log(`[API] ${options.method || 'GET'} ${endpoint} response:`, data);
+          return data;
+        }
+        
+        data = await response.text();
+        console.log(`[API] ${options.method || 'GET'} ${endpoint} response (text):`, data);
+        return data;
       } catch (error) {
-        // If response is not JSON, return as text
-        return response.text();
+        console.error('[API] Error parsing response:', error);
+        throw new Error(`Failed to parse response: ${error.message}`);
       }
     } catch (error) {
       // Clear the timeout in case of error
       clearTimeout(timeoutId);
-      console.error(`API request failed: ${error}`);
-      throw error;
+      console.error(`[API] Request failed: ${error.message}`, { 
+        endpoint, 
+        method: options.method || 'GET',
+        error: error.response || error.message 
+      });
+      
+      // Add more context to the error
+      const apiError = new Error(error.message || 'API request failed');
+      apiError.endpoint = endpoint;
+      apiError.method = options.method || 'GET';
+      apiError.originalError = error;
+      
+      throw apiError;
     }
   }
 
@@ -228,13 +297,12 @@ export const chatApi = {
    */
   async sendMessage({ message, model = 'llama3', style = 'supportive', conversationId }) {
     try {
-      const response = await apiClient.post('chat/messages', {
+      return await apiClient.post('chat/messages', {
         message,
         model,
         style,
         conversationId
       });
-      return response.data;
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
@@ -247,8 +315,7 @@ export const chatApi = {
    */
   async getModels() {
     try {
-      const response = await apiClient.get('chat/models');
-      return response.data || [];
+      return await apiClient.get('chat/models') || [];
     } catch (error) {
       console.error('Error fetching models:', error);
       return [];
@@ -261,13 +328,7 @@ export const chatApi = {
    */
   async getConversations() {
     try {
-      const response = await apiClient.get('conversations', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.data || [];
+      return await apiClient.get('conversations') || [];
     } catch (error) {
       console.error('Error fetching conversations:', error);
       return [];
@@ -281,13 +342,7 @@ export const chatApi = {
    */
   async getConversation(conversationId) {
     try {
-      const response = await apiClient.get(`conversations/${conversationId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.data || null;
+      return await apiClient.get(`conversations/${conversationId}`) || null;
     } catch (error) {
       console.error(`Error fetching conversation ${conversationId}:`, error);
       return null;
@@ -321,16 +376,9 @@ export const chatApi = {
       : `conversations/${conversation.id}`;
       
     try {
-      const response = await apiClient.request(url, {
-        method: isNew ? 'POST' : 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(conversation),
-      });
-      return response.data || null;
+      return await apiClient[isNew ? 'post' : 'put'](url, conversation);
     } catch (error) {
-      console.error('Error saving conversation:', error);
+      console.error(`Error ${isNew ? 'creating' : 'updating'} conversation:`, error);
       throw error;
     }
   },

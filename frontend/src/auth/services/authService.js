@@ -17,12 +17,61 @@ const provider = new GoogleAuthProvider();
 provider.addScope('profile');
 provider.addScope('email');
 
+// Token storage keys
+const TOKEN_KEY = 'authToken';
+const USER_KEY = 'authUser';
+
+// Store auth data in local storage
+const storeAuthData = (token, user) => {
+  console.log('Storing auth data in local storage...');
+  console.log('Token to store:', token ? 'Token exists' : 'No token');
+  console.log('User to store:', user ? 'User exists' : 'No user');
+  
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      console.log('Token stored in localStorage');
+    }
+    if (user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      console.log('User data stored in localStorage');
+    }
+    
+    // Verify storage
+    console.log('Verifying storage...');
+    console.log('Stored token:', localStorage.getItem(TOKEN_KEY) ? 'Exists' : 'Missing');
+    console.log('Stored user:', localStorage.getItem(USER_KEY) ? 'Exists' : 'Missing');
+  } else {
+    console.log('Window is undefined, cannot access localStorage');
+  }
+};
+
+// Clear auth data from local storage
+export const clearAuthData = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }
+};
+
+// Get stored auth token
+export const getStoredToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+  return null;
+};
+
 export const signIn = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return await getAuthUser(userCredential.user);
+    const userData = await getAuthUser(userCredential.user);
+    const token = await getAuthToken();
+    storeAuthData(token, userData);
+    return userData;
   } catch (error) {
     console.error('Sign in error:', error);
+    clearAuthData();
     throw error;
   }
 };
@@ -40,19 +89,44 @@ export const signUp = async (email, password, displayName) => {
       url: `${window.location.origin}/verify-email`,
     });
     
-    return await createUserProfile(userCredential.user, { displayName });
+    const userData = await createUserProfile(userCredential.user, { displayName });
+    const token = await getAuthToken();
+    storeAuthData(token, userData);
+    return userData;
   } catch (error) {
     console.error('Sign up error:', error);
+    clearAuthData();
     throw error;
   }
 };
 
 export const signInWithGoogle = async () => {
+  console.log('Starting Google sign in...');
   try {
+    console.log('Opening Google sign in popup...');
     const result = await signInWithPopup(auth, provider);
-    return await ensureUserProfile(result.user);
+    console.log('Google sign in successful, user:', result.user);
+    
+    console.log('Ensuring user profile...');
+    const userData = await ensureUserProfile(result.user);
+    console.log('User profile ensured:', userData);
+    
+    console.log('Getting auth token...');
+    const token = await getAuthToken();
+    console.log('Auth token retrieved:', token ? 'Token exists' : 'No token');
+    
+    console.log('Storing auth data...');
+    storeAuthData(token, userData);
+    
+    // Verify storage after setting
+    console.log('Verifying storage after sign in:');
+    console.log('localStorage token:', localStorage.getItem(TOKEN_KEY) ? 'Exists' : 'Missing');
+    console.log('localStorage user:', localStorage.getItem(USER_KEY) ? 'Exists' : 'Missing');
+    
+    return userData;
   } catch (error) {
     console.error('Google sign in error:', error);
+    clearAuthData();
     throw error;
   }
 };
@@ -60,8 +134,10 @@ export const signInWithGoogle = async () => {
 export const signOut = async () => {
   try {
     await firebaseSignOut(auth);
+    clearAuthData();
   } catch (error) {
     console.error('Sign out error:', error);
+    clearAuthData();
     throw error;
   }
 };
@@ -111,27 +187,69 @@ const getUserDoc = (userId) => {
  * @returns {Promise<string>} The Firebase ID token
  */
 export const getAuthToken = async (forceRefresh = false) => {
+  console.log('getAuthToken called, forceRefresh:', forceRefresh);
+  
   try {
+    console.log('Checking for current user...');
     if (!auth.currentUser) {
+      console.log('No current user, checking stored token...');
+      const storedToken = getStoredToken();
+      console.log('Stored token found:', storedToken ? 'Yes' : 'No');
+      if (storedToken) {
+        console.log('Returning stored token');
+        return storedToken;
+      }
       throw new Error('No user is currently signed in');
     }
-    return await auth.currentUser.getIdToken(forceRefresh);
+    
+    console.log('Getting ID token from Firebase...');
+    const token = await auth.currentUser.getIdToken(forceRefresh);
+    console.log('Token retrieved from Firebase');
+    
+    // Update stored token if it's a new one
+    if (typeof window !== 'undefined') {
+      console.log('Storing token in localStorage...');
+      localStorage.setItem(TOKEN_KEY, token);
+      console.log('Token stored in localStorage');
+      
+      // Verify storage
+      const storedToken = localStorage.getItem(TOKEN_KEY);
+      console.log('Token verification:', storedToken ? 'Stored successfully' : 'Failed to store');
+    }
+    
+    return token;
   } catch (error) {
     console.error('Error getting auth token:', error);
+    clearAuthData();
     throw error;
   }
 };
 
 export const getAuthUser = async (user) => {
-  if (!user) return null;
+  if (!user) {
+    // Try to get user from local storage if no user provided
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem(USER_KEY);
+      if (storedUser) return JSON.parse(storedUser);
+    }
+    return null;
+  }
   
   try {
     const userDoc = await getDoc(getUserDoc(user.uid));
-    return userDoc.exists() 
+    const userData = userDoc.exists() 
       ? { ...user, ...userDoc.data() }
       : await createUserProfile(user);
+    
+    // Store the updated user data
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    }
+    
+    return userData;
   } catch (error) {
     console.error('Get user error:', error);
+    clearAuthData();
     throw error;
   }
 };

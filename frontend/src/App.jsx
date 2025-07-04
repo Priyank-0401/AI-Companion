@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'r
 import { motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -19,23 +20,22 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 
 // Contexts
-import { AuthProvider, useAuth } from './auth/context/AuthContext';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import ChatProvider from './contexts/ChatContext/ChatProvider';
-import { ConversationProvider } from './contexts/ConversationContext';
+import { AuthProvider } from './auth/context/AuthContext';
+import useAuth from './auth/hooks/useAuth';
+import { ThemeProvider, useTheme } from './contexts/useTheme';
 
 import './App.css'
 
 function AppContent() {
   const location = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, initialized } = useAuth();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isHomePage = location.pathname === '/';
   const hideNavbar = false;
   const isDashboardPage = location.pathname === '/dashboard';
   const isSettingsPage = location.pathname === '/settings';
   
-  // Prevent body scrolling on specific pages
+  // Prevent body scrolling on specific pages - must be called unconditionally
   useEffect(() => {
     const isChatRoute = location.pathname.startsWith('/chat');
     if (!isHomePage && !isDashboardPage && !isSettingsPage && !isChatRoute) {
@@ -51,10 +51,10 @@ function AppContent() {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     };
-  }, [isHomePage, isDashboardPage, isSettingsPage, location.pathname]);
+  }, [location.pathname, isHomePage, isDashboardPage, isSettingsPage]);
 
   // Redirect authenticated users away from auth pages
-  if (isAuthPage && user && !loading) {
+  if (isAuthPage && user) {
     return <Navigate to="/" replace />;
   }
   
@@ -66,7 +66,7 @@ function AppContent() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="flex-1"
+        className="flex-1 pt-20"
       >
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -127,38 +127,20 @@ function AppContent() {
   );
 }
 
-// Wrapper component to handle theme application
-const ThemeWrapper = ({ children }) => {
-  const { theme } = useTheme();
-
-  // Apply theme class to html element
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-    
-    // Also set a data-theme attribute for any CSS-in-JS libraries that might need it
-    root.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  return children;
-};
+// Create a client
+const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <ThemeProvider>
-          <ThemeWrapper>
-            <ChatProvider>
-              <ConversationProvider>
-                <AppContent />
-              </ConversationProvider>
-            </ChatProvider>
-          </ThemeWrapper>
-        </ThemeProvider>
-      </AuthProvider>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <AuthProvider>
+          <ThemeProvider>
+            <AppContent />
+          </ThemeProvider>
+        </AuthProvider>
+      </Router>
+    </QueryClientProvider>
   );
 }
 

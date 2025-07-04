@@ -1,19 +1,25 @@
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../auth/context/AuthContext';
+import { Navigate, useLocation } from 'react-router-dom';
+import useAuth from '../auth/hooks/useAuth';
 
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, initialized } = useAuth();
+  const location = useLocation();
   
   // Show loading state while auth is being determined
-  if (loading) {
+  if (loading || !initialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-accent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
   
-  return user ? children : <Navigate to="/login" replace />;
+  // Only redirect to login when we're certain the user is not authenticated
+  if (!user && initialized) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  
+  return children;
 };
 
 export default ProtectedRoute;

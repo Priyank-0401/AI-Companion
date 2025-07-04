@@ -21,6 +21,7 @@
     "@mui/material": "^7.2.0",
     "@react-three/drei": "^10.1.2",
     "@react-three/fiber": "^9.1.2",
+    "@tanstack/react-query": "^5.81.5",
     "@tensorflow/tfjs": "^4.22.0",
     "@types/uuid": "^10.0.0",
     "browserslist": "^4.25.0",

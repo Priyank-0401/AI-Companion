@@ -6,6 +6,10 @@ import { initializeFirebase } from './config/firebase.js';
 // Initialize Firebase and start server
 const startServer = async () => {
   try {
+    // Initialize Firebase first
+    await initializeFirebase();
+    logger.info('Firebase initialized successfully');
+    
     // Start the server
     const server = app.listen(config.app.port, config.app.host, () => {
       logger.info(`Server running in ${config.app.env} mode`);
@@ -40,14 +44,14 @@ const startServer = async () => {
 // Start the server
 let server;
 
-// Initialize Firebase and start the server
+// Initialize and start the server
 const initializeAndStart = async () => {
   try {
     // Initialize Firebase first
     await initializeFirebase();
     logger.info('Firebase initialized successfully');
     
-    // Then start the server
+    // Start the server
     server = await startServer();
     
     // Handle unhandled promise rejections

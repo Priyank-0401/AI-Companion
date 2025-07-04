@@ -1,5 +1,5 @@
 import MoodTracker from '../MoodTracker';
-import { useAuth } from '../../auth/context/AuthContext';
+import useAuth from '../../auth/hooks/useAuth';
 
 const MoodTrackerCard = () => {
   const { currentUser } = useAuth();
