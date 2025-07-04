@@ -53,11 +53,6 @@ export const ChatSidebar = ({
   onSelectConversation = () => {},
   onDeleteConversation = () => {}
 }) => {
-  // Debug: Log conversations when they change
-  useEffect(() => {
-    console.log('ChatSidebar - Received conversations:', conversations);
-  }, [conversations]);
-
   if (!isOpen) return null;
 
   return (

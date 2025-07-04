@@ -78,10 +78,8 @@ class ChatController {
   async getConversations(req, res, next) {
     try {
       const userId = req.user?.uid;
-      console.log('getConversations called with user ID:', userId);
       
       if (!userId) {
-        console.error('No user ID found in request');
         return res.status(401).json({
           success: false,
           message: 'User not authenticated'
@@ -89,30 +87,22 @@ class ChatController {
       }
       
       const { limit = 20, startAfter } = req.query;
-      console.log('Query parameters:', { limit, startAfter });
+      const limitCount = parseInt(limit, 10);
 
-      const result = await FirestoreService.getUserConversations(
+      const { conversations = [], lastVisible } = await FirestoreService.getUserConversations(
         userId,
-        parseInt(limit, 10),
+        limitCount,
         startAfter
       );
-      
-      console.log('FirestoreService.getUserConversations result:', {
-        conversationsCount: result.conversations?.length || 0,
-        lastVisible: result.lastVisible
-      });
 
-      const response = {
+      res.json({
         success: true,
-        data: result.conversations || [],
+        data: conversations,
         pagination: {
-          hasMore: result.conversations?.length === parseInt(limit, 10),
-          nextCursor: result.lastVisible || null,
+          hasMore: conversations.length === limitCount,
+          nextCursor: lastVisible || null,
         },
-      };
-      
-      console.log('Sending response with', response.data.length, 'conversations');
-      res.json(response);
+      });
     } catch (error) {
       logger.error('Error getting conversations:', error);
       next(error);

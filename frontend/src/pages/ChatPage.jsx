@@ -108,58 +108,37 @@ const ChatPage = () => {
     queryKey: ['conversations'],
     queryFn: async () => {
       try {
-        console.log('Fetching conversations...');
         if (!currentUser) {
-          console.log('No current user, cancelling conversations fetch');
           navigate('/login');
           return [];
         }
         
-        console.log('Current user:', currentUser.uid);
-        
         // Get fresh token before making the request
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) {
-          console.log('No Firebase user found, redirecting to login');
           navigate('/login');
           return [];
         }
         
         // Force token refresh to ensure it's valid
-        const token = await firebaseUser.getIdToken(true);
-        console.log('Using token for API request:', token ? 'Token exists' : 'No token');
+        await firebaseUser.getIdToken(true);
         
-        console.log('Fetching conversations with token:', token.substring(0, 10) + '...');
         const response = await chatApi.getConversations();
-        console.log('Raw conversations API response:', response);
-        
-        // Log the exact type and structure of the response
-        console.log('Response type:', typeof response);
-        console.log('Response keys:', Object.keys(response));
         
         // Handle different response formats
-        let conversations = [];
         if (Array.isArray(response)) {
-          console.log('Response is an array with length:', response.length);
-          conversations = response;
+          return response;
         } else if (response?.data && Array.isArray(response.data)) {
-          console.log('Response has data array with length:', response.data.length);
-          conversations = response.data;
+          return response.data;
         } else if (typeof response === 'object' && response !== null) {
-          console.log('Response is an object with keys:', Object.keys(response));
           // Handle case where response is an object with conversation IDs as keys
-          conversations = Object.entries(response).map(([id, data]) => {
-            console.log(`Processing conversation ${id}:`, data);
-            return {
-              id,
-              ...data
-            };
-          });
+          return Object.entries(response).map(([id, data]) => ({
+            id,
+            ...data,
+          }));
         }
         
-        console.log('Processed conversations:', conversations);
-        console.log('Number of conversations:', conversations.length);
-        return conversations;
+        return [];
       } catch (error) {
         console.error('Error in conversations query:', error);
         
@@ -168,7 +147,6 @@ const ChatPage = () => {
             error?.response?.status === 401 || 
             error?.message?.includes('auth') || 
             error?.message?.includes('Authentication')) {
-          console.log('Authentication error detected, signing out...');
           try {
             await auth.signOut();
             if (typeof window !== 'undefined') {
@@ -197,12 +175,11 @@ const ChatPage = () => {
           error?.response?.status === 401 || 
           error?.message?.includes('auth') ||
           error?.message?.includes('Authentication')) {
-        console.log('Auth error in onError, redirecting to login');
         auth.signOut().finally(() => {
           window.location.href = '/login';
         });
       }
-    }
+    },
   });
 
   // Fetch active conversation

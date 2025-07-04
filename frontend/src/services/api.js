@@ -103,18 +103,12 @@ class ApiClient {
         console.warn('No auth token available for request');
       }
 
-      // Log request details
-      const requestDetails = {
-        url,
-        method: options.method || 'GET',
-        headers: Object.fromEntries(headers.entries()),
-        hasAuthHeader: headers.has('Authorization'),
-        token: headers.get('Authorization')?.substring(0, 20) + '...'
-      };
-      console.log('API Request:', requestDetails);
+      // Log minimal request details in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API] ${options.method || 'GET'} ${url}`);
+      }
 
       // Make the fetch request
-      console.log(`Making ${options.method || 'GET'} request to:`, url);
       const response = await fetch(url, {
         ...options,
         headers,
@@ -123,21 +117,6 @@ class ApiClient {
       });
 
       clearTimeout(timeoutId);
-      
-      // Clone the response to read it without consuming the stream
-      const responseClone = response.clone();
-      
-      // Log response details
-      console.log(`Response status: ${response.status} ${response.statusText}`);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      // Try to log response body for debugging
-      try {
-        const text = await responseClone.text();
-        console.log('Response body:', text);
-      } catch (e) {
-        console.log('Could not read response body:', e);
-      }
 
       // Handle non-OK responses
       if (!response.ok) {
