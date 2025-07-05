@@ -23,19 +23,23 @@ const HomePage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
+    <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
       <Hero user={user} scrollToFeatures={scrollToFeatures} />
-      <div ref={featuresRef} className="bg-gray-50 dark:bg-gray-800/50 transition-colors duration-200">
+      <div ref={featuresRef} className="bg-gray-50 dark:bg-gray-800 transition-colors duration-200">
         <Features />
       </div>
-      <HowItWorks />
-      <div className="bg-gray-50 dark:bg-gray-800/50 transition-colors duration-200">
+      <div className="bg-white dark:bg-gray-900 transition-colors duration-200">
+        <HowItWorks />
+      </div>
+      <div className="bg-gray-50 dark:bg-gray-800 transition-colors duration-200">
         <Testimonials />
       </div>
-      <div className="bg-gray-50 dark:bg-gray-800/50 transition-colors duration-200">
+      <div className="bg-white dark:bg-gray-900 transition-colors duration-200">
         <FAQ />
       </div>
-      <CTA user={user} />
+      <div className="bg-gray-50 dark:bg-gray-800 transition-colors duration-200">
+        <CTA user={user} />
+      </div>
     </div>
   );
 };

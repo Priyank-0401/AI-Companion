@@ -1,0 +1,18 @@
+/* Theme transition styles */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Hide content until theme is loaded */
+#root {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+#root.theme-loaded {
+  opacity: 1;
+}

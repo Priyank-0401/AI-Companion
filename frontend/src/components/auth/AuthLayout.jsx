@@ -1,11 +1,20 @@
 import { motion } from 'framer-motion';
 import { useTheme } from '../../contexts/useTheme';
+import { useEffect } from 'react';
 
 const AuthLayout = ({ children, title, subtitle }) => {
   const { isDark } = useTheme();
   
+  // Ensure dark mode is properly applied to the body
+  useEffect(() => {
+    document.body.className = isDark ? 'bg-gray-900' : 'bg-gray-50';
+    return () => {
+      document.body.className = '';
+    };
+  }, [isDark]);
+  
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -29,25 +38,25 @@ const AuthLayout = ({ children, title, subtitle }) => {
               />
             </svg>
           </div>
-          <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">
             Seriva<span className="text-indigo-500">.</span>
           </h1>
-          <h2 className={`text-2xl font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">
             {title}
           </h2>
-          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {subtitle}
           </p>
         </div>
         
         {/* Form Container */}
-        <div className={`p-8 rounded-2xl ${isDark ? 'bg-gray-800/50 backdrop-blur-sm border border-gray-700' : 'bg-white shadow-xl'}`}>
+        <div className="p-8 rounded-2xl bg-white dark:bg-gray-800/50 dark:border dark:border-gray-700 shadow-xl dark:shadow-none backdrop-blur-sm transition-colors duration-200">
           {children}
         </div>
         
         {/* Decorative elements */}
-        <div className={`absolute top-0 right-0 w-32 h-32 -z-10 ${isDark ? 'bg-indigo-900/20' : 'bg-indigo-100'} rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob`}></div>
-        <div className={`absolute bottom-10 left-0 w-32 h-32 -z-10 ${isDark ? 'bg-purple-900/20' : 'bg-purple-100'} rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000`}></div>
+        <div className="fixed top-0 right-0 w-64 h-64 -z-10 bg-indigo-100 dark:bg-indigo-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 dark:opacity-30 animate-blob"></div>
+        <div className="fixed bottom-10 left-0 w-64 h-64 -z-10 bg-purple-100 dark:bg-purple-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 dark:opacity-30 animate-blob animation-delay-2000"></div>
         <div className={`absolute top-1/2 left-1/2 w-40 h-40 -z-10 ${isDark ? 'bg-pink-900/20' : 'bg-pink-100'} rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000`}></div>
       </motion.div>
     </div>

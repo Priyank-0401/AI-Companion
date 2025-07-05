@@ -110,16 +110,16 @@ const FAQ = () => {
         </div>
 
         <div className="mt-16 text-center">
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 max-w-3xl mx-auto">
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-sm border border-gray-100 dark:border-gray-700/50 max-w-3xl mx-auto transition-colors duration-200">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
               Still have questions?
             </h3>
-            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+            <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
               Can't find the answer you're looking for? Our support team is here to help.
             </p>
             <a
               href="mailto:priyankpahwa41@gmail.com"
-              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors duration-200"
+              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-indigo-700 dark:text-indigo-100 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/70 transition-colors duration-200"
             >
               Contact Support
               <svg className="ml-2 -mr-1 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">

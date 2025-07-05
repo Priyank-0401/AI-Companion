@@ -133,13 +133,15 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AuthProvider>
-          <ThemeProvider>
-            <AppContent />
-          </ThemeProvider>
-        </AuthProvider>
-      </Router>
+      <ThemeProvider>
+        <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+          <Router>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
+          </Router>
+        </div>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

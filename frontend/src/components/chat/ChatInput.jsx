@@ -136,7 +136,7 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
   };
 
   return (
-    <div ref={containerRef} className="px-4 py-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-100 dark:border-gray-800">
+    <div ref={containerRef} className="px-4 py-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
       <div className="max-w-3xl mx-auto">
         {/* Emoji Picker */}
         <AnimatePresence>

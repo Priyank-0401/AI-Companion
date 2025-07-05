@@ -1,15 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Seriva - Your personal AI companion for emotional support and wellness" />
-    <meta name="theme-color" content="#22d3ee" />
+    
+    <!-- Theme Color Meta Tags -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" id="light-theme-color">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" id="dark-theme-color">
+    
     <title>Seriva</title>
+    
+    <!-- Prevent theme flash and set initial theme -->
+    <script>
+      (function() {
+        // Get theme from localStorage or system preference
+        const getInitialTheme = () => {
+          const savedTheme = localStorage.getItem('theme');
+          if (savedTheme) return savedTheme;
+          
+          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        };
+        
+        // Set initial theme
+        const theme = getInitialTheme();
+        const root = document.documentElement;
+        
+        // Add theme class before any content renders
+        root.classList.remove('light', 'dark');
+        root.classList.add(theme);
+        root.style.colorScheme = theme;
+        
+        // Set initial theme color meta tag
+        const themeColor = theme === 'dark' ? '#0f172a' : '#ffffff';
+        const metaThemeColor = document.createElement('meta');
+        metaThemeColor.name = 'theme-color';
+        metaThemeColor.content = themeColor;
+        document.head.appendChild(metaThemeColor);
+        
+        // Apply background color to prevent flash
+        document.body.style.backgroundColor = theme === 'dark' ? '#0f172a' : '#ffffff';
+      })();
+    </script>
+    
+    <link rel="stylesheet" href="/src/theme.css">
   </head>
-  <body>
+  <body class="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
