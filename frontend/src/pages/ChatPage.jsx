@@ -594,15 +594,27 @@ const ChatPage = () => {
         setActiveConversation(null);
         setIsNewChat(true);
         
-        // Create a new conversation with a default title
-        const newConversation = await createConversationMutation.mutateAsync('New Chat');
+        // Create a new conversation with a default title and settings
+        const currentStyle = activeConversationData?.style || 'empathetic';
+        const currentModel = activeConversationData?.model || 'llama3:latest';
+        
+        const newConversation = await createConversationMutation.mutateAsync({
+          title: 'New Chat',
+          model: currentModel,
+          style: currentStyle,
+          messages: []
+        });
         
         if (!newConversation?.id) {
           throw new Error('Failed to create conversation: Invalid response from server');
         }
         
-        // The onSuccess handler of the mutation will update the UI
-        // with the new conversation and set it as active
+        // Set the new active conversation
+        setActiveConversation(newConversation.id);
+        setIsNewChat(false);
+        
+        // Invalidate the conversations list to refresh it
+        queryClient.invalidateQueries(['conversations', currentUser?.uid]);
         
         // Dismiss loading toast
         toast.success('New conversation created', { id: loadingToast });
@@ -780,12 +792,12 @@ const ChatPage = () => {
       trimmedLength: messageContent.length 
     });
 
-    if (!activeConversation) {
-      console.log('No active conversation, creating a new one');
+    if (!activeConversation || isNewChat) {
+      console.log('No active conversation or new chat, creating a new one');
       try {
         // Get the current style and model from activeConversationData or use defaults
         const currentStyle = activeConversationData?.style || 'empathetic';
-        const currentModel = activeConversationData?.model || 'llama3';
+        const currentModel = activeConversationData?.model || 'llama3:latest';
         
         console.log('Creating new conversation with settings:', {
           currentStyle,
@@ -816,6 +828,7 @@ const ChatPage = () => {
         if (newConversation?.id) {
           console.log('Setting active conversation to:', newConversation.id);
           setActiveConversation(newConversation.id);
+          setIsNewChat(false); // Reset isNewChat flag when we have a valid conversation
           
           // Now send the first message to the new conversation
           console.log('Sending first message to new conversation:', {

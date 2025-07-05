@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f8fafc;
+    --color-text-primary: #1e293b;
+    --color-text-secondary: #64748b;
+    --color-border: #e2e8f0;
+  }
+
+  .dark {
+    --color-bg-primary: #0f172a;
+    --color-bg-secondary: #1e293b;
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #94a3b8;
+    --color-border: #334155;
+  }
+}
+
+/* Smooth theme transitions */
+* {
+  @apply transition-colors duration-200;
+}
+
+/* Keyframe animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -17,11 +41,23 @@
   to { transform: translateX(0); opacity: 1; }
 }
 
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Animation classes */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
   opacity: 0;
 }
 
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Message transitions */
 .message-enter {
   opacity: 0;
   transform: translateY(10px);
@@ -30,7 +66,7 @@
 .message-enter-active {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 300ms ease-out, transform 300ms ease-out;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
 }
 
 .message-exit {
@@ -41,13 +77,12 @@
 .message-exit-active {
   opacity: 0;
   transform: translateY(-10px);
-  transition: opacity 300ms ease-in, transform 300ms ease-in;
+  transition: opacity 200ms ease-in, transform 200ms ease-in;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  @apply w-1.5 h-1.5;
 }
 
 ::-webkit-scrollbar-track {
@@ -186,8 +221,43 @@
 }
 
 @layer components {
+    /* Glass morphism effect */
+  .glass {
+    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-white/20 dark:border-white/10 shadow-glass dark:shadow-glass-dark;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Buttons */
   .btn-primary {
-    @apply bg-accent hover:bg-accent/90 text-white font-medium py-2.5 px-6 rounded-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] shadow-md hover:shadow-lg;
+    @apply bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-2.5 px-6 rounded-xl transition-all duration-200 ease-in-out transform hover:scale-[1.02] shadow-md hover:shadow-lg active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 font-medium py-2.5 px-6 rounded-xl border border-gray-200 dark:border-slate-700 transition-all duration-200 ease-in-out transform hover:scale-[1.02] shadow-sm hover:shadow-md active:scale-95;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden transition-all duration-200 hover:shadow-xl dark:shadow-slate-900/50;
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500;
+  }
+
+  /* Message bubbles */
+  .message-bubble {
+    @apply max-w-[80%] p-4 rounded-2xl shadow-sm relative transition-all duration-200;
+  }
+
+  .message-sent {
+    @apply bg-blue-500 text-white rounded-tr-none ml-auto shadow-md hover:shadow-lg;
+  }
+
+  .message-received {
+    @apply bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 rounded-tl-none mr-auto shadow-sm hover:shadow-md;
   }
 
   .btn-secondary {

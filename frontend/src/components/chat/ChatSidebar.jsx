@@ -1,6 +1,8 @@
-import { FiPlus, FiSearch, FiCheck, FiX, FiMenu, FiMessageSquare } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiCheck, FiX, FiMenu, FiMessageSquare, FiSun, FiMoon, FiChevronDown, FiHeart, FiZap, FiSmile, FiCompass } from 'react-icons/fi';
+import { FaBrain, FaLaughSquint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
+import { useTheme } from '../../contexts/useTheme';
 
 const ConversationItem = ({ 
   conversation, 
@@ -115,28 +117,44 @@ export const ChatSidebar = ({
   const conversationStyles = [
     { 
       id: 'empathetic', 
-      name: 'Empathetic Listener', 
+      name: 'Empathetic',
+      color: 'text-pink-600',
+      bgColor: 'bg-pink-100 dark:bg-pink-900/20',
+      icon: <FiHeart className="w-4 h-4" />,
+      emoji: '🫂',
       prompt: 'You are an empathetic listener. Respond with warmth, calmness, and without judgment. Focus on emotional support and validation rather than solutions. Be gentle and understanding in your responses.'
     },
     { 
       id: 'coach', 
-      name: 'Insightful Coach', 
+      name: 'Insightful Coach',
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-100 dark:bg-amber-900/20',
+      icon: <FaBrain className="w-4 h-4" />,
+      emoji: '🧠',
       prompt: 'You are an insightful coach. Be encouraging, constructive, and goal-oriented. Help with habit building, goal setting, and productivity. Offer practical suggestions and celebrate progress.'
     },
     { 
       id: 'playful', 
-      name: 'Playful Buddy', 
+      name: 'Playful Buddy',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/20',
+      icon: <FaLaughSquint className="w-4 h-4" />,
+      emoji: '🎭',
       prompt: 'You are a playful and fun companion. Keep the tone casual, friendly, and sometimes humorous. Share jokes, fun facts, and keep the conversation light-hearted.'
     },
     { 
       id: 'mindful', 
-      name: 'Mindful Guide', 
+      name: 'Mindful Guide',
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-100 dark:bg-emerald-900/20',
+      icon: <FiCompass className="w-4 h-4" />,
+      emoji: '🧘‍♀️',
       prompt: 'You are a mindful guide. Maintain a calm, spiritual, and meditative tone. Offer breathing exercises, guided meditations, and gentle reminders for mindfulness and relaxation.'
     }
   ];
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-800">
+    <div className="h-full w-72 flex-shrink-0 flex flex-col bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
       {/* Header */}
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
         <button
@@ -150,37 +168,70 @@ export const ChatSidebar = ({
         </button>
       </div>
 
-      {/* Companion Style Selector */}
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1">Companion Style</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {conversationStyles.map((style) => (
-            <motion.button
-              key={style.id}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => handleStyleChange(style.id)}
-              className={`relative p-3 rounded-xl border transition-all duration-200 text-center ${
-                selectedStyle === style.id
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/70'
-              }`}
+      {/* Conversation Style Dropdown */}
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+        <div className="relative w-full max-w-[240px] mx-auto">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
+            Conversation Style
+          </label>
+          
+          <div className="relative group">
+            {/* Custom Select Button - Hover only */}
+            <div 
+              className="w-full flex items-center justify-between px-4 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 cursor-pointer transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500"
+              onClick={(e) => e.preventDefault()}
             >
-              <div className="flex flex-col items-center">
-                <span className="text-2xl mb-1.5">{style.icon}</span>
-                <div className="font-medium text-xs text-gray-900 dark:text-white">
-                  {style.name.split(' ')[0]}
-                </div>
+              <div className="flex items-center space-x-3">
+                <span className="text-lg">
+                  {conversationStyles.find(s => s.id === selectedStyle)?.emoji}
+                </span>
+                <span className="font-medium">
+                  {conversationStyles.find(s => s.id === selectedStyle)?.name}
+                </span>
               </div>
-              {selectedStyle === style.id && (
-                <div className="absolute top-1 right-1 p-1 text-blue-500">
-                  <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                    <FiCheck className="w-2.5 h-2.5" />
-                  </div>
+              <FiChevronDown className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-y-0.5" />
+            </div>
+
+            {/* Hidden Native Select for Accessibility - Prevent click events */}
+            <select
+              value={selectedStyle}
+              onChange={(e) => handleStyleChange(e.target.value)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              style={{ pointerEvents: 'none' }}
+              aria-label="Select conversation style"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => e.preventDefault()}
+            >
+              {conversationStyles.map((style) => (
+                <option key={style.id} value={style.id}>
+                  {style.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Dropdown Options - Show on hover only */}
+            <div 
+              className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0"
+            >
+              {conversationStyles.map((style) => (
+                <div
+                  key={style.id}
+                  onClick={() => handleStyleChange(style.id)}
+                  className={`flex items-center px-4 py-2.5 text-sm cursor-pointer transition-colors duration-150 ${
+                    selectedStyle === style.id 
+                      ? `${style.bgColor} ${style.color} font-medium`
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600/50'
+                  }`}
+                >
+                  <span className="mr-3 text-lg">{style.emoji}</span>
+                  <span>{style.name}</span>
+                  {selectedStyle === style.id && (
+                    <FiCheck className="ml-auto w-4 h-4" />
+                  )}
                 </div>
-              )}
-            </motion.button>
-          ))}
+              ))}
+            </div>
+          </div>
         </div>
       </div>
       
@@ -240,19 +291,41 @@ export const ChatSidebar = ({
         </AnimatePresence>
       </div>
       
-      {/* User Profile */}
+      {/* User Profile and Theme Toggle */}
       <div className="mt-auto p-4 border-t border-gray-100 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
-        <div className="flex items-center">
-          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-medium shadow-inner">
-            U
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-medium shadow-inner">
+              U
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">User</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Free Plan</p>
+            </div>
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-gray-900 dark:text-white">User</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Free Plan</p>
-          </div>
+          <ThemeToggleButton />
         </div>
       </div>
     </div>
+  );
+};
+
+// Theme Toggle Button Component
+const ThemeToggleButton = () => {
+  const { theme, toggleTheme } = useTheme();
+  
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {theme === 'dark' ? (
+        <FiSun className="w-5 h-5" />
+      ) : (
+        <FiMoon className="w-5 h-5" />
+      )}
+    </button>
   );
 };
 
