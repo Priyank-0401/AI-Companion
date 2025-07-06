@@ -44,7 +44,7 @@ class ChatController {
       const conversation = await FirestoreService.createConversation({
         userId,
         title: title?.trim() || 'New Chat',
-        model: model?.trim() || 'llama3:latest',
+        model: model?.trim() || 'llama3:8B',
         style: style?.trim() || 'empathetic',
       });
 
@@ -219,7 +219,7 @@ class ChatController {
               id: conversationId,
               userId: userId,
               title: req.body.title || 'New Chat',
-              model: req.body.model || 'llama3:latest',
+              model: req.body.model || 'llama3:8B',
               style: req.body.style || 'empathetic',
               messages: []
             });

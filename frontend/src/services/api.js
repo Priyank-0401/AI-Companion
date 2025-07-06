@@ -579,9 +579,9 @@ export const chatApi = {
       // For new conversations, ensure we only send the fields the backend expects
       // Ensure model has the correct format (add :latest if needed for llama3)
       const sanitizeModel = (model) => {
-        if (!model) return 'llama3:latest';
+        if (!model) return 'llama3:8B';
         if (model === 'llama3' || model.startsWith('llama3:')) {
-          return 'llama3:latest';
+          return 'llama3:8B';
         }
         return model;
       };

@@ -71,7 +71,7 @@ class FirestoreService {
         id: conversationData.id || uuidv4(),
         userId: conversationData.userId,
         title: conversationData.title || 'New Chat',
-        model: conversationData.model || 'llama3:latest',
+        model: conversationData.model || 'llama3:8B',
         style: conversationData.style || 'empathetic',
         messages: conversationData.messages || [],
         isArchived: conversationData.isArchived || false,

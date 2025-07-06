@@ -99,7 +99,7 @@ const config = {
   // Ollama Configuration
   ollama: {
     host: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
-    model: process.env.OLLAMA_MODEL || 'llama3:latest',
+    model: process.env.OLLAMA_MODEL || 'llama3:8B',
     timeout: parseInt(process.env.OLLAMA_TIMEOUT) || 30000
   }
 };

@@ -7,7 +7,7 @@ import https from 'https';
 class OllamaService {
   constructor() {
     this.baseUrl = config.ollama.baseUrl || 'http://127.0.0.1:11434';
-    this.defaultModel = config.ollama.defaultModel || 'llama3:latest';
+    this.defaultModel = config.ollama.defaultModel || 'llama3:8B';
     this.timeout = config.ollama.timeout || 300000; // 5 minutes
     this.maxRetries = config.ollama.maxRetries || 2;
     this.agentOptions = {

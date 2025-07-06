@@ -30,9 +30,9 @@ const chatApi = {
   getConversation: (id) => apiClient.get(`chat/conversations/${id}`),
   saveConversation: (conversation) => {
     // Ensure model has the correct format (add :latest if needed for llama3)
-    let model = conversation.model || 'llama3:latest';
+    let model = conversation.model || 'llama3:8B';
     if (model === 'llama3' || model.startsWith('llama3:')) {
-      model = 'llama3:latest';
+      model = 'llama3:8B';
     }
     
     const sanitizedConversation = {
@@ -60,7 +60,7 @@ const chatApi = {
       conversationId, 
       content, 
       message, 
-      model = 'llama3:latest', 
+      model = 'llama3:8B', 
       style = 'empathetic' 
     } = messageData;
     
@@ -494,7 +494,7 @@ const ChatPage = () => {
         
         // Use provided values or fall back to defaults
         const currentStyle = conversationData.style || conversationStyle;
-        const currentModel = conversationData.model || 'llama3:latest';
+        const currentModel = conversationData.model || 'llama3:8B';
         
         // Prepare the conversation data with conversation settings or defaults
         const newConversationData = {
@@ -562,7 +562,7 @@ const ChatPage = () => {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ content, conversationId, model = 'llama3:latest', style = 'empathetic' }) => {
+    mutationFn: async ({ content, conversationId, model = 'llama3:8B', style = 'empathetic' }) => {
       console.log('sendMessage mutation called with:', { 
         conversationId, 
         contentLength: content?.length || 0,
@@ -771,7 +771,7 @@ const ChatPage = () => {
       // Create a new conversation with default settings
       const newConversation = await createConversationMutation.mutateAsync({
         title: 'New Chat',
-        model: 'llama3:latest',  // Default model
+        model: 'llama3:8B',  // Default model
         style: conversationStyle, // Default style
         messages: []
       });
@@ -995,7 +995,7 @@ const ChatPage = () => {
     }
     
     // Define default values
-    const defaultModel = 'llama3:latest';
+    const defaultModel = 'llama3:8B';
     const defaultStyle = 'empathetic';
     
     if (!activeConversation || isNewChat) {

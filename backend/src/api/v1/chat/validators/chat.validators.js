@@ -22,7 +22,7 @@ export const validateCreateConversation = [
     .optional()
     .isString()
     .withMessage('Model must be a string')
-    .isIn(['llama3:latest', 'llama2', 'mistral', 'gemma', 'neural-chat'])
+    .isIn(['llama3:8B', 'llama2', 'mistral', 'gemma', 'neural-chat'])
     .withMessage('Invalid model selection'),
   
   body('style')

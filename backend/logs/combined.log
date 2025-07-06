@@ -4559,3 +4559,283 @@
 {"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 12:47:07"}
 {"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 12:47:07"}
 {"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 12:47:07"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:34"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:36"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:36"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:38:36"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:38:36"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:36"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:40"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:41"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:41"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:38:41"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:38:41"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:41"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:48"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:49"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:49"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:38:49"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:38:49"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:49"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:38:54"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:55"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:38:55"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:38:55"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:38:55"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:38:55"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:39:08"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:39:09"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:39:09"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:39:09"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:39:09"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:39:09"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:40:11"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:40:12"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:40:12"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:40:12"}
+{"level":"info","message":"Mounting health routes at /api/health","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Mounting auth routes at /api/auth","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Mounting chat routes at /api/chat","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Registered Routes:","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: OPTIONS *","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/health/","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /api/auth/register","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /api/auth/login","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /api/auth/forgot-password","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: PATCH  /api/auth/reset-password/:token","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/auth/me","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: PATCH  /api/auth/update-me","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: DELETE /api/auth/delete-me","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/auth/logout","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: PUT    /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: PATCH  /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: DELETE /api/chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /api/chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /api/chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /chat/conversations","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: PUT    /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: PATCH  /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: DELETE /chat/conversations/:conversationId","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: POST   /chat/conversations/:conversationId/messages/stream","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /chat/conversations/:conversationId/messages","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Route: GET    /chat/models","service":"AI-Companion","timestamp":"2025-07-06 13:41:39"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:41:40"}
+{"level":"info","message":"Firebase initialized successfully","service":"AI-Companion","timestamp":"2025-07-06 13:41:40"}
+{"level":"info","message":"Server running in development mode","service":"AI-Companion","timestamp":"2025-07-06 13:41:40"}
+{"level":"info","message":"API Base URL: http://0.0.0.0:3001/api","service":"AI-Companion","timestamp":"2025-07-06 13:41:40"}
+{"level":"info","message":"Health Check: http://0.0.0.0:3001/api/health","service":"AI-Companion","timestamp":"2025-07-06 13:41:40"}
