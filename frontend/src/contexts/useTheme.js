@@ -69,11 +69,8 @@ const ThemeProvider = ({ children }) => {
     toggleTheme
   }), [theme, isDark, toggleTheme]);
 
-  // Prevent flash of wrong theme
-  if (!isMounted) {
-    return null;
-  }
-
+  // Always render the provider with the current theme
+  // The theme will be applied to the DOM once mounted
   return React.createElement(
     ThemeContext.Provider,
     { value },

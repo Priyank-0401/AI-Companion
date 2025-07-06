@@ -43,18 +43,46 @@ const chatApi = {
   },
   deleteConversation: (id) => apiClient.delete(`chat/conversations/${id}`),
   sendMessage: (messageData) => {
-    const { conversationId, content, message, model = 'llama3:latest', style = 'empathetic' } = messageData;
+    // Add null/undefined check for messageData
+    if (!messageData) {
+      console.error('Message data is required');
+      throw new Error('Message data is required');
+    }
+
+    // Add type check for messageData
+    if (typeof messageData !== 'object') {
+      console.error('Message data must be an object', { type: typeof messageData, value: messageData });
+      throw new Error('Message data must be an object');
+    }
+
+    // Destructure with defaults after validation
+    const { 
+      conversationId, 
+      content, 
+      message, 
+      model = 'llama3:latest', 
+      style = 'empathetic' 
+    } = messageData;
+    
+    // Validate required fields
+    if (!conversationId) {
+      console.error('conversationId is required');
+      throw new Error('conversationId is required');
+    }
     
     // Ensure content is a non-empty string
     const messageContent = typeof content === 'string' ? content.trim() : String(content || message || '').trim();
     
     if (!messageContent) {
+      console.error('Message content cannot be empty');
       throw new Error('Message content cannot be empty');
     }
     
     // Log the request payload for debugging
     console.log('Sending message with data:', {
-      content: messageContent,
+      content: messageContent.length > 50 ? 
+        `${messageContent.substring(0, 50)}...` : 
+        messageContent,
       conversationId,
       model,
       style
@@ -90,11 +118,103 @@ const formatConversationDate = (dateString) => {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+// Debug helper function
+const debugLog = (message, data = {}) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`, Object.keys(data).length ? data : '');
+};
+
 const ChatPage = () => {
+  debugLog('=== CHAT PAGE RENDER ===');
+  
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: currentUser, loading: authLoading, logout } = useAuth();
   const { theme } = useTheme();
+  
+  // Define valid styles for safety check
+  const validStyles = ['empathetic', 'coach', 'playful', 'mindful'];
+  const defaultStyle = 'empathetic';
+  
+  // State declarations
+  const [conversationStyle, setConversationStyle] = useState(defaultStyle);
+  const [activeConversation, setActiveConversation] = useState(null);
+  const [isNewChat, setIsNewChat] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Debug effect for tracking component mounts/unmounts
+  useEffect(() => {
+    debugLog('ChatPage mounted');
+    return () => {
+      debugLog('ChatPage unmounting');
+    };
+  }, []);
+  
+  // Debug effect for tracking auth state
+  useEffect(() => {
+    debugLog('Auth state changed', { 
+      isAuthenticated: !!currentUser,
+      userId: currentUser?.uid || 'no user'
+    });
+  }, [currentUser]);
+  
+  // Debug effect for tracking active conversation changes
+  useEffect(() => {
+    debugLog('Active conversation changed', { 
+      activeConversationId: activeConversation,
+      hasStyle: activeConversation && activeConversation.style ? true : 'no style property',
+      style: activeConversation?.style || 'no style'
+    });
+    
+    // Safely update conversation style when active conversation changes
+    if (activeConversation?.style) {
+      setSafeConversationStyle(activeConversation.style);
+    } else {
+      setSafeConversationStyle(defaultStyle);
+    }
+  }, [activeConversation]);
+  
+  // Debug effect for tracking style changes
+  useEffect(() => {
+    debugLog('Conversation style state changed', { conversationStyle });
+  }, [conversationStyle]);
+  
+  // Safe setter for conversation style with validation and debug logging
+  const setSafeConversationStyle = (style) => {
+    try {
+      debugLog('setSafeConversationStyle called', { 
+        inputStyle: style,
+        isValidStyle: style && validStyles.includes(style),
+        validStyles
+      });
+      
+      // If style is valid, use it; otherwise fall back to default
+      const newStyle = (style && validStyles.includes(style)) ? style : defaultStyle;
+      
+      debugLog('Setting conversation style', { 
+        oldStyle: conversationStyle,
+        newStyle,
+        styleChanged: newStyle !== conversationStyle
+      });
+      
+      // Only update if the style has actually changed
+      if (newStyle !== conversationStyle) {
+        setConversationStyle(newStyle);
+      }
+      
+      return newStyle;
+    } catch (error) {
+      console.error('Error in setSafeConversationStyle:', error);
+      // Ensure we always have a valid style even if there's an error
+      setConversationStyle(defaultStyle);
+      return defaultStyle;
+    }
+  };
   
   // Prevent page scrolling when ChatPage is mounted
   useEffect(() => {
@@ -122,14 +242,6 @@ const ChatPage = () => {
       }
     }
   }, [currentUser]);
-
-  const [activeConversation, setActiveConversation] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isNewChat, setIsNewChat] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [conversationToDelete, setConversationToDelete] = useState(null);
 
   // Check if mobile view
   useEffect(() => {
@@ -345,6 +457,15 @@ const ChatPage = () => {
     enabled: !!activeConversation && !isNewChat,
     onSuccess: (data) => {
       console.log('Active conversation loaded:', data);
+      // Always ensure we have a valid style
+      const defaultStyle = 'empathetic';
+      const newStyle = data?.style || defaultStyle;
+      
+      // Only update if different to prevent unnecessary re-renders
+      if (newStyle !== conversationStyle) {
+        console.log('Setting conversation style to:', newStyle);
+        setConversationStyle(newStyle);
+      }
     },
     onError: (error) => {
       console.error('Error loading active conversation:', error);
@@ -353,35 +474,37 @@ const ChatPage = () => {
 
   // Create new conversation mutation
   const createConversationMutation = useMutation({
-    mutationFn: async (firstMessage) => {
+    mutationFn: async (conversationData = {}) => {
       try {
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) {
           throw new Error('No authenticated user');
         }
         
-        // Generate a title from the first message
-        const title = firstMessage.substring(0, 30) + (firstMessage.length > 30 ? '...' : '');
+        // Default title for new conversations
+        let title = conversationData.title || 'New Chat';
+        
+        // If there are messages, use the first one to generate a title
+        if (conversationData.messages?.length > 0 && conversationData.messages[0]?.content) {
+          const firstMessage = conversationData.messages[0].content;
+          title = firstMessage.substring(0, 30) + (firstMessage.length > 30 ? '...' : '');
+        }
+        
         const now = new Date().toISOString();
         
-        // Get the current conversation's style and model from activeConversationData or use defaults
-        const currentStyle = activeConversationData?.style || 'empathetic';
-        const currentModel = activeConversationData?.model || 'llama3';
+        // Use provided values or fall back to defaults
+        const currentStyle = conversationData.style || conversationStyle;
+        const currentModel = conversationData.model || 'llama3:latest';
         
         // Prepare the conversation data with conversation settings or defaults
         const newConversationData = {
           title: title,
           model: currentModel,
           style: currentStyle,
-          lastMessage: firstMessage,
+          lastMessage: conversationData.messages?.[0]?.content || '',
           createdAt: now,
           updatedAt: now,
-          messages: [{
-            id: `temp-${Date.now()}`,
-            content: firstMessage,
-            role: 'user',
-            timestamp: now
-          }]
+          messages: conversationData.messages || []
         };
         
         console.log('Creating conversation with data:', newConversationData);
@@ -390,17 +513,17 @@ const ChatPage = () => {
         const response = await chatApi.saveConversation(newConversationData);
         
         // Handle different response formats
-        const conversationData = response?.data || response;
+        const responseData = response?.data || response;
         
         // Check if we have valid conversation data
-        if (!conversationData?.id) {
+        if (!responseData?.id) {
           const errorMsg = response?.message || 'Failed to create conversation: Invalid response format';
           console.error('Error creating conversation:', errorMsg, response);
           throw new Error(errorMsg);
         }
         
-        console.log('Successfully created conversation:', conversationData.id);
-        return conversationData;
+        console.log('Successfully created conversation:', responseData.id);
+        return responseData;
         
       } catch (error) {
         console.error('Error in createConversation:', error);
@@ -439,21 +562,30 @@ const ChatPage = () => {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ content, conversationId }) => {
-      console.log('sendMessage mutation called with:', { content, conversationId, contentType: typeof content });
+    mutationFn: async ({ content, conversationId, model = 'llama3:latest', style = 'empathetic' }) => {
+      console.log('sendMessage mutation called with:', { 
+        conversationId, 
+        contentLength: content?.length || 0,
+        contentType: typeof content,
+        model,
+        style
+      });
       
       if (!conversationId) {
+        console.error('No conversation ID provided for message');
         throw new Error('No conversation ID provided for message');
       }
       
       // Ensure content is a non-empty string after trimming
       const messageContent = typeof content === 'string' ? content.trim() : String(content).trim();
       if (!messageContent) {
+        console.error('Message content is empty');
         throw new Error('Message content cannot be empty');
       }
 
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
+        console.error('User not authenticated');
         throw new Error('User not authenticated');
       }
 
@@ -466,43 +598,86 @@ const ChatPage = () => {
         // Ensure content is a string
         const messageContent = typeof content === 'string' ? content : String(content);
         
-        // Send the message to the backend
-        const response = await chatApi.sendMessage({
-          content: messageContent,
-          conversationId,
-          stream: false
-        });
-
-        if (!response?.success) {
-          throw new Error('Failed to send message');
-        }
-
-        // Get the updated conversation with the AI response
-        const updatedConversation = await chatApi.getConversation(conversationId);
+        // Show sending state to user
+        toast.loading('Sending message...', { id: 'sending-message' });
         
-        if (!updatedConversation) {
-          throw new Error('Failed to get updated conversation');
-        }
+        try {
+          // Send the message to the backend with a timeout
+          const response = await Promise.race([
+            chatApi.sendMessage({
+              content: messageContent,
+              conversationId,
+              stream: false
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Request took too long. The server might be busy.')), 180000)
+            )
+          ]);
 
-        // Update the local cache with the server response
-        queryClient.setQueryData(['conversation', conversationId], updatedConversation);
-        
-        // Update the conversations list to show the latest message
-        queryClient.setQueryData(['conversations', firebaseUser.uid], (old) => {
-          if (!old) return [updatedConversation];
-          
-          const index = old.findIndex(c => c.id === conversationId);
-          if (index >= 0) {
-            const newConversations = [...old];
-            newConversations[index] = updatedConversation;
-            return newConversations;
+          if (!response?.success) {
+            throw new Error('Failed to get a valid response from the server');
           }
-          return [updatedConversation, ...old];
-        });
 
-        return updatedConversation;
+          // Get the updated conversation with the AI response
+          const updatedConversation = await chatApi.getConversation(conversationId);
+          
+          if (!updatedConversation) {
+            throw new Error('Failed to get updated conversation');
+          }
+
+          // Update the local cache with the server response
+          queryClient.setQueryData(['conversation', conversationId], (old) => ({
+            ...(old || {}),
+            ...updatedConversation,
+            messages: updatedConversation.messages || []
+          }));
+          
+          // Update the conversations list to show the latest message
+          queryClient.setQueryData(['conversations', firebaseUser.uid], (old) => {
+            if (!old) return [updatedConversation];
+            
+            const index = old.findIndex(c => c.id === conversationId);
+            if (index >= 0) {
+              const newConversations = [...old];
+              newConversations[index] = {
+                ...newConversations[index],
+                ...updatedConversation,
+                lastMessage: updatedConversation.lastMessage || newConversations[index].lastMessage,
+                updatedAt: updatedConversation.updatedAt || newConversations[index].updatedAt
+              };
+              return newConversations;
+            }
+            return [updatedConversation, ...old];
+          });
+
+          return updatedConversation;
+        } catch (error) {
+          console.error('Error in sendMessage API call:', error);
+          
+          // Remove the sending state from the UI
+          queryClient.setQueryData(['conversation', conversationId], (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              messages: old.messages.filter(m => !m.isSending)
+            };
+          });
+          
+          throw error;
+        } finally {
+          toast.dismiss('sending-message');
+        }
       } catch (error) {
         console.error('Error in sendMessage mutation:', error);
+        
+        // Show user-friendly error message
+        const errorMessage = error.message.includes('time') || error.message.includes('timeout') || error.message.includes('long')
+          ? 'The request took too long. The server might be busy. Please try again in a moment.'
+          : 'Failed to send message. Please try again.';
+          
+        toast.error(errorMessage);
+        
+        // Re-throw to trigger onError in the mutation
         throw error;
       }
     },
@@ -585,94 +760,132 @@ const ChatPage = () => {
 
   // Handle new chat
   const handleNewChat = async () => {
+    // Show loading state
+    const loadingToast = toast.loading('Creating new conversation...');
+    
     try {
-      // Show loading state
-      const loadingToast = toast.loading('Creating new conversation...');
+      // Reset any existing conversation state after showing loading
+      setActiveConversation(null);
+      setIsNewChat(true);
       
-      try {
-        // Reset any existing conversation state after showing loading
-        setActiveConversation(null);
-        setIsNewChat(true);
-        
-        // Create a new conversation with a default title and settings
-        const currentStyle = activeConversationData?.style || 'empathetic';
-        const currentModel = activeConversationData?.model || 'llama3:latest';
-        
-        const newConversation = await createConversationMutation.mutateAsync({
-          title: 'New Chat',
-          model: currentModel,
-          style: currentStyle,
-          messages: []
-        });
-        
-        if (!newConversation?.id) {
-          throw new Error('Failed to create conversation: Invalid response from server');
-        }
-        
-        // Set the new active conversation
-        setActiveConversation(newConversation.id);
-        setIsNewChat(false);
-        
-        // Invalidate the conversations list to refresh it
-        queryClient.invalidateQueries(['conversations', currentUser?.uid]);
-        
-        // Dismiss loading toast
-        toast.success('New conversation created', { id: loadingToast });
-        
-        // Focus the message input after a short delay to ensure it's rendered
-        setTimeout(() => {
-          const messageInput = document.querySelector('textarea[placeholder="Type a message..."]');
-          if (messageInput) {
-            messageInput.focus();
-          }
-        }, 300);
-        
-        // Close sidebar on mobile
-        if (isMobile) {
-          setIsSidebarOpen(false);
-        }
-        
-        return newConversation;
-      } catch (error) {
-        console.error('Error in handleNewChat:', error);
-        toast.error(error.message || 'Failed to create conversation', { id: loadingToast });
-        throw error;
+      // Create a new conversation with default settings
+      const newConversation = await createConversationMutation.mutateAsync({
+        title: 'New Chat',
+        model: 'llama3:latest',  // Default model
+        style: conversationStyle, // Default style
+        messages: []
+      });
+      
+      if (!newConversation?.id) {
+        throw new Error('Failed to create conversation: Invalid response from server');
       }
+      
+      // Set the new active conversation
+      setActiveConversation(newConversation.id);
+      setIsNewChat(false);
+      
+      // Invalidate the conversations list to refresh it
+      await queryClient.invalidateQueries(['conversations', currentUser?.uid]);
+      
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      toast.success('New conversation created');
+      
+      // Close sidebar on mobile
+      if (isMobile) {
+        setIsSidebarOpen(false);
+      }
+      
+      return newConversation;
     } catch (error) {
-      console.error('Error in handleNewChat:', error);
-      // Error details are already shown by the toast in the inner try-catch
+      console.error('Error creating new conversation:', error);
+      toast.dismiss(loadingToast);
+      toast.error(error.message || 'Failed to create new conversation');
+      throw error;
     }
   };
 
-  // Handle send message - removed duplicate implementation
-  // The main implementation is now using useCallback above
-
   // Handle conversation selection
-  const handleSelectConversation = (conversationId) => {
-    if (!conversationId) return;
-    
-    console.log('Selecting conversation:', conversationId);
-    
-    // Reset any existing optimistic updates or errors
-    queryClient.cancelQueries(['conversation', activeConversation]);
-    
-    // Set the new active conversation
-    setActiveConversation(conversationId);
-    setIsNewChat(false);
-    
-    // Prefetch the conversation data
-    queryClient.prefetchQuery({
-      queryKey: ['conversation', conversationId],
-      queryFn: async () => {
-        const data = await chatApi.getConversation(conversationId);
-        return data?.data || null;
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    });
-    
-    // Close sidebar on mobile
-    if (isMobile) {
-      setIsSidebarOpen(false);
+  const handleSelectConversation = (conversationId, style) => {
+    try {
+      debugLog('handleSelectConversation called', { 
+        conversationId, 
+        style,
+        currentActiveConversation: activeConversation,
+        hasStyleProp: style !== undefined && style !== null
+      });
+      
+      if (!conversationId) {
+        debugLog('No conversationId provided to handleSelectConversation');
+        return;
+      }
+      
+      // Cancel any ongoing queries for the previous conversation
+      debugLog('Cancelling queries for previous conversation', { previousConversationId: activeConversation });
+      queryClient.cancelQueries(['conversation', activeConversation]);
+      
+      // Set the new active conversation
+      debugLog('Setting new active conversation', { conversationId });
+      setActiveConversation(conversationId);
+      
+      // Update the conversation style safely with a default fallback
+      const safeStyle = validStyles.includes(style) ? style : defaultStyle;
+      debugLog('Setting conversation style', { 
+        requestedStyle: style,
+        safeStyle,
+        isValidStyle: validStyles.includes(safeStyle)
+      });
+      setSafeConversationStyle(safeStyle);
+      
+      // Mark that we're not in a new chat
+      debugLog('Setting isNewChat to false');
+      setIsNewChat(false);
+      
+      // Prefetch the conversation data
+      debugLog('Prefetching conversation data', { conversationId });
+      queryClient.prefetchQuery({
+        queryKey: ['conversation', conversationId],
+        queryFn: async () => {
+          try {
+            debugLog('Fetching conversation data', { conversationId });
+            const data = await chatApi.getConversation(conversationId);
+            
+            debugLog('Received conversation data', { 
+              hasData: !!data,
+              hasStyle: !!data?.data?.style,
+              style: data?.data?.style || 'no style'
+            });
+            
+            // Update the style when prefetching if it's available in the response
+            const newStyle = data?.data?.style;
+            if (newStyle && validStyles.includes(newStyle)) {
+              debugLog('Updating style from conversation data', { style: newStyle });
+              setSafeConversationStyle(newStyle);
+            } else {
+              debugLog('Using default style, invalid or missing style in response', { 
+                hasStyle: !!newStyle,
+                isValid: newStyle ? validStyles.includes(newStyle) : false
+              });
+            }
+            
+            return data?.data || null;
+          } catch (error) {
+            console.error('Error in conversation prefetch:', error);
+            throw error;
+          }
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      });
+      
+      // Close sidebar on mobile
+      if (isMobile) {
+        debugLog('Closing mobile sidebar');
+        setIsSidebarOpen(false);
+      }
+    } catch (error) {
+      console.error('Error in handleSelectConversation:', error);
+      // Optionally show error to user
+      toast.error('Failed to select conversation');
     }
   };
 
@@ -747,13 +960,15 @@ const ChatPage = () => {
     }
   });
   
-  const handleDeleteConversation = (conversationId) => {
-    if (!conversationId) {
-      console.error('No conversation ID provided for deletion');
-      return;
-    }
+  // Delete conversation handlers
+  const promptDelete = (conversationId) => {
     setConversationToDelete(conversationId);
     setShowDeleteDialog(true);
+  };
+
+  const cancelDelete = () => {
+    setConversationToDelete(null);
+    setShowDeleteDialog(false);
   };
 
   const confirmDelete = async () => {
@@ -769,43 +984,35 @@ const ChatPage = () => {
     }
   };
 
-  const cancelDelete = () => {
-    setShowDeleteDialog(false);
-    setConversationToDelete(null);
-  };
-
   // Handle sending a message
   const handleSendMessage = useCallback(async (content) => {
     // Ensure content is a string and trim whitespace
-    const messageContent = typeof content === 'string' ? content.trim() : String(content).trim();
+    const messageContent = typeof content === 'string' ? content.trim() : String(content || '').trim();
     
     if (!messageContent) {
-      console.log('Empty message after trimming, not sending');
-      toast.error('Message cannot be empty');
+      console.log('Empty message content, not sending');
       return;
     }
-
-    console.log('handleSendMessage called with content:', { 
-      originalContent: content,
-      messageContent,
-      type: typeof content,
-      trimmedLength: messageContent.length 
-    });
-
+    
+    // Define default values
+    const defaultModel = 'llama3:latest';
+    const defaultStyle = 'empathetic';
+    
     if (!activeConversation || isNewChat) {
-      console.log('No active conversation or new chat, creating a new one');
+      console.log('Creating new conversation for message...');
+      
+      // Safely get style and model with fallbacks
+      const currentStyle = activeConversationData?.style || conversationStyle || defaultStyle;
+      const currentModel = activeConversationData?.model || defaultModel;
+      
+      console.log('Creating new conversation with settings:', {
+        currentStyle,
+        currentModel,
+        hasActiveConversationData: !!activeConversationData,
+        content: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+      });
+      
       try {
-        // Get the current style and model from activeConversationData or use defaults
-        const currentStyle = activeConversationData?.style || 'empathetic';
-        const currentModel = activeConversationData?.model || 'llama3:latest';
-        
-        console.log('Creating new conversation with settings:', {
-          currentStyle,
-          currentModel,
-          hasActiveConversationData: !!activeConversationData,
-          content: content.substring(0, 50) + (content.length > 50 ? '...' : '')
-        });
-        
         const newConversation = await createConversationMutation.mutateAsync({
           title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
           lastMessage: content,
@@ -828,7 +1035,7 @@ const ChatPage = () => {
         if (newConversation?.id) {
           console.log('Setting active conversation to:', newConversation.id);
           setActiveConversation(newConversation.id);
-          setIsNewChat(false); // Reset isNewChat flag when we have a valid conversation
+          setIsNewChat(false);
           
           // Now send the first message to the new conversation
           console.log('Sending first message to new conversation:', {
@@ -846,36 +1053,36 @@ const ChatPage = () => {
           });
         }
       } catch (error) {
-        console.error('Error creating new conversation:', error);
-        toast.error('Failed to start new conversation');
+        console.error('Error in conversation creation:', error);
+        throw error;
       }
     } else {
       // Existing conversation, send message with current conversation settings
       console.log('Sending message to existing conversation:', {
         conversationId: activeConversation,
         hasActiveConversationData: !!activeConversationData,
-        content: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+        content: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : '')
       });
       
       try {
-        // Get the current conversation's style and model from activeConversationData
-        const currentStyle = activeConversationData?.style || 'empathetic';
-        const currentModel = activeConversationData?.model || 'llama3';
+        // Safely get the current conversation's style and model with fallbacks
+        const currentStyle = activeConversationData?.style || conversationStyle || defaultStyle;
+        const currentModel = activeConversationData?.model || defaultModel;
+        
+        if (!activeConversation) {
+          console.error('No active conversation ID available');
+          toast.error('No active conversation');
+          return;
+        }
         
         console.log('Sending message with settings:', {
           style: currentStyle,
           model: currentModel,
-          conversationId: activeConversation,
-          activeConversationData: {
-            id: activeConversationData?.id,
-            style: activeConversationData?.style,
-            model: activeConversationData?.model,
-            title: activeConversationData?.title
-          }
+          conversationId: activeConversation
         });
         
         const messageData = {
-          content: content,
+          content: messageContent,
           conversationId: activeConversation,
           model: currentModel,
           style: currentStyle
@@ -886,19 +1093,78 @@ const ChatPage = () => {
           content: messageData.content.substring(0, 30) + (messageData.content.length > 30 ? '...' : '')
         });
         
-        await sendMessageMutation.mutateAsync(messageData);
+        await sendMessageMutation.mutateAsync(messageData).catch(error => {
+          console.error('Error in sendMessageMutation:', error);
+          throw error; // Re-throw to be caught by the outer catch
+        });
       } catch (error) {
         console.error('Error sending message:', error);
-        toast.error('Failed to send message');
+        toast.error(error.message || 'Failed to send message');
+        throw error; // Re-throw to allow calling code to handle the error if needed
       }
     }
   }, [
-    activeConversation, 
-    createConversationMutation, 
-    sendMessageMutation, 
-    activeConversationData?.style, 
-    activeConversationData?.model
+    activeConversation,
+    isNewChat,
+    activeConversationData,
+    conversationStyle,
+    createConversationMutation,
+    sendMessageMutation
   ]);
+
+  // Handle style change with immediate UI update and optimistic updates
+  const handleStyleChange = useCallback((newStyle) => {
+    if (!newStyle || !validStyles.includes(newStyle)) {
+      console.warn('Invalid style provided:', newStyle);
+      return;
+    }
+    
+    // Update local state immediately for better UX
+    const previousStyle = conversationStyle;
+    setConversationStyle(newStyle);
+    
+    // Update the active conversation's style if we have valid data
+    if (activeConversation && activeConversationData) {
+      const updatedConversation = {
+        ...activeConversationData,
+        style: newStyle,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Update the local cache immediately for instant UI update
+      queryClient.setQueryData(['conversation', activeConversation], updatedConversation);
+      
+      // Also update the conversations list to reflect the style change
+      queryClient.setQueryData(['conversations', currentUser?.uid], (old = []) => {
+        if (!Array.isArray(old)) return old;
+        return old.map(conv => 
+          conv.id === activeConversation 
+            ? { ...conv, style: newStyle, updatedAt: updatedConversation.updatedAt }
+            : conv
+        );
+      });
+      
+      // Then save to the server in the background
+      chatApi.saveConversation(updatedConversation)
+        .then(() => {
+          debugLog('Successfully updated conversation style', { style: newStyle });
+        })
+        .catch(error => {
+          console.error('Failed to update conversation style:', error);
+          // Revert on error
+          setConversationStyle(previousStyle);
+          
+          // Revert the conversation data
+          queryClient.setQueryData(['conversation', activeConversation], {
+            ...updatedConversation,
+            style: previousStyle
+          });
+          
+          // Show error to user
+          toast.error('Failed to update conversation style');
+        });
+    }
+  }, [activeConversation, activeConversationData, conversationStyle, currentUser?.uid, queryClient]);
 
   // Get messages for the active conversation
   const messages = activeConversationData?.messages || [];
@@ -955,8 +1221,10 @@ const ChatPage = () => {
             onSearchChange={setSearchQuery}
             onNewChat={handleNewChat}
             onSelectConversation={handleSelectConversation}
-            onDeleteConversation={handleDeleteConversation}
+            onDeleteConversation={promptDelete}
             selectedConversation={activeConversation}
+            conversationStyle={conversationStyle}
+            onStyleChange={handleStyleChange}
           />
         </div>
 

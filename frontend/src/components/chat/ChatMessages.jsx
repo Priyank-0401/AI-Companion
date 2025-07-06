@@ -5,7 +5,13 @@ import useAuth from '../../auth/hooks/useAuth';
 const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
   const { user } = useAuth();
   const displayName = user?.displayName || 'You';
-  const timeString = new Date(message.timestamp).toLocaleTimeString([], { 
+  
+  // Safely handle message and its properties
+  const safeMessage = message || {};
+  const safeContent = safeMessage.content || '';
+  const safeTimestamp = safeMessage.timestamp || new Date().toISOString();
+  
+  const timeString = new Date(safeTimestamp).toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit' 
   });
@@ -53,7 +59,7 @@ const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
             }`} style={{ maxWidth: '48rem' }}
           >
             <div className="whitespace-pre-wrap text-sm leading-relaxed">
-              {message.content}
+              {safeContent}
             </div>
             
             {/* Message Metadata */}
@@ -64,7 +70,7 @@ const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
               
               {isUser && (
                 <span className="flex items-center" style={{ color: 'rgba(255,255,255,0.8)' }}>
-                  {message.status === 'sending' && (
+                  {safeMessage.status === 'sending' && (
                     <motion.span 
                       animate={{ opacity: [0.5, 1, 0.5] }}
                       transition={{ duration: 1.5, repeat: Infinity }}
@@ -72,14 +78,14 @@ const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
                       <FiCheck className="w-3 h-3" />
                     </motion.span>
                   )}
-                  {message.status === 'sent' && <FiCheck className="w-3 h-3" />}
-                  {message.status === 'delivered' && (
+                  {safeMessage.status === 'sent' && <FiCheck className="w-3 h-3" />}
+                  {safeMessage.status === 'delivered' && (
                     <span className="flex">
                       <FiCheck className="w-3 h-3 -mr-1" />
                       <FiCheck className="w-3 h-3" />
                     </span>
                   )}
-                  {message.status === 'read' && (
+                  {safeMessage.status === 'read' && (
                     <span className="flex text-blue-200">
                       <FiCheckCircle className="w-3 h-3 -mr-1" />
                       <FiCheckCircle className="w-3 h-3" />

@@ -63,20 +63,20 @@ class ApiClient {
     
     const controller = new AbortController();
     
-    // Set a longer timeout for chat endpoints (5 minutes)
+    // Set a longer timeout for chat endpoints (5 minutes to match server)
     const isChatEndpoint = endpoint.includes('chat/');
-    const timeoutDuration = isChatEndpoint ? 300000 : 60000; // 5 minutes for chat, 1 minute for others
-    const timeoutId = setTimeout(
-      () => controller.abort(new Error(`Request timed out after ${timeoutDuration/1000} seconds`)), 
-      timeoutDuration
-    );
+    const timeoutDuration = isChatEndpoint ? 300000 : 120000; // 5 minutes for chat (matching server), 2 minutes for others
+    const timeoutId = setTimeout(() => {
+      controller.abort(new Error(`Request timed out after ${timeoutDuration/1000} seconds`));
+      console.warn(`[API] Request timed out: ${endpoint}`, { timeout: `${timeoutDuration/1000}s` });
+    }, timeoutDuration);
     
-    console.log(`[API] ${fetchOptions.method || 'GET'} ${url}`, { 
-      ...fetchOptions,
-      timeout: `${timeoutDuration/1000}s`,
-      params,
-      body: requestBody
-    });
+    // console.log(`[API] ${fetchOptions.method || 'GET'} ${url}`, { 
+    //   ...fetchOptions,
+    //   timeout: `${timeoutDuration/1000}s`,
+    //   params,
+    //   body: requestBody
+    // });
     
     try {
       // Get auth token from Firebase Auth
@@ -87,7 +87,7 @@ class ApiClient {
         try {
           // Force token refresh to ensure it's valid
           token = await currentUser.getIdToken(true);
-          console.log('Auth token retrieved successfully');
+          // console.log('Auth token retrieved successfully');
         } catch (tokenError) {
           console.error('Error getting auth token:', tokenError);
           // Clear any stale auth data
@@ -116,12 +116,12 @@ class ApiClient {
       
       // Add auth token if available
       if (token) {
-        console.log('Adding Authorization header with token');
+        // console.log('Adding Authorization header with token');
         headers.set('Authorization', `Bearer ${token}`);
       }
       
       // Log the final headers for debugging
-      console.log('Request headers:', Object.fromEntries(headers.entries()));
+      // console.log('Request headers:', Object.fromEntries(headers.entries()));
       
       // Prepare the request options
       const requestOptions = {
@@ -134,16 +134,16 @@ class ApiClient {
       const isBodyAllowed = ['POST', 'PUT', 'PATCH'].includes(requestOptions.method);
       if (isBodyAllowed && requestBody) {
         requestOptions.body = JSON.stringify(requestBody);
-        console.log('Request body:', requestOptions.body);
+        // console.log('Request body:', requestOptions.body);
       }
       
       // Log the request details for debugging
-      console.group(`[API] ${requestOptions.method} ${url}`);
-      console.log('Headers:', Object.fromEntries(requestOptions.headers.entries()));
-      if (fetchOptions.body) {
-        console.log('Body:', fetchOptions.body);
-      }
-      console.groupEnd();
+      // console.group(`[API] ${requestOptions.method} ${url}`);
+      // console.log('Headers:', Object.fromEntries(requestOptions.headers.entries()));
+      // if (fetchOptions.body) {
+      //   console.log('Body:', fetchOptions.body);
+      // }
+      // console.groupEnd();
       
       // Make the fetch request with the updated options
       let response;
@@ -156,16 +156,26 @@ class ApiClient {
         }
         
         // Make the request with a timeout
-        const fetchPromise = fetch(url, requestOptions);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timed out')), 30000)
-        );
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout for chat endpoints
         
-        response = await Promise.race([fetchPromise, timeoutPromise]);
+        // Add signal to request options
+        requestOptions.signal = controller.signal;
+        
+        try {
+          response = await fetch(url, requestOptions);
+          clearTimeout(timeoutId);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error.name === 'AbortError') {
+            throw new Error('Request timed out after 3 minutes');
+          }
+          throw error;
+        }
         console.log('Received response:', response.status, response.statusText);
         
         // Log response headers for debugging
-        console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
+        // console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
         
       } catch (networkError) {
         console.error('Network error details:', {
@@ -201,9 +211,6 @@ class ApiClient {
         // Read the response body only once
         const responseText = await responseClone.text();
         
-        // Log raw response for debugging
-        console.log('Raw response text:', responseText);
-        
         // Try to parse as JSON if content type suggests it or if it looks like JSON
         const isLikelyJson = contentType.includes('application/json') || 
                             (responseText.trim().startsWith('{') || responseText.trim().startsWith('['));
@@ -236,9 +243,9 @@ class ApiClient {
       
       // Log the response for debugging
       console.group(`[API] Response from ${requestOptions.method} ${url}`);
-      console.log('Status:', response.status, response.statusText);
-      console.log('Headers:', Object.fromEntries([...response.headers.entries()]));
-      console.log('Response data:', responseData);
+      // console.log('Status:', response.status, response.statusText);
+      // console.log('Headers:', Object.fromEntries([...response.headers.entries()]));
+      // console.log('Response data:', responseData);
       console.groupEnd();
       
       // Handle non-2xx responses
@@ -590,11 +597,11 @@ export const chatApi = {
             model: sanitizeModel(conversation.model)
           };
       
-      console.log('Sending conversation data:', requestData);
+      // console.log('Sending conversation data:', requestData);
       
       const response = await apiClient[isNew ? 'post' : 'put'](url, requestData);
       
-      console.log('Save conversation response:', response);
+      // console.log('Save conversation response:', response);
       
       // Ensure we have a successful response
       if (!response) {

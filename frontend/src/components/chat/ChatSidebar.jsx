@@ -13,23 +13,33 @@ const ConversationItem = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   
+  // Safely handle null/undefined conversation
+  const safeConversation = conversation || { id: '', title: 'New Chat', lastMessage: '', style: 'empathetic' };
+  const conversationId = safeConversation.id || '';
+  const conversationStyle = safeConversation.style || 'empathetic';
+  
+  // Handle both string and object types for selectedConversation
+  const isSelected = typeof selectedConversation === 'string' 
+    ? selectedConversation === conversationId
+    : selectedConversation?.id === conversationId;
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
       className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
-        selectedConversation === conversation.id
+        isSelected
           ? 'bg-white dark:bg-gray-800 shadow-md border-l-4 border-blue-500 pl-2.5'
           : 'hover:bg-white/80 dark:hover:bg-gray-700/50 border-l-4 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
       }`}
-      onClick={() => onSelect(conversation.id)}
+      onClick={() => onSelect(conversationId, conversationStyle)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-center min-w-0">
         <div className={`p-2 rounded-lg mr-3 ${
-          selectedConversation === conversation.id 
+          isSelected
             ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300' 
             : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
         }`}>
@@ -37,28 +47,28 @@ const ConversationItem = ({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className={`text-sm font-medium truncate ${
-            selectedConversation === conversation.id 
+            isSelected
               ? 'text-gray-900 dark:text-white' 
               : 'text-gray-700 dark:text-gray-300'
           }`}>
-            {conversation.title || 'New Chat'}
+            {safeConversation.title || 'New Chat'}
           </h3>
           <p className={`text-xs truncate ${
-            selectedConversation === conversation.id 
+            isSelected
               ? 'text-gray-500 dark:text-gray-400' 
               : 'text-gray-400 dark:text-gray-500'
           }`}>
-            {conversation.lastMessage || 'No messages yet'}
+            {safeConversation.lastMessage || 'No messages yet'}
           </p>
         </div>
       </div>
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onDelete(conversation.id);
+          onDelete(conversationId);
         }}
         className={`p-1 rounded-full ${
-          isHovered || selectedConversation === conversation.id
+          isHovered || isSelected
             ? 'opacity-100 text-gray-400 hover:text-red-500'
             : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500'
         } transition-opacity`}
@@ -81,9 +91,22 @@ export const ChatSidebar = ({
   onSelectConversation = () => {},
   onDeleteConversation = () => {},
   selectedConversation = null,
-  conversationStyle = 'empathetic',
+  conversationStyle: propStyle,
   onStyleChange = () => {}
 }) => {
+  // Ensure we have a valid style
+  const validatedStyle = propStyle && ['empathetic', 'coach', 'playful', 'mindful'].includes(propStyle) 
+    ? propStyle 
+    : 'empathetic';
+  // Debug logging
+  console.log('=== CHAT SIDEBAR RENDER ===');
+  console.log('validatedStyle:', validatedStyle);
+  console.log('selectedConversation:', selectedConversation);
+  
+  // Debug effect for tracking style changes
+  useEffect(() => {
+    console.log('Conversation style changed:', validatedStyle);
+  }, [validatedStyle]);
   const [isMobile, setIsMobile] = useState(false);
   const searchInputRef = useRef(null);
 
@@ -104,13 +127,22 @@ export const ChatSidebar = ({
   }, [isOpen, isMobile]);
   if (!isOpen) return null;
 
-  const [selectedStyle, setSelectedStyle] = useState(conversationStyle);
+  // Define valid styles for safety check
+  const validStyles = ['empathetic', 'coach', 'playful', 'mindful'];
+  const defaultStyle = 'empathetic';
   
+  // Use the validated style for the dropdown
+  const [selectedStyle, setSelectedStyle] = useState(validatedStyle);
+  
+  // Update selected style when validatedStyle changes
   useEffect(() => {
-    setSelectedStyle(conversationStyle);
-  }, [conversationStyle]);
+    if (validatedStyle && validatedStyle !== selectedStyle) {
+      setSelectedStyle(validatedStyle);
+    }
+  }, [validatedStyle, selectedStyle]);
   
   const handleStyleChange = (styleId) => {
+    if (!styleId) return; // Don't allow setting to null/undefined
     setSelectedStyle(styleId);
     onStyleChange(styleId);
   };
@@ -183,10 +215,10 @@ export const ChatSidebar = ({
             >
               <div className="flex items-center space-x-3">
                 <span className="text-lg">
-                  {conversationStyles.find(s => s.id === selectedStyle)?.emoji}
+                  {conversationStyles.find(s => s.id === selectedStyle)?.emoji || '🫂'}
                 </span>
                 <span className="font-medium">
-                  {conversationStyles.find(s => s.id === selectedStyle)?.name}
+                  {conversationStyles.find(s => s.id === selectedStyle)?.name || 'Empathetic'}
                 </span>
               </div>
               <FiChevronDown className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-y-0.5" />
@@ -215,7 +247,7 @@ export const ChatSidebar = ({
             >
               {conversationStyles.map((style) => (
                 <div
-                  key={style.id}
+                  key={`style-${style.id}`}
                   onClick={() => handleStyleChange(style.id)}
                   className={`flex items-center px-4 py-2.5 text-sm cursor-pointer transition-colors duration-150 ${
                     selectedStyle === style.id 
@@ -223,10 +255,10 @@ export const ChatSidebar = ({
                       : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600/50'
                   }`}
                 >
-                  <span className="mr-3 text-lg">{style.emoji}</span>
-                  <span>{style.name}</span>
+                  <span key={`emoji-${style.id}`} className="mr-3 text-lg">{style.emoji}</span>
+                  <span key={`name-${style.id}`}>{style.name}</span>
                   {selectedStyle === style.id && (
-                    <FiCheck className="ml-auto w-4 h-4" />
+                    <FiCheck key={`check-${style.id}`} className="ml-auto w-4 h-4" />
                   )}
                 </div>
               ))}

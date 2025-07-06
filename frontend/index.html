@@ -15,34 +15,51 @@
     
     <!-- Prevent theme flash and set initial theme -->
     <script>
-      (function() {
-        // Get theme from localStorage or system preference
-        const getInitialTheme = () => {
-          const savedTheme = localStorage.getItem('theme');
-          if (savedTheme) return savedTheme;
+      document.addEventListener('DOMContentLoaded', function() {
+        try {
+          // Get theme from localStorage or system preference
+          const getInitialTheme = () => {
+            try {
+              const savedTheme = localStorage.getItem('theme');
+              if (savedTheme) return savedTheme;
+              return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            } catch (e) {
+              console.error('Error getting theme:', e);
+              return 'light'; // Default to light theme if any error occurs
+            }
+          };
           
-          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        };
-        
-        // Set initial theme
-        const theme = getInitialTheme();
-        const root = document.documentElement;
-        
-        // Add theme class before any content renders
-        root.classList.remove('light', 'dark');
-        root.classList.add(theme);
-        root.style.colorScheme = theme;
-        
-        // Set initial theme color meta tag
-        const themeColor = theme === 'dark' ? '#0f172a' : '#ffffff';
-        const metaThemeColor = document.createElement('meta');
-        metaThemeColor.name = 'theme-color';
-        metaThemeColor.content = themeColor;
-        document.head.appendChild(metaThemeColor);
-        
-        // Apply background color to prevent flash
-        document.body.style.backgroundColor = theme === 'dark' ? '#0f172a' : '#ffffff';
-      })();
+          // Set initial theme
+          const theme = getInitialTheme();
+          const root = document.documentElement;
+          
+          if (root) {
+            root.classList.remove('light', 'dark');
+            root.classList.add(theme);
+            if (root.style) {
+              root.style.colorScheme = theme;
+            }
+            
+            // Set initial theme color meta tag
+            const themeColor = theme === 'dark' ? '#0f172a' : '#ffffff';
+            let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+            
+            if (!metaThemeColor) {
+              metaThemeColor = document.createElement('meta');
+              metaThemeColor.name = 'theme-color';
+              document.head.appendChild(metaThemeColor);
+            }
+            metaThemeColor.content = themeColor;
+            
+            // Apply background color to prevent flash
+            if (document.body) {
+              document.body.style.backgroundColor = themeColor;
+            }
+          }
+        } catch (e) {
+          console.error('Error initializing theme:', e);
+        }
+      });
     </script>
     
     <link rel="stylesheet" href="/src/theme.css">
