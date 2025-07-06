@@ -12,14 +12,6 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   const handleAuthStateChanged = useCallback(async (firebaseUser) => {
-    console.log('[AuthProvider] Auth state changed, firebaseUser:', firebaseUser ? {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      displayName: firebaseUser.displayName,
-      emailVerified: firebaseUser.emailVerified,
-      hasPhoto: !!firebaseUser.photoURL
-    } : 'No user');
-    
     try {
       if (firebaseUser) {
         const userData = {

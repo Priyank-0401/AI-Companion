@@ -522,17 +522,11 @@ const AvatarCallPage = () => {
       return;
     }
 
-    console.log('Initializing speech recognition...');
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
     
-    console.log('Speech recognition settings:', {
-      continuous: recognition.continuous,
-      interimResults: recognition.interimResults,
-      lang: recognition.lang
-    });
 
     let isStarting = false;
     let retryCount = 0;
@@ -543,10 +537,7 @@ const AvatarCallPage = () => {
       if (isStarting || retryCount >= MAX_RETRIES) return;
       isStarting = true;
       
-      console.log('Starting speech recognition, attempt', retryCount + 1);
-      
       recognition.start().then(() => {
-        console.log('Speech recognition started successfully');
         retryCount = 0; // Reset retry count on success
         setError(null); // Clear any previous errors
       }).catch(error => {
@@ -688,11 +679,9 @@ const AvatarCallPage = () => {
     
     // Cleanup function
     return () => {
-      console.log('Cleaning up speech recognition...');
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-          console.log('Speech recognition stopped during cleanup');
         } catch (e) {
           console.error('Error stopping recognition during cleanup:', e);
         } finally {
@@ -703,7 +692,6 @@ const AvatarCallPage = () => {
       // Clean up any ongoing speech synthesis
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
-        console.log('Cancelled any ongoing speech synthesis');
       }
       
       // Clean up any ongoing processing
@@ -788,7 +776,6 @@ const AvatarCallPage = () => {
       if (!isListening || !isMounted) return;
       
       try {
-        console.log('🎤 Starting speech recognition...');
         recognition.start();
       } catch (error) {
         console.error('❌ Failed to start speech recognition:', error);
@@ -801,7 +788,6 @@ const AvatarCallPage = () => {
     
     const stopRecognition = () => {
       try {
-        console.log('🛑 Stopping speech recognition...');
         recognition.stop();
       } catch (error) {
         console.error('Error stopping recognition:', error);
@@ -1228,7 +1214,7 @@ const AvatarCallPage = () => {
                 title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
               >
                 {isListening ? (
-                  <Volume className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
+                  <Volume2 className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
                 ) : (
                   <MicOff className="w-6 h-6 text-gray-900 dark:text-white/80" />
                 )}

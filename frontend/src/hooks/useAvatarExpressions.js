@@ -102,7 +102,6 @@ export const useAvatarExpressions = (
   // NEW: Handle forced expressions (like greeting smile)
   useEffect(() => {
     if (forceExpression) {
-      console.log(` Forcing expression: ${forceExpression}`);
       setCurrentExpression(forceExpression);
 
       // Clear any existing expression timers when forcing
@@ -149,8 +148,6 @@ export const useAvatarExpressions = (
     
     // Calculate actual delay with jitter
     const actualDelay = getDelayedAction(delay, jitter);
-    
-    // console.log(`Transitioning from ${previousEmotion.current} to ${newEmotion} (${transitionType} transition, ${actualDelay.toFixed(0)}ms)`);
     
     // Queue the expression with medium priority
     expressionManager.current.queueExpression(
@@ -214,26 +211,20 @@ export const useAvatarExpressions = (
       const [minInterval, maxInterval] = blinkInterval;
       const interval = minInterval + Math.random() * (maxInterval - minInterval);
 
-      console.log(` Next blink scheduled in ${interval}ms`);
       blinkTimer.current = setTimeout(() => {
-        console.log(` Blink timer fired. Current expression: ${currentExpression}`);
-
         // Allow blinking even with mild expressions, but not during strong emotions
         const allowBlinking = currentExpression === 'neutral' ||
           currentExpression === 'smile' ||
           Math.random() < 0.3; // 30% chance to blink during other expressions
 
         if (allowBlinking && Math.random() < 0.8) { // Increased probability to 80%
-          console.log(' Starting blink');
           setIsBlinking(true);
 
           // Brief blink without changing the main expression
           setTimeout(() => {
-            console.log(' Ending blink');
             setIsBlinking(false);
           }, 150);
         } else {
-          console.log(` Skipping blink - expression: ${currentExpression}, allowBlinking: ${allowBlinking}`);
         }
 
         // Schedule next blink
@@ -253,7 +244,6 @@ export const useAvatarExpressions = (
   // NEW: Reset to neutral when forced expression is removed
   useEffect(() => {
     if (forceExpression === null && currentExpression !== 'neutral' && !isTalking) {
-      // console.log(' Resetting to neutral expression after forced expression');
       setCurrentExpression('neutral');
     }
   }, [forceExpression, currentExpression, isTalking]);
