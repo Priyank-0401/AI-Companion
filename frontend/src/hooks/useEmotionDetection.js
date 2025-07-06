@@ -6,8 +6,8 @@ const EMOTION_MAPPING = {
   'sad': 'sad',
   'angry': 'angry',
   'surprised': 'surprised',
-  'disgusted': 'neutral',
-  'fearful': 'neutral',
+  'disgusted': 'disgusted',
+  'fearful': 'fearful',
   'neutral': 'neutral'
 };
 
@@ -34,6 +34,9 @@ export const useEmotionDetection = (options = {}) => {
   const videoRef = useRef(null);
   const detectionInterval = useRef(null);
   const modelsLoaded = useRef(false);
+  const lastEmotionChange = useRef(Date.now());
+  const currentDetectedEmotion = useRef('neutral');
+  const EMOTION_CHANGE_COOLDOWN = 5000; // 5 seconds cooldown between emotion changes
 
   // Load face-api.js models
   const loadModels = useCallback(async () => {
@@ -182,9 +185,14 @@ export const useEmotionDetection = (options = {}) => {
 
   // Stop video stream
   const stopVideo = useCallback(() => {
+    let wasStreaming = false;
+    
     if (streamRef.current) {
       const tracks = streamRef.current.getTracks();
-      tracks.forEach(track => track.stop());
+      tracks.forEach(track => {
+        track.stop();
+        wasStreaming = true;
+      });
       streamRef.current = null;
       
       if (videoRef.current) {
@@ -192,9 +200,20 @@ export const useEmotionDetection = (options = {}) => {
       }
       
       setHasCameraAccess(false);
-      return true;
     }
-    return false;
+    
+    // Clear any pending detections
+    if (detectionInterval.current) {
+      clearInterval(detectionInterval.current);
+      detectionInterval.current = null;
+    }
+    
+    // Reset emotion state
+    setEmotion('neutral');
+    currentDetectedEmotion.current = 'neutral';
+    lastEmotionChange.current = Date.now();
+    
+    return wasStreaming;
   }, []);
 
   // Check if models are loaded
@@ -297,32 +316,39 @@ export const useEmotionDetection = (options = {}) => {
 
       if (detections.length > 0) {
         const detection = detections[0];
-        // console.log('Face detection box:', JSON.stringify(detection.detection?.box, null, 2));
+        const now = Date.now();
+        const timeSinceLastChange = now - lastEmotionChange.current;
         
         if (detection.expressions) {
           const expressions = detection.expressions;
           // console.log('Raw expressions:', JSON.stringify(expressions, null, 2));
           
           const sortedExpressions = Object.entries(expressions)
-            .filter(([_, value]) => typeof value === 'number') // Ensure we only have numeric values
+            .filter(([_, value]) => typeof value === 'number' && value > EMOTION_THRESHOLD)
             .sort(([, a], [, b]) => b - a);
 
           if (sortedExpressions.length > 0) {
-            const [dominantEmotion, confidence] = sortedExpressions[0];
-            // console.log(`Dominant emotion: ${dominantEmotion} (${Math.round(confidence * 100)}%)`);
+            const [dominantEmotion] = sortedExpressions[0];
+            const mappedEmotion = EMOTION_MAPPING[dominantEmotion] || 'neutral';
             
-            if (confidence > EMOTION_THRESHOLD) {
-              const mappedEmotion = EMOTION_MAPPING[dominantEmotion] || dominantEmotion;
-              // console.log(`Mapped emotion: ${mappedEmotion}`);
-              return mappedEmotion;
+            // Only update emotion if cooldown has passed or if we're changing to neutral
+            if (timeSinceLastChange >= EMOTION_CHANGE_COOLDOWN || currentDetectedEmotion.current === 'neutral') {
+              if (mappedEmotion !== currentDetectedEmotion.current) {
+                console.log(`Emotion changing from ${currentDetectedEmotion.current} to ${mappedEmotion}`);
+                currentDetectedEmotion.current = mappedEmotion;
+                lastEmotionChange.current = now;
+                setEmotion(mappedEmotion);
+                onEmotionDetected(mappedEmotion);
+              }
             } else {
-              console.log(`Confidence (${Math.round(confidence * 100)}%) below threshold (${EMOTION_THRESHOLD * 100}%)`);
+              console.log(`Emotion change on cooldown. Time remaining: ${Math.ceil((EMOTION_CHANGE_COOLDOWN - timeSinceLastChange) / 1000)}s`);
             }
+            
+            return currentDetectedEmotion.current;
           } else {
-            console.log('No valid expressions detected');
+            console.log('No expressions above confidence threshold');
+            return currentDetectedEmotion.current;
           }
-        } else {
-          // console.log('No expressions detected in face detection');
         }
       } else {
         // console.log('No faces detected in the frame');
@@ -392,52 +418,73 @@ export const useEmotionDetection = (options = {}) => {
 
   // Start/stop detection interval when camera is ready and enabled
   useEffect(() => {
-    if (!isReady || !enabled || !hasCameraAccess) {
+    // Cleanup function to clear interval and reset state
+    const cleanup = () => {
       if (detectionInterval.current) {
-        // console.log('Stopping detection interval');
         clearInterval(detectionInterval.current);
         detectionInterval.current = null;
       }
+      setEmotion('neutral');
+      currentDetectedEmotion.current = 'neutral';
+      lastEmotionChange.current = Date.now();
+    };
+
+    if (!isReady || !enabled || !hasCameraAccess) {
+      cleanup();
       return;
     }
     
     // console.log('Starting detection interval');
-
-    // Clear any existing interval
-    if (detectionInterval.current) {
-      clearInterval(detectionInterval.current);
-    }
+    cleanup(); // Clear any existing interval
 
     let isDetecting = false;
+    let isMounted = true;
     
     // Start new detection interval
     const startDetection = async () => {
-      if (isDetecting) return;
+      // Skip if we're already detecting or component is unmounted
+      if (isDetecting || !isMounted) return;
+      
       isDetecting = true;
       
       try {
+        // Skip if camera access was lost during detection
+        if (!hasCameraAccess) return;
+        
         const detectedEmotion = await detectEmotions();
-        if (detectedEmotion) {
-          // console.log('Setting new emotion:', detectedEmotion);
+        if (detectedEmotion && isMounted) {
           setEmotion(detectedEmotion);
           if (typeof onEmotionDetected === 'function') {
             onEmotionDetected(detectedEmotion);
           }
         }
       } catch (error) {
-        console.error('Error in emotion detection:', error);
+        if (isMounted) {
+          console.error('Error in emotion detection:', error);
+        }
       } finally {
-        isDetecting = false;
+        if (isMounted) {
+          isDetecting = false;
+        }
       }
     };
 
     // Run detection immediately and then at intervals
     const initialDetection = async () => {
+      if (!isMounted) return;
       await startDetection();
-      detectionInterval.current = setInterval(startDetection, EMOTION_UPDATE_INTERVAL);
+      if (isMounted) {
+        detectionInterval.current = setInterval(startDetection, EMOTION_UPDATE_INTERVAL);
+      }
     };
     
     initialDetection();
+    
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      isMounted = false;
+      cleanup();
+    };
 
     return () => {
       if (detectionInterval.current) {

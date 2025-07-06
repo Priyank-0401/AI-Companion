@@ -205,7 +205,7 @@ const AvatarCallPage = () => {
     startVideo,
     stopVideo
   } = useEmotionDetection({
-    enabled: true,
+    enabled: isCameraEnabled, // Only enable when camera is on
     onEmotionDetected: (emotion) => {
       console.log('Detected emotion:', emotion);
       setEmotion(emotion);
@@ -218,40 +218,39 @@ const AvatarCallPage = () => {
   // Handle camera toggle
   const handleToggleCamera = useCallback(async () => {
     try {
-      // First ensure models are loaded
-      if (!areModelsLoaded()) {
-        console.log('Loading models...');
-        const loaded = await loadModels();
-        if (!loaded) {
-          console.error('Failed to load models');
-          return;
-        }
-      }
+      const newCameraState = !isCameraEnabled;
       
-      // Toggle camera
-      const success = await toggleEmotionDetection(!isCameraEnabled);
-      if (success) {
-        const newCameraState = !isCameraEnabled;
-        setIsCameraEnabled(newCameraState);
-        
-        // Start/stop detection based on camera state
-        if (newCameraState) {
-          const stream = await startVideo();
-          if (stream && previewVideoRef.current) {
-            previewVideoRef.current.srcObject = stream;
+      // If turning on, ensure models are loaded first
+      if (newCameraState) {
+        if (!areModelsLoaded()) {
+          console.log('Loading models...');
+          const loaded = await loadModels();
+          if (!loaded) {
+            console.error('Failed to load models');
+            return;
           }
+        }
+        
+        // Start video and detection
+        const stream = await startVideo();
+        if (stream && previewVideoRef.current) {
+          previewVideoRef.current.srcObject = stream;
           // Small delay to ensure video is playing
           setTimeout(() => {
             startDetection();
           }, 500);
-        } else {
-          stopDetection();
-          await stopVideo();
-          if (previewVideoRef.current) {
-            previewVideoRef.current.srcObject = null;
-          }
+        }
+      } else {
+        // Stop video and detection
+        stopDetection();
+        await stopVideo();
+        if (previewVideoRef.current) {
+          previewVideoRef.current.srcObject = null;
         }
       }
+      
+      // Update camera state
+      setIsCameraEnabled(newCameraState);
     } catch (error) {
       console.error('Error toggling camera:', error);
       setError(error.message || 'Failed to toggle camera');
