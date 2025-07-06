@@ -23,7 +23,7 @@ import {
   Video,
   VideoOff,
   Maximize2,
-  Minimize2
+  Minimize2,
 } from 'lucide-react';
 
 import voiceService from '../services/voiceService';
@@ -153,7 +153,7 @@ const sendToOllama = async (message, conversationHistory, setConversationHistory
   }
 };
 
-const AvatarCallPage = () => {  
+const AvatarCallPage = () => {
   const recognitionRef = useRef(null);
   const audioRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -183,82 +183,118 @@ const AvatarCallPage = () => {
   const [emotion, setEmotion] = useState('neutral');
   
   // Camera preview state
-  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   
   // Camera state
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
 
-  // Emotion detection - starts with camera disabled by default
-  const { 
-    videoRef, 
-    videoStream,
-    isReady: isEmotionReady, 
-    hasCameraAccess, 
+  // Emotion detection - starts with camera 
+  const {
+    videoRef: emotionVideoRef,
+    isReady: isEmotionDetectionReady,
+    hasCameraAccess,
     error: emotionError,
-    stopVideo,
-    startVideo
-  } = useEmotionDetection({ 
-    enabled: isCameraEnabled,
-    onEmotionDetected: (detectedEmotion) => {
-      setEmotion(detectedEmotion);
-    }
+    toggleVideo: toggleEmotionDetection,
+    isDetecting: isEmotionDetectionActive,
+    emotion: currentEmotion,
+    startDetection,
+    stopDetection,
+    areModelsLoaded,
+    loadModels,
+    startVideo,
+    stopVideo
+  } = useEmotionDetection({
+    enabled: true,
+    onEmotionDetected: (emotion) => {
+      console.log('Detected emotion:', emotion);
+      setEmotion(emotion);
+    },
   });
+
+  // Create a separate ref for the preview video
+  const previewVideoRef = useRef(null);
+  
+  // Handle camera toggle
+  const handleToggleCamera = useCallback(async () => {
+    try {
+      // First ensure models are loaded
+      if (!areModelsLoaded()) {
+        console.log('Loading models...');
+        const loaded = await loadModels();
+        if (!loaded) {
+          console.error('Failed to load models');
+          return;
+        }
+      }
+      
+      // Toggle camera
+      const success = await toggleEmotionDetection(!isCameraEnabled);
+      if (success) {
+        const newCameraState = !isCameraEnabled;
+        setIsCameraEnabled(newCameraState);
+        
+        // Start/stop detection based on camera state
+        if (newCameraState) {
+          const stream = await startVideo();
+          if (stream && previewVideoRef.current) {
+            previewVideoRef.current.srcObject = stream;
+          }
+          // Small delay to ensure video is playing
+          setTimeout(() => {
+            startDetection();
+          }, 500);
+        } else {
+          stopDetection();
+          await stopVideo();
+          if (previewVideoRef.current) {
+            previewVideoRef.current.srcObject = null;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling camera:', error);
+      setError(error.message || 'Failed to toggle camera');
+    }
+  }, [isCameraEnabled, areModelsLoaded, loadModels, toggleEmotionDetection, startVideo, stopVideo, startDetection, stopDetection]);
+  
+  // Update preview video source when stream changes
+  useEffect(() => {
+    if (previewVideoRef.current && emotionVideoRef?.current?.srcObject) {
+      previewVideoRef.current.srcObject = emotionVideoRef.current.srcObject;
+      previewVideoRef.current.play().catch(err => {
+        console.error('Error playing preview video:', err);
+      });
+    }
+  }, [emotionVideoRef?.current?.srcObject]);
 
   // Toggle camera
   const toggleCamera = useCallback(async () => {
-    const newState = !isCameraEnabled;
-    console.log('Toggling camera to:', newState);
-    
-    if (newState) {
-      // When enabling camera
-      setIsPreviewVisible(true);
-      setIsCameraEnabled(true);
-    } else {
-      // When disabling camera
-      setIsCameraEnabled(false);
-      // Reset emotion to neutral when camera is off
-      setEmotion('neutral');
-      
-      // Stop any active video tracks
-      if (videoRef?.current?.srcObject) {
-        const stream = videoRef.current.srcObject;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-      }
-    }
-  }, [isCameraEnabled]);
+    await handleToggleCamera();
+  }, [handleToggleCamera]);
 
-  // Cleanup on unmount
+  // Cleanup video streams on unmount
   useEffect(() => {
     return () => {
-      // Cleanup camera on unmount
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-        videoRef.current.srcObject = null;
+      // Clean up emotion detection video
+      if (emotionVideoRef.current) {
+        const stream = emotionVideoRef.current.srcObject;
+        if (stream) {
+          const tracks = stream.getTracks();
+          tracks.forEach(track => track.stop());
+        }
+      }
+      // Clean up preview video
+      if (previewVideoRef.current) {
+        const stream = previewVideoRef.current.srcObject;
+        if (stream) {
+          const tracks = stream.getTracks();
+          tracks.forEach(track => track.stop());
+          previewVideoRef.current.srcObject = null;
+        }
       }
     };
-  }, []);
-
-  // Handle camera toggle
-  useEffect(() => {
-    if (!isCameraEnabled) {
-      stopVideo?.();
-      setEmotion('neutral');
-    } else {
-      startVideo?.();
-    }
-  }, [isCameraEnabled, startVideo, stopVideo]);
-
-  // Log detected emotion
-  useEffect(() => {
-    if (emotion) {
-      console.log('Detected emotion:', emotion);
-    }
-  }, [emotion]);
+  }, [emotionVideoRef, previewVideoRef]);
 
   // Handle delayed animation state
   useEffect(() => {
@@ -828,7 +864,7 @@ const AvatarCallPage = () => {
     if (audioContextRef.current && audioContextRef.current.gain) {
       audioContextRef.current.gain.gain.value = isMuted ? 0 : newVolume / 100;
     }
-  }, [isMuted]);
+  }, [isMuted, systemVolume]);
 
   const showVolumeSliderOnHover = useCallback(() => {
     if (volumeHoverTimeoutRef.current) {
@@ -1016,7 +1052,7 @@ const AvatarCallPage = () => {
   }
   
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white overflow-hidden transition-colors duration-200">
       {/* Custom styles for volume slider */}
       <style jsx="true">{`
         input[type="range"] {
@@ -1071,19 +1107,25 @@ const AvatarCallPage = () => {
       <div className="relative w-full h-full overflow-hidden">
         {/* Hidden video element for emotion detection */}
         <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          style={{
+          ref={emotionVideoRef}
+          style={{ 
             position: 'absolute',
-            top: '-9999px',
-            left: '-9999px',
-            width: '1px',
-            height: '1px',
-            opacity: 0,
+            top: 0,
+            left: 0,
+            width: '320px',
+            height: '240px',
+            opacity: 0,  // Completely hidden
+            zIndex: -1,  // Move behind other content
+            transform: 'scaleX(-1)', // Mirror the video
             pointerEvents: 'none',
+            visibility: 'hidden'
           }}
+          autoPlay
+          playsInline
+          muted
+          onPlay={() => console.log('Emotion detection video is playing')}
+          onLoadedData={() => console.log('Emotion detection video data loaded')}
+          onError={(e) => console.error('Emotion detection video error:', e)}
         />
         
         <motion.div 
@@ -1114,58 +1156,65 @@ const AvatarCallPage = () => {
           </div>
         </motion.div>
       </div>      
-      {/* Camera Preview */}
-      {isPreviewVisible && isCameraEnabled && (
-        <motion.div 
-          className={`fixed right-4 z-50 bg-black/80 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 backdrop-blur-sm transition-all duration-300 ${
-            isPreviewExpanded 
-              ? 'bottom-24 w-[500px] h-[375px]' 
-              : 'bottom-24 w-[320px] h-[240px]'
-          }`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-        >
-          <div className="relative w-full h-full">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover transform -scale-x-100"
-              style={{ transform: 'scaleX(-1)' }}
-            />
-            <div className="absolute top-2 right-2 flex space-x-1">
-              <button 
-                onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
-                className="p-1.5 bg-black/60 rounded-full text-white hover:bg-white/20 transition-colors"
-                title={isPreviewExpanded ? 'Minimize' : 'Maximize'}
-              >
-                {isPreviewExpanded ? (
-                  <Minimize2 className="w-4 h-4" />
-                ) : (
-                  <Maximize2 className="w-4 h-4" />
-                )}
-              </button>
-              <button 
-                onClick={() => setIsPreviewVisible(false)}
-                className="p-1.5 bg-black/60 rounded-full text-white hover:bg-white/20 transition-colors"
-                title="Close preview"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {emotion && (
-              <div className="absolute bottom-2 left-2 px-3 py-1.5 bg-black/60 text-white text-sm rounded-md font-medium">
-                {emotion}
+      {/* Camera Preview - Positioned below navbar */}
+      <AnimatePresence>
+        {isCameraEnabled && (
+          <motion.div 
+            className={`fixed left-4 top-24 z-50 bg-black/80 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 backdrop-blur-sm transition-all duration-300 ${
+              isPreviewExpanded 
+                ? 'w-[500px] h-[375px]' 
+                : 'w-[320px] h-[240px]'
+            }`}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <div className="relative w-full h-full">
+              {/* Visible preview */}
+              <video
+                ref={previewVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+                style={{
+                  transform: 'scaleX(-1)', // Mirror the video
+                }}
+                onPlay={() => console.log('Preview video is playing')}
+                onLoadedData={() => console.log('Preview video data loaded')}
+                onError={(e) => console.error('Preview video error:', e)}
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span>You</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2 py-1 bg-black/50 rounded">
+                      {currentEmotion || 'neutral'}
+                    </span>
+                    <button 
+                      onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
+                      className="p-1 hover:bg-white/20 rounded-full"
+                    >
+                      {isPreviewExpanded ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </motion.div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Enhanced Bottom Controls */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent backdrop-blur-sm z-40">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white/80 dark:from-black/80 to-transparent backdrop-blur-sm z-40 border-t border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-center space-x-2 md:space-x-4">
             {/* Voice Input Button */}
@@ -1174,21 +1223,21 @@ const AvatarCallPage = () => {
                 onClick={toggleListening}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   isListening 
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 scale-110' 
-                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md'
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 scale-110 text-white' 
+                    : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
                 title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
               >
                 {isListening ? (
-                  <Mic className="w-7 h-7 text-white" />
+                  <Volume className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
                 ) : (
-                  <MicOff className="w-6 h-6 text-white/80" />
+                  <MicOff className="w-6 h-6 text-gray-900 dark:text-white/80" />
                 )}
               </button>
               {isListening && (
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping"></div>
               )}
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 {isListening ? 'Listening...' : 'Voice Input'}
               </div>
             </div>
@@ -1201,16 +1250,16 @@ const AvatarCallPage = () => {
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   voiceEnabled
                     ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/30 hover:scale-105' 
-                    : 'bg-white/10 opacity-50 cursor-not-allowed'
+                    : 'bg-white/10 dark:bg-white/10 opacity-50 cursor-not-allowed'
                 }`}
                 title={voiceEnabled ? 'Change Voice Tone' : 'Enable voice first'}
               >
-                <User className="w-6 h-6 text-white" />
+                <User className="w-6 h-6 text-gray-900 dark:text-white" />
                 {voiceEnabled && (
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
                 )}
               </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 Voice Tone
               </div>
 
@@ -1255,28 +1304,37 @@ const AvatarCallPage = () => {
               </AnimatePresence>
             </div>
 
-            {/* Camera Toggle */}
+            {/* Camera Toggle Button */}
             <div className="relative group">
-              {isPreviewVisible && isCameraEnabled && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
-              )}
               <button 
                 onClick={toggleCamera}
+                disabled={!isEmotionDetectionReady}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   isCameraEnabled 
-                    ? 'bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg shadow-purple-500/30 hover:scale-105' 
-                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md'
+                    ? 'bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/30 scale-110 text-white' 
+                    : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
                 title={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
               >
-                {isCameraEnabled ? (
-                  <Video className="w-6 h-6 text-white" />
+                {isEmotionDetectionReady ? (
+                  isCameraEnabled ? (
+                    <VideoOff className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
+                  ) : (
+                    <Video className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
+                  )
                 ) : (
-                  <VideoOff className="w-6 h-6 text-white/80" />
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-900/80 dark:text-white/80" />
                 )}
               </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
-                {isCameraEnabled ? 'Camera On' : 'Camera Off'}
+              {isCameraEnabled && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 rounded-full animate-ping"></div>
+              )}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
+                {!isEmotionDetectionReady 
+                  ? 'Loading models...' 
+                  : isCameraEnabled 
+                    ? 'Turn off camera' 
+                    : 'Turn on camera'}
               </div>
             </div>
 
@@ -1297,7 +1355,7 @@ const AvatarCallPage = () => {
               >
                 {getVolumeIcon()}
               </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 {isMuted ? 'Unmute' : 'Volume'}
               </div>
 
@@ -1342,7 +1400,7 @@ const AvatarCallPage = () => {
               >
                 <PhoneOff className="w-7 h-7 text-white" />
               </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-white/70 whitespace-nowrap">
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 End Call
               </div>
             </div>

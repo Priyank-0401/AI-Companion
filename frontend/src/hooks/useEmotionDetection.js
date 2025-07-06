@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import * as faceapi from 'face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 
 const EMOTION_MAPPING = {
   'happy': 'happy',
@@ -37,41 +37,78 @@ export const useEmotionDetection = (options = {}) => {
 
   // Load face-api.js models
   const loadModels = useCallback(async () => {
-    if (modelsLoaded.current) return true;
+    if (modelsLoaded.current) {
+      // console.log('Models already loaded');
+      return true;
+    }
 
     try {
-      // Use relative path to models in the public directory
-      const MODEL_URL = '/face-api-models';
+      // console.log('Initializing face-api.js...');
       
-      console.log('Loading face-api.js models from:', MODEL_URL);
+      // Set the backend to webgl
+      // console.log('Setting up TensorFlow.js backend...');
+      await faceapi.tf.enableProdMode(); // Enable production mode for better performance
+      await faceapi.tf.setBackend('webgl');
+      await faceapi.tf.ready();
+      // console.log('Backend set to:', await faceapi.tf.getBackend());
       
-      // Load models with error handling for each model
+      // In development, use the full URL to the models
+      const isDev = process.env.NODE_ENV === 'development';
+      const modelPath = isDev 
+        ? `${window.location.origin}/models/face-api`
+        : '/models/face-api';
+      
+      // console.log(`Loading models from: ${modelPath}`);
+      
+      // Verify models directory
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        console.log('TinyFaceDetector model loaded');
-      } catch (e) {
-        console.error('Error loading TinyFaceDetector model:', e);
-        throw e;
+        const response = await fetch(`${modelPath}/face_expression_model-weights_manifest.json`);
+        if (!response.ok) throw new Error('Cannot access model files');
+        // console.log('Model files are accessible');
+      } catch (err) {
+        console.error('Error accessing model files:', err);
+        throw new Error(`Cannot access model files at ${modelPath}. Make sure the files are in the public directory.`);
       }
       
+      // Load models with error handling for each
       try {
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        console.log('FaceLandmark68Net model loaded');
-      } catch (e) {
-        console.error('Error loading FaceLandmark68Net model:', e);
-        throw e;
+        // First, load the Tiny Face Detector
+        // console.log('Loading Tiny Face Detector...');
+        await faceapi.nets.tinyFaceDetector.loadFromUri(modelPath);
+        // console.log('Tiny Face Detector loaded');
+        
+        // Then load the Face Landmark model - use the correct model name
+        // console.log('Loading Face Landmark 68 Net...');
+        await faceapi.nets.faceLandmark68Net.loadFromUri(modelPath);
+        // console.log('Face Landmark 68 Net loaded');
+        
+        // Finally, load the Expression model
+        // console.log('Loading Face Expression Net...');
+        await faceapi.nets.faceExpressionNet.loadFromUri(modelPath);
+        // console.log('Face Expression Net loaded');
+        
+        // Verify all models are loaded
+        if (!faceapi.nets.tinyFaceDetector.isLoaded ||
+            !faceapi.nets.faceLandmark68Net.isLoaded ||
+            !faceapi.nets.faceExpressionNet.isLoaded) {
+          console.error('One or more models failed to load');
+          // console.log('Tiny Face Detector loaded:', faceapi.nets.tinyFaceDetector.isLoaded);
+          // console.log('Face Landmark loaded:', faceapi.nets.faceLandmark68Net?.isLoaded);
+          // console.log('Face Expression loaded:', faceapi.nets.faceExpressionNet?.isLoaded);
+          throw new Error('One or more models failed to load');
+        }
+        
+        // console.log('All models loaded and verified');
+        modelsLoaded.current = true;
+        return true;
+      } catch (modelErr) {
+        console.error('Error loading models:', modelErr);
+        // Log which models are loaded
+        // console.log('Tiny Face Detector loaded:', faceapi.nets.tinyFaceDetector.isLoaded);
+        // console.log('Face Landmark loaded:', faceapi.nets.faceLandmark68TinyNet?.isLoaded);
+        // console.log('Face Expression loaded:', faceapi.nets.faceExpressionNet?.isLoaded);
+        throw new Error(`Failed to load one or more models: ${modelErr.message}`);
       }
-      
-      try {
-        await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-        console.log('FaceExpressionNet model loaded');
-      } catch (e) {
-        console.error('Error loading FaceExpressionNet model:', e);
-        throw e;
-      }
-      
-      modelsLoaded.current = true;
-      return true;
     } catch (err) {
       console.error('Failed to load face-api models:', err);
       setError(new Error('Failed to load emotion detection models. Make sure to run `npm run download-models` first.'));
@@ -79,6 +116,9 @@ export const useEmotionDetection = (options = {}) => {
     }
   }, []);
 
+  // Track the current stream
+  const streamRef = useRef(null);
+  
   // Start video stream
   const startVideo = useCallback(async () => {
     if (!modelsLoaded.current) {
@@ -86,9 +126,9 @@ export const useEmotionDetection = (options = {}) => {
       return false;
     }
     
-    // If we already have an active stream, return
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject;
+    // If we already have an active stream, return it
+    if (streamRef.current) {
+      const stream = streamRef.current;
       if (stream.getTracks().some(track => track.readyState === 'live')) {
         console.log('Video stream already active');
         setHasCameraAccess(true);
@@ -97,16 +137,12 @@ export const useEmotionDetection = (options = {}) => {
     }
 
     try {
-      // Check if we already have a stream
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject;
-        const tracks = stream.getTracks();
-        if (tracks.some(track => track.readyState === 'live')) {
-          console.log('Video stream already active');
-          return true;
-        }
+      // Stop any existing stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
 
+      // Get new stream
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           width: 640, 
@@ -115,68 +151,191 @@ export const useEmotionDetection = (options = {}) => {
         },
         audio: false
       });
+      
+      // Store the stream reference
+      streamRef.current = stream;
 
+      // Set up the video element for emotion detection
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await new Promise((resolve) => {
           if (videoRef.current) {
             videoRef.current.onloadedmetadata = () => {
-              videoRef.current.play().then(resolve).catch(err => {
+              videoRef.current.play().catch(err => {
                 console.error('Error playing video:', err);
-                resolve();
               });
+              resolve();
             };
           }
         });
-        setHasCameraAccess(true);
       }
+      
+      setHasCameraAccess(true);
+      return true;
     } catch (err) {
       console.error('Error accessing camera:', err);
       setError(new Error('Could not access camera. Please check permissions.'));
       setHasCameraAccess(false);
+      return false;
     }
-  }, [enabled]);
+  }, []);
 
   // Stop video stream
   const stopVideo = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject;
-      const tracks = stream.getTracks();
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
       tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+      streamRef.current = null;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      
       setHasCameraAccess(false);
       return true;
     }
     return false;
   }, []);
 
+  // Check if models are loaded
+  const areModelsLoaded = useCallback(() => {
+    return modelsLoaded.current;
+  }, []);
+
   // Detect emotions from video stream
   const detectEmotions = useCallback(async () => {
-    if (!videoRef.current || !modelsLoaded.current) return 'neutral';
-
     try {
-      const detections = await faceapi
-        .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceExpressions();
-
-      if (detections.length > 0) {
-        const expressions = detections[0].expressions;
-        const sortedExpressions = Object.entries(expressions)
-          .sort(([, a], [, b]) => b - a);
-
-        const [dominantEmotion, confidence] = sortedExpressions[0];
-        
-        if (confidence > EMOTION_THRESHOLD && EMOTION_MAPPING[dominantEmotion]) {
-          const mappedEmotion = EMOTION_MAPPING[dominantEmotion];
-          return mappedEmotion;
+      if (!videoRef.current) {
+        console.log('Video ref not ready');
+        return 'neutral';
+      }
+      
+      // Ensure models are loaded
+      if (!modelsLoaded.current) {
+        console.log('Models not loaded, loading now...');
+        const loaded = await loadModels();
+        if (!loaded) {
+          console.error('Failed to load models');
+          return 'neutral';
         }
       }
+      
+      // Check if video element has video dimensions
+      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        console.log('Video element has no dimensions yet');
+        return 'neutral';
+      }
+      
+      // Ensure video is playing
+      if (videoRef.current.paused) {
+        console.log('Video is paused, trying to play...');
+        try {
+          await videoRef.current.play();
+        } catch (err) {
+          console.error('Error playing video:', err);
+          return 'neutral';
+        }
+      }
+
+      // console.log('Starting face detection...');
+      const detectionOptions = new faceapi.TinyFaceDetectorOptions({
+        inputSize: 320,  // Slightly larger for better detection
+        scoreThreshold: 0.4,  // Lower threshold to detect more faces
+      });
+
+      // console.log('Using detection options:', JSON.stringify(detectionOptions, null, 2));
+      
+      // Perform face detection with landmarks and expressions
+      let detections = [];
+      try {
+        // First detect all faces with expressions and landmarks
+        const faces = await faceapi
+          .detectAllFaces(videoRef.current, detectionOptions)
+          .withFaceLandmarks()
+          .withFaceExpressions();
+        
+        if (faces.length > 0) {
+          // Map the results to our expected format
+          detections = faces.map(face => ({
+            detection: face.detection,
+            landmarks: face.landmarks || null,
+            expressions: face.expressions || null
+          }));
+        }
+      } catch (detectErr) {
+        console.error('Error during face detection:', detectErr);
+        // Try reloading models if detection fails
+        if (detectErr.message.includes('load model before inference')) {
+          console.log('Model not loaded, attempting to reload...');
+          modelsLoaded.current = false;
+          const loaded = await loadModels();
+          if (loaded) {
+            console.log('Models reloaded, retrying detection...');
+            const faces = await faceapi
+            .detectAllFaces(videoRef.current, detectionOptions)
+            .withFaceLandmarks()
+            .withFaceExpressions();
+          
+          if (faces.length > 0) {
+            detections = faces.map(face => ({
+              detection: face.detection,
+              landmarks: face.landmarks || null,
+              expressions: face.expressions || null
+            }));
+          }
+          } else {
+            console.error('Failed to reload models');
+            return 'neutral';
+          }
+        } else {
+          console.error('Face detection error:', detectErr);
+          return 'neutral';
+        }
+      }
+
+      // console.log('Detected', detections.length, 'faces');
+
+      if (detections.length > 0) {
+        const detection = detections[0];
+        // console.log('Face detection box:', JSON.stringify(detection.detection?.box, null, 2));
+        
+        if (detection.expressions) {
+          const expressions = detection.expressions;
+          // console.log('Raw expressions:', JSON.stringify(expressions, null, 2));
+          
+          const sortedExpressions = Object.entries(expressions)
+            .filter(([_, value]) => typeof value === 'number') // Ensure we only have numeric values
+            .sort(([, a], [, b]) => b - a);
+
+          if (sortedExpressions.length > 0) {
+            const [dominantEmotion, confidence] = sortedExpressions[0];
+            // console.log(`Dominant emotion: ${dominantEmotion} (${Math.round(confidence * 100)}%)`);
+            
+            if (confidence > EMOTION_THRESHOLD) {
+              const mappedEmotion = EMOTION_MAPPING[dominantEmotion] || dominantEmotion;
+              // console.log(`Mapped emotion: ${mappedEmotion}`);
+              return mappedEmotion;
+            } else {
+              console.log(`Confidence (${Math.round(confidence * 100)}%) below threshold (${EMOTION_THRESHOLD * 100}%)`);
+            }
+          } else {
+            console.log('No valid expressions detected');
+          }
+        } else {
+          // console.log('No expressions detected in face detection');
+        }
+      } else {
+        // console.log('No faces detected in the frame');
+        // Check if video is actually playing
+        // console.log('Video readyState:', videoRef.current.readyState);
+        // console.log('Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+      }
     } catch (err) {
-      console.error('Error detecting emotions:', err);
+      console.error('Error in emotion detection:', err);
+      return 'neutral';
+    } finally {
+      console.log('Emotion detection completed');
     }
-    
-    return 'neutral';
   }, []);
 
   // Initialize models when component mounts
@@ -184,7 +343,7 @@ export const useEmotionDetection = (options = {}) => {
     const init = async () => {
       const success = await loadModels();
       if (success) {
-        console.log('Models loaded successfully');
+        // console.log('Models loaded successfully');
         setIsReady(true);
       }
     };
@@ -199,67 +358,86 @@ export const useEmotionDetection = (options = {}) => {
       stopVideo();
     };
   }, [loadModels, stopVideo]);
-
-  // Handle video start/stop when enabled changes
-  useEffect(() => {
-    if (!isReady) {
-      console.log('Not ready to toggle video');
-      return;
+  
+  // Only start/stop video when explicitly enabled/disabled
+  const toggleVideo = useCallback(async (shouldEnable) => {
+    if (shouldEnable) {
+      const success = await startVideo();
+      if (success) {
+        setHasCameraAccess(true);
+        // Ensure the video is playing before starting detection
+        if (videoRef.current) {
+          await videoRef.current.play().catch(err => {
+            console.error('Error playing video for detection:', err);
+          });
+        }
+      }
+      return success;
+    } else {
+      stopVideo();
+      setHasCameraAccess(false);
+      return true;
     }
+  }, [startVideo, stopVideo]);
 
-    console.log('Toggling video, enabled:', enabled);
-    
-    const handleVideoToggle = async () => {
-      if (enabled) {
-        console.log('Starting video...');
-        await startVideo();
-      } else {
-        console.log('Stopping video...');
-        stopVideo();
-      }
-    };
-
-    handleVideoToggle();
-    
-    // Cleanup on unmount or when enabled changes
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      if (!enabled) {
-        console.log('Cleaning up video');
-        stopVideo();
+      if (detectionInterval.current) {
+        clearInterval(detectionInterval.current);
       }
+      stopVideo();
     };
-  }, [enabled, isReady, startVideo, stopVideo]);
+  }, [stopVideo]);
 
   // Start/stop detection interval when camera is ready and enabled
   useEffect(() => {
     if (!isReady || !enabled || !hasCameraAccess) {
       if (detectionInterval.current) {
-        console.log('Stopping detection interval');
+        // console.log('Stopping detection interval');
         clearInterval(detectionInterval.current);
         detectionInterval.current = null;
       }
       return;
     }
     
-    console.log('Starting detection interval');
+    // console.log('Starting detection interval');
 
     // Clear any existing interval
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
     }
 
+    let isDetecting = false;
+    
     // Start new detection interval
-    detectionInterval.current = setInterval(async () => {
+    const startDetection = async () => {
+      if (isDetecting) return;
+      isDetecting = true;
+      
       try {
         const detectedEmotion = await detectEmotions();
-        if (detectedEmotion && detectedEmotion !== emotion) {
+        if (detectedEmotion) {
+          // console.log('Setting new emotion:', detectedEmotion);
           setEmotion(detectedEmotion);
-          onEmotionDetected(detectedEmotion);
+          if (typeof onEmotionDetected === 'function') {
+            onEmotionDetected(detectedEmotion);
+          }
         }
       } catch (error) {
         console.error('Error in emotion detection:', error);
+      } finally {
+        isDetecting = false;
       }
-    }, EMOTION_UPDATE_INTERVAL);
+    };
+
+    // Run detection immediately and then at intervals
+    const initialDetection = async () => {
+      await startDetection();
+      detectionInterval.current = setInterval(startDetection, EMOTION_UPDATE_INTERVAL);
+    };
+    
+    initialDetection();
 
     return () => {
       if (detectionInterval.current) {
@@ -267,17 +445,42 @@ export const useEmotionDetection = (options = {}) => {
         detectionInterval.current = null;
       }
     };
-  }, [isReady, hasCameraAccess, detectEmotions, emotion, onEmotionDetected]);
+  }, [isReady, enabled, hasCameraAccess, detectEmotions, onEmotionDetected]);
 
   return {
-    emotion,
     videoRef,
-    videoStream: videoRef.current?.srcObject || null,
+    videoStream: streamRef.current || null,
     isReady,
     hasCameraAccess,
     error,
+    toggleVideo,
     startVideo,
-    stopVideo
+    stopVideo,
+    loadModels,
+    areModelsLoaded,
+    emotion,
+    isDetecting: detectionInterval.current !== null,
+    startDetection: () => {
+      if (!detectionInterval.current) {
+        const startDetection = async () => {
+          const detectedEmotion = await detectEmotions();
+          if (detectedEmotion) {
+            setEmotion(detectedEmotion);
+            if (typeof onEmotionDetected === 'function') {
+              onEmotionDetected(detectedEmotion);
+            }
+          }
+        };
+        startDetection();
+        detectionInterval.current = setInterval(startDetection, EMOTION_UPDATE_INTERVAL);
+      }
+    },
+    stopDetection: () => {
+      if (detectionInterval.current) {
+        clearInterval(detectionInterval.current);
+        detectionInterval.current = null;
+      }
+    }
   };
 };
 

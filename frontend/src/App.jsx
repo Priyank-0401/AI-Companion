@@ -130,12 +130,18 @@ function AppContent() {
 // Create a client
 const queryClient = new QueryClient();
 
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
-          <Router>
+          <Router
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}
+          >
             <AuthProvider>
               <AppContent />
             </AuthProvider>

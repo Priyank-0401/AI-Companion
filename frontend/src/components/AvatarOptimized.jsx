@@ -15,7 +15,7 @@ useGLTF.preload(AVATAR_CONFIG.MODELS.NOD); // Preload nod animation
 // Loading fallback component
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center h-full bg-gray-900 text-white">
+    <div className="flex items-center justify-center h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-200">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
         <div className="text-lg">Loading Avatar...</div>
@@ -27,7 +27,7 @@ function LoadingFallback() {
 // Error boundary component 
 function ErrorFallback({ error }) {
   return (
-    <div className="flex items-center justify-center h-full bg-gray-900 text-red-400">
+    <div className="flex items-center justify-center h-full bg-white dark:bg-gray-900 text-red-500 dark:text-red-400 transition-colors duration-200">
       <div className="text-center">
         <div className="text-lg mb-2">Avatar Loading Error</div>
         <div className="text-sm opacity-70">{error?.message || 'Unknown error'}</div>
@@ -92,13 +92,6 @@ const AvatarModel = React.memo(({
       forceExpression: greetingState.shouldSmile ? 'smile' : null,
     }
   );
-
-  // Log detected emotions for debugging
-  useEffect(() => {
-    if (detectedEmotion) {
-      console.log(`Detected user emotion: ${detectedEmotion}`);
-    }
-  }, [detectedEmotion]);
 
   // Voice system
   const {
@@ -233,8 +226,6 @@ const AvatarModel = React.memo(({
     if (!enableGreeting || !AVATAR_CONFIG.GREETING.ENABLED) return;
     if (greetingState.hasShownGreeting) return;
 
-    console.log('🎉 Initializing greeting sequence...');
-
     const startGreeting = () => {
       setGreetingState(prev => ({
         ...prev,
@@ -242,8 +233,6 @@ const AvatarModel = React.memo(({
         isGreeting: true,
         shouldSmile: AVATAR_CONFIG.EXPRESSIONS.ENABLE_GREETING_SMILE,
       }));
-
-      console.log('👋 Starting greeting animation with smile');
     };
 
     // Delay greeting start
@@ -259,8 +248,6 @@ const AvatarModel = React.memo(({
     const greetingDuration = AVATAR_CONFIG.GREETING.DURATION;
     
     const completeGreeting = () => {
-      console.log('✅ Greeting animation complete, transitioning to idle');
-      
       setGreetingState(prev => ({
         ...prev,
         isGreeting: false,
@@ -322,7 +309,6 @@ const AvatarModel = React.memo(({
         if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE] !== undefined) {
           const targetIndex = dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE];
           influences[targetIndex] = AVATAR_CONFIG.GREETING.SMILE_INTENSITY;
-          console.log(`😊 Applying greeting smile with intensity: ${AVATAR_CONFIG.GREETING.SMILE_INTENSITY}`);
         }
       } else if (currentExpression === 'smile') {
         if (dictionary[AVATAR_CONFIG.EXPRESSIONS.MORPH_TARGETS.MOUTH_SMILE] !== undefined) {
@@ -385,22 +371,18 @@ const AvatarModel = React.memo(({
     if (greetingState.isGreeting && !greetingState.greetingComplete) {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.GREET}_0`;
       shouldLoop = false; // Greeting plays once only
-      console.log('🎬 Switching to greeting animation');
     } 
     // Check talking state (high priority)
     else if (isTalking) {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.TALKING}_0`;
-      console.log('🗣️ Switching to talking animation');
     } 
     // Check listening state (medium priority)
     else if (isListening) {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.NOD}_0`;
-      console.log('👍 Switching to nod animation (listening)');
     }
     // Default to idle (lowest priority)
     else {
       targetAnimation = `${AVATAR_CONFIG.ANIMATIONS.NAMES.IDLE}_0`;
-      console.log('😌 Switching to idle animation');
     }
 
     // Only switch if different from current
@@ -545,12 +527,13 @@ const AvatarScene = React.memo(({
   }
 
   return (
-    <div className={className}>
+    <div className={`${className} bg-transparent`}>
       <Canvas
         shadows={false}
         dpr={[1, 2]}
         frameloop="always"
-        gl={{ antialias: true, alpha: false }}
+        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+        style={{ background: 'transparent' }}
       >
         <PerspectiveCamera 
           makeDefault

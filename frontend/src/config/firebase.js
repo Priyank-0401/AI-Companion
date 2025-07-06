@@ -1,10 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { 
-  getFirestore, 
   initializeFirestore, 
-  enableIndexedDbPersistence,
-  CACHE_SIZE_UNLIMITED
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
@@ -27,22 +26,14 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Initialize Firestore with persistence
+// Initialize Firestore with persistent cache
 const db = initializeFirestore(app, {
-  cacheSizeBytes: CACHE_SIZE_UNLIMITED
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
 });
 
-// Enable offline persistence
-enableIndexedDbPersistence(db)
-  .catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Offline persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser doesn\'t support offline persistence');
-    }
-  });
-
-  // Create Google Auth Provider instance
+// Create Google Auth Provider instance
 const googleProvider = new GoogleAuthProvider();
 
 // Add any additional provider configuration

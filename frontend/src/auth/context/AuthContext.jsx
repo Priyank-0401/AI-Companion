@@ -29,10 +29,10 @@ export const AuthProvider = ({ children }) => {
           photoURL: firebaseUser.photoURL,
           emailVerified: firebaseUser.emailVerified,
         };
-        console.log('[AuthProvider] Setting user data:', userData);
+        // console.log('[AuthProvider] Setting user data:', userData);
         setUser(userData); // This should trigger a re-render with the new user
       } else {
-        console.log('[AuthProvider] No user, setting user to null');
+        // console.log('[AuthProvider] No user, setting user to null');
         setUser(null);
       }
       setInitialized(true);
@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
       setError(err);
       setInitialized(true);
     } finally {
-      console.log('[AuthProvider] Auth state update complete, loading:', false);
+      // console.log('[AuthProvider] Auth state update complete, loading:', false);
       setLoading(false);
     }
   }, []);
@@ -125,12 +125,12 @@ export const AuthProvider = ({ children }) => {
 
   // Debug log the context value
   useEffect(() => {
-    console.log('[AuthProvider] Context value updated:', {
-      user: user ? { uid: user.uid, email: user.email } : null,
-      loading,
-      initialized,
-      hasError: !!error
-    });
+    // console.log('[AuthProvider] Context value updated:', {
+    //   user: user ? { uid: user.uid, email: user.email } : null,
+    //   loading,
+    //   initialized,
+    //   hasError: !!error
+    // });
   }, [user, loading, initialized, error]);
 
   return (
