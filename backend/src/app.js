@@ -12,7 +12,7 @@ import compression from 'compression';
 import config from './config/index.js';
 import { errorHandler } from './middleware/error.js';
 import { logger } from './utils/logger.js';
-import { chatRoutes } from './api/v1/chat/routes/chat.routes.js';
+import { chatRoutes, llmRoutes } from './api/v1/chat/index.js';
 
 // Get the directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -121,6 +121,11 @@ logger.info(`Mounting chat routes at ${chatPath}`);
 app.use(chatPath, chatRoutes);
 // Also mount at /chat for backward compatibility
 app.use('/chat', chatRoutes);
+
+// Mount LLM routes
+const llmPath = apiPrefix + '/llm';
+logger.info(`Mounting LLM routes at ${llmPath}`);
+app.use(llmPath, llmRoutes);
 
 // Enhanced route debugging
 const logRoutes = (router, prefix = '') => {

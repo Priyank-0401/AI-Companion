@@ -1,6 +1,6 @@
 import { validationResult } from 'express-validator';
 import FirestoreService from '../services/firestore.service.js';
-import OllamaService from '../services/ollama.service.js';
+import LLMService from '../services/LLMService.js';
 import { logger } from '../../../../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -44,7 +44,7 @@ class ChatController {
       const conversation = await FirestoreService.createConversation({
         userId,
         title: title?.trim() || 'New Chat',
-        model: model?.trim() || 'llama3:8B',
+        model: model?.trim() || 'llama3-70b-8192', // Updated to use Groq model
         style: style?.trim() || 'empathetic',
       });
 
@@ -387,13 +387,17 @@ class ChatController {
         content,
       });
 
-      // Generate AI response
-      const aiResponse = await OllamaService.chatCompletion(conversationHistory, {
+      // Generate AI response using LLMService
+      const aiResponse = await LLMService.chatCompletion(conversationHistory, {
+        provider: 'groq', // or get from conversation settings
         model: conversation.model,
         temperature: 0.7,
         maxTokens: 2000,
-        stream,
+        stream: false
       });
+      
+      // Extract the AI message from the response
+      const aiMessageContent = aiResponse.choices?.[0]?.message?.content || 'I\'m sorry, I couldn\'t generate a response.';
 
       // Create AI message
       const aiMessage = await FirestoreService.createMessage({
@@ -504,7 +508,8 @@ class ChatController {
 
       // Stream the response
       try {
-        const stream = await OllamaService.chatCompletion(conversationHistory, {
+        const stream = await LLMService.chatCompletion(conversationHistory, {
+          provider: 'groq', // or get from conversation settings
           model: conversation.model,
           temperature: 0.7,
           maxTokens: 2000,
@@ -513,9 +518,9 @@ class ChatController {
 
         // Process the stream
         for await (const chunk of stream) {
-          const parsed = JSON.parse(chunk.toString());
-          if (parsed.message) {
-            const content = parsed.message.content || '';
+          // Handle the chunk format from LLMService
+          if (chunk.choices && chunk.choices[0]?.delta) {
+            const content = chunk.choices[0].delta.content || '';
             fullResponse += content;
             
             // Send the chunk to the client
@@ -586,7 +591,8 @@ class ChatController {
    */
   async listModels(req, res, next) {
     try {
-      const models = await OllamaService.listModels();
+      // Get models from LLMService
+      const models = await LLMService.listModels();
       res.json({
         success: true,
         data: models,

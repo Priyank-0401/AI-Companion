@@ -98,14 +98,10 @@ export const ChatSidebar = ({
   const validatedStyle = propStyle && ['empathetic', 'coach', 'playful', 'mindful'].includes(propStyle) 
     ? propStyle 
     : 'empathetic';
-  // Debug logging
-  console.log('=== CHAT SIDEBAR RENDER ===');
-  console.log('validatedStyle:', validatedStyle);
-  console.log('selectedConversation:', selectedConversation);
   
   // Debug effect for tracking style changes
   useEffect(() => {
-    console.log('Conversation style changed:', validatedStyle);
+    //console.log('Conversation style changed:', validatedStyle);
   }, [validatedStyle]);
   const [isMobile, setIsMobile] = useState(false);
   const searchInputRef = useRef(null);

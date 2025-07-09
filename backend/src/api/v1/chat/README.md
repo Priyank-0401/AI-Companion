@@ -1,6 +1,6 @@
 # Chat API Documentation
 
-This module provides a RESTful API for managing chat conversations with AI models using Ollama.
+This module provides a RESTful API for managing chat conversations with various AI models through supported providers (Groq, OpenRouter).
 
 ## API Endpoints
 
@@ -15,7 +15,7 @@ POST /api/v1/chat/conversations
 ```json
 {
   "title": "My First Chat",
-  "model": "llama3:8B",
+  "model": "llama3-70b-8192",
   "style": "empathetic"
 }
 ```
@@ -28,7 +28,7 @@ POST /api/v1/chat/conversations
     "id": "conversation-id",
     "userId": "user-id",
     "title": "My First Chat",
-    "model": "llama3:8B",
+    "model": "llama3-70b-8192",
     "style": "empathetic",
     "createdAt": "2023-01-01T00:00:00.000Z",
     "updatedAt": "2023-01-01T00:00:00.000Z",
@@ -55,7 +55,7 @@ GET /api/v1/chat/conversations?limit=20&startAfter=last-conversation-id
       "id": "conversation-id",
       "userId": "user-id",
       "title": "My First Chat",
-      "model": "llama3:8B",
+      "model": "llama3-70b-8192",
       "style": "empathetic",
       "createdAt": "2023-01-01T00:00:00.000Z",
       "updatedAt": "2023-01-01T00:00:05.000Z",
@@ -111,7 +111,7 @@ POST /api/v1/chat/conversations/:conversationId/messages
       "role": "assistant",
       "timestamp": "2023-01-01T00:01:02.000Z",
       "metadata": {
-        "model": "llama3:8B",
+        "model": "llama3-70b-8192",
         "tokens": 12,
         "isEdited": false
       }
@@ -177,7 +177,7 @@ GET /api/v1/chat/conversations/:conversationId/messages?limit=50&startAfter=last
       "role": "assistant",
       "timestamp": "2023-01-01T00:01:02.000Z",
       "metadata": {
-        "model": "llama3:8B",
+        "model": "llama3-70b-8192",
         "tokens": 12,
         "isEdited": false
       }

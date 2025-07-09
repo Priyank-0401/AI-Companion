@@ -11,6 +11,9 @@ dotenv.config({
   path: path.resolve(__dirname, '../../.env')
 });
 
+// Import LLM config
+import llmConfig from './llm.config.js';
+
 const config = {
   // App Configuration
   app: {
@@ -47,11 +50,14 @@ const config = {
     cookieExpires: process.env.JWT_COOKIE_EXPIRES || 7
   },
 
+  // LLM Configuration
+  llm: llmConfig,
+
   // CORS Configuration
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:5173', 'http://127.0.0.1:5173'],
     methods: process.env.CORS_METHODS?.split(',') || ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: process.env.CORS_ALLOWED_HEADERS?.split(',') || [
+    allowedHeaders: [
       'Content-Type', 
       'Authorization', 
       'X-Requested-With',
@@ -68,7 +74,7 @@ const config = {
       'Referer',
       'User-Agent'
     ],
-    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'x-request-start'],
+    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'x-request-start', 'Content-Range', 'X-Total-Count'],
     credentials: true,
     maxAge: parseInt(process.env.CORS_MAX_AGE) || 86400,
     preflightContinue: false,
@@ -96,12 +102,8 @@ const config = {
     rateLimiting: process.env.FEATURE_RATE_LIMITING !== 'false'
   },
 
-  // Ollama Configuration
-  ollama: {
-    host: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
-    model: process.env.OLLAMA_MODEL || 'llama3:8B',
-    timeout: parseInt(process.env.OLLAMA_TIMEOUT) || 30000
-  }
+  // LLM Configuration
+  // Configuration for LLM providers is now in llm.config.js
 };
 
 export default config;
