@@ -22,8 +22,46 @@ export const validateCreateConversation = [
     .optional()
     .isString()
     .withMessage('Model must be a string')
-    .isIn(['llama3:8B', 'llama2', 'mistral', 'gemma', 'neural-chat'])
-    .withMessage('Invalid model selection'),
+    .custom(async (value, { req }) => {
+      try {
+        // Get the list of available models
+        const LLMService = (await import('../services/LLMService.js')).default;
+        const models = await LLMService.listModels();
+        
+        // Flatten the models object to get all model IDs
+        const allModelIds = [];
+        Object.values(models).forEach(providerModels => {
+          if (typeof providerModels === 'object' && providerModels !== null) {
+            Object.keys(providerModels).forEach(modelId => {
+              if (modelId !== 'error') {
+                allModelIds.push(modelId);
+              }
+            });
+          }
+        });
+        
+        // If no models were found, use a default set
+        if (allModelIds.length === 0) {
+          allModelIds.push(
+            'llama3-8b-8192',
+            'llama3-70b-8192',
+            'mixtral-8x7b-32768'
+          );
+        }
+        
+        // Check if the provided model is in the list of available models
+        if (!allModelIds.includes(value)) {
+          throw new Error(`Invalid model selection. Please use one of the available models from the /models endpoint. Received: ${value}`);
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error validating model:', error);
+        // If there's an error getting models, allow the request to proceed
+        // The LLMService will handle invalid models with appropriate defaults
+        return true;
+      }
+    }),
   
   body('style')
     .optional()

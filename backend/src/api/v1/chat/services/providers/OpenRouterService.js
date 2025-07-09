@@ -136,4 +136,58 @@ export default class OpenRouterService extends BaseProvider {
       throw error;
     }
   }
+
+  /**
+   * List available models from OpenRouter
+   * @returns {Object} Available models with their configurations
+   */
+  async listModels() {
+    return {
+      // Claude models
+      'anthropic/claude-3-haiku': {
+        displayName: 'Claude 3 Haiku',
+        maxTokens: 200000,
+        supportsStreaming: true,
+        description: 'Fast and capable model from Anthropic',
+        pricing: this.tokenUsage.pricing['anthropic/claude-3-haiku']
+      },
+      'anthropic/claude-3-opus': {
+        displayName: 'Claude 3 Opus',
+        maxTokens: 200000,
+        supportsStreaming: true,
+        description: 'Most capable model from Anthropic',
+        pricing: this.tokenUsage.pricing['anthropic/claude-3-opus']
+      },
+      // Mistral models
+      'mistralai/mistral-7b-instruct': {
+        displayName: 'Mistral 7B Instruct',
+        maxTokens: 32768,
+        supportsStreaming: true,
+        description: '7B parameter instruct-tuned model from Mistral',
+        pricing: this.tokenUsage.pricing['mistralai/mistral-7b-instruct']
+      },
+      'mistralai/mixtral-8x7b-instruct': {
+        displayName: 'Mixtral 8x7B Instruct',
+        maxTokens: 32768,
+        supportsStreaming: true,
+        description: 'Mixture of Experts model with 7B parameters per expert',
+        pricing: this.tokenUsage.pricing['mistralai/mixtral-8x7b-instruct']
+      },
+      // OpenAI models
+      'openai/gpt-3.5-turbo': {
+        displayName: 'GPT-3.5 Turbo',
+        maxTokens: 16385,
+        supportsStreaming: true,
+        description: 'Most capable GPT-3.5 model from OpenAI',
+        pricing: this.tokenUsage.pricing['openai/gpt-3.5-turbo']
+      },
+      'openai/gpt-4': {
+        displayName: 'GPT-4',
+        maxTokens: 8192,
+        supportsStreaming: true,
+        description: 'Most capable model from OpenAI',
+        pricing: this.tokenUsage.pricing['openai/gpt-4']
+      }
+    };
+  }
 }

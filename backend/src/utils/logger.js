@@ -39,7 +39,7 @@ const fileFormat = combine(
 
 // Create logger instance
 const logger = createLogger({
-  level: config.app.logLevel || 'info',
+  level: 'debug', // Force debug level for all logs
   format: fileFormat,
   defaultMeta: { service: config.app.name },
   transports: [
@@ -50,9 +50,10 @@ const logger = createLogger({
       maxsize: config.app.logMaxSize || 10485760, // 10MB
       maxFiles: config.app.logMaxFiles || 7,
     }),
-    // Write all logs with level `info` and below to `combined.log`
+    // Write all logs with level `debug` and below to `combined.log`
     new transports.File({
       filename: path.join(logDir, 'combined.log'),
+      level: 'debug',
       maxsize: config.app.logMaxSize || 10485760, // 10MB
       maxFiles: config.app.logMaxFiles || 7,
     }),
@@ -60,10 +61,11 @@ const logger = createLogger({
   exitOnError: false, // Don't exit on handled exceptions
 });
 
-// If we're not in production, log to the console as well
+// Always log to console in development with debug level
 if (config.app.env !== 'production') {
   logger.add(
     new transports.Console({
+      level: 'debug',
       format: consoleFormat,
     })
   );

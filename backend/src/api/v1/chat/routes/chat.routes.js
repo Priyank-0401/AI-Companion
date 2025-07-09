@@ -13,7 +13,10 @@ import {
 
 const router = Router();
 
-// Apply authentication middleware to all routes
+// Public routes
+router.get('/models', ChatController.listModels);
+
+// Apply authentication middleware to protected routes
 router.use(authenticate);
 
 // Remove leading slashes from route paths to prevent double slashes
@@ -47,7 +50,6 @@ router.post('/conversations/:conversationId/messages', validateSendMessage, Chat
 router.post('/conversations/:conversationId/messages/stream', validateStreamMessage, ChatController.streamMessage);
 router.get('/conversations/:conversationId/messages', validateGetMessages, ChatController.getMessages);
 
-// Model management
-router.get('/models', ChatController.listModels);
+// Model management is now at the top as a public route
 
 export { router as chatRoutes };

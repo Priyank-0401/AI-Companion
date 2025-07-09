@@ -388,27 +388,244 @@ class ChatController {
       });
 
       // Generate AI response using LLMService
-      const aiResponse = await LLMService.chatCompletion(conversationHistory, {
-        provider: 'groq', // or get from conversation settings
+      logger.info(`[LLM] Sending request to LLM service`, {
+        conversationId,
         model: conversation.model,
-        temperature: 0.7,
-        maxTokens: 2000,
-        stream: false
+        messageCount: conversationHistory.length,
+        lastMessage: conversationHistory[conversationHistory.length - 1]?.content?.substring(0, 100) + '...'
       });
       
-      // Extract the AI message from the response
-      const aiMessageContent = aiResponse.choices?.[0]?.message?.content || 'I\'m sorry, I couldn\'t generate a response.';
+      let aiResponse;
+      try {
+        // Call the LLM service with Groq as the primary provider
+        const startTime = Date.now();
+        
+        // Prepare the request options
+        const llmOptions = {
+          provider: 'groq',
+          model: conversation.model,
+          temperature: 0.7,
+          maxTokens: 2000,
+          stream: false,
+          fallback: false // Disable fallback since we're handling it in the controller
+        };
+        
+        logger.debug('[LLM] Calling LLMService with options:', llmOptions);
+        aiResponse = await LLMService.chatCompletion(conversationHistory, llmOptions);
+        
+        // Calculate response time
+        const responseTime = Date.now() - startTime;
+        
+        // Log the AI response metadata for debugging
+        logger.info('[LLM] Successfully received AI response', {
+          responseId: aiResponse.id,
+          model: aiResponse.model,
+          provider: aiResponse.provider || 'groq',
+          finishReason: aiResponse.choices?.[0]?.finish_reason || 'unknown',
+          usage: aiResponse.usage || {},
+          contentLength: aiResponse.choices?.[0]?.message?.content?.length || 0,
+          responseTime: `${responseTime}ms`
+        });
+        
+        // Validate the AI response structure
+        if (!aiResponse.choices || !Array.isArray(aiResponse.choices) || aiResponse.choices.length === 0) {
+          throw new Error('Invalid response format: No choices in response');
+        }
+        
+        const firstChoice = aiResponse.choices[0];
+        if (!firstChoice || !firstChoice.message) {
+          throw new Error('Invalid response format: Missing message in choice');
+        }
+        
+        // Extract the AI's response content
+        const aiContent = firstChoice.message.content;
+        if (aiContent === undefined || aiContent === null) {
+          throw new Error('No content in AI response');
+        }
+        
+        // Create the assistant message in Firestore
+        const aiMessage = await FirestoreService.createMessage({
+          conversationId,
+          content: aiContent,
+          role: 'assistant',
+          metadata: {
+            model: aiResponse.model || conversation.model,
+            provider: aiResponse.provider || 'groq',
+            finishReason: firstChoice.finish_reason || 'stop',
+            usage: aiResponse.usage || {
+              prompt_tokens: 0,
+              completion_tokens: 0,
+              total_tokens: 0
+            }
+          }
+        });
+        
+        // Update the conversation with the latest message
+        await FirestoreService.updateConversation(conversationId, {
+          updatedAt: new Date().toISOString(),
+          'metadata.lastMessage': aiContent.substring(0, 100) + (aiContent.length > 100 ? '...' : ''),
+          'metadata.messageCount': (conversation.metadata?.messageCount || 0) + 2 // +1 for user, +1 for assistant
+        });
+        
+        // Return the response
+        return res.status(200).json({
+          success: true,
+          data: {
+            userMessage,
+            aiMessage,
+            conversation: {
+              id: conversationId,
+              title: conversation.title,
+              model: conversation.model,
+              style: conversation.style,
+              updatedAt: new Date().toISOString()
+            }
+          }
+        });
+        
+      } catch (error) {
+        logger.error('[LLM] Error generating AI response:', {
+          error: error.message,
+          stack: error.stack,
+          conversationId,
+          model: conversation.model,
+          historyLength: conversationHistory.length
+        });
+        
+        // Create a detailed error message
+        let errorDetails = error.message;
+        let errorType = 'api_error';
+        
+        // Extract more detailed error information if available
+        if (error.response?.data?.error) {
+          errorDetails = error.response.data.error.message || errorDetails;
+          errorType = error.response.data.error.type || errorType;
+        } else if (error.error) {
+          errorDetails = error.error.message || errorDetails;
+          errorType = error.error.type || errorType;
+        }
+        
+        const errorMessage = 'I\'m sorry, I encountered an error while generating a response. Please try again.';
+        
+        // Log additional details for debugging
+        if (error.response) {
+          logger.error('[LLM] Provider API error details:', {
+            status: error.response.status,
+            statusText: error.response.statusText,
+            headers: error.response.headers,
+            data: error.response.data
+          });
+        }
+        
+        // Create an error message in the conversation
+        const aiMessage = await FirestoreService.createMessage({
+          conversationId,
+          content: errorMessage,
+          role: 'assistant',
+          metadata: {
+            model: conversation.model,
+            tokens: Math.ceil(errorMessage.length / 4),
+            finishReason: 'error',
+            error: errorDetails,
+            errorType: errorType || 'unknown_error',
+            errorType: error.response?.status === 429 ? 'rate_limit' : 'api_error'
+          },
+        });
+        
+        // Return a structured error response
+        return res.status(error.response?.status || 500).json({
+          success: false,
+          error: 'Failed to generate AI response',
+          errorDetails: errorDetails,
+          errorType: error.response?.status === 429 ? 'rate_limit' : 'api_error',
+          data: { 
+            userMessage, 
+            aiMessage,
+            retryable: error.response?.status !== 400 // Not retryable for bad requests
+          }
+        });
+      }
+      
+      // Extract and validate the AI message from the response
+      let aiMessageContent = aiResponse.choices?.[0]?.message?.content;
+      
+      // Handle empty or invalid responses
+      if (!aiMessageContent || typeof aiMessageContent !== 'string') {
+        logger.warn('[LLM] Invalid or empty message content in response', {
+          responseId: aiResponse.id,
+          model: aiResponse.model,
+          finishReason: aiResponse.choices?.[0]?.finish_reason
+        });
+        aiMessageContent = 'I\'m sorry, I couldn\'t generate a response at this time.';
+      }
+      
+      // Calculate token usage and get finish reason
+      const tokensUsed = aiResponse.usage?.completion_tokens || Math.ceil(aiMessageContent.length / 4);
+      const finishReason = aiResponse.choices?.[0]?.finish_reason || 'unknown';
+      
+      logger.debug('[LLM] Processed AI response', {
+        contentLength: aiMessageContent.length,
+        tokensUsed,
+        finishReason
+      });
 
       // Create AI message
-      const aiMessage = await FirestoreService.createMessage({
-        conversationId,
-        content: aiResponse.message?.content || 'I\'m sorry, I couldn\'t generate a response.',
-        role: 'assistant',
-        metadata: {
+      let aiMessage;
+      try {
+        aiMessage = await FirestoreService.createMessage({
+          conversationId,
+          content: aiMessageContent,
+          role: 'assistant',
+          metadata: {
+            model: conversation.model,
+            tokens: tokensUsed,
+            finishReason: finishReason,
+            provider: 'groq',
+            responseId: aiResponse.id,
+            usage: aiResponse.usage || {}
+          },
+        });
+        
+        logger.info('[LLM] Successfully generated AI response', {
+          messageId: aiMessage.id,
+          conversationId,
           model: conversation.model,
-          tokens: aiResponse.message?.content?.length / 4 || 0,
-        },
-      });
+          tokens: tokensUsed,
+          finishReason: finishReason,
+          responseId: aiResponse.id
+        });
+      } catch (error) {
+        logger.error('[LLM] Error saving AI message to Firestore:', {
+          error: error.message,
+          stack: error.stack,
+          conversationId,
+          contentLength: aiMessageContent.length,
+          tokensUsed
+        });
+        
+        // Return the response even if saving to Firestore fails
+        return res.status(200).json({
+          success: true,
+          data: {
+            userMessage,
+            aiMessage: {
+              id: `temp-${Date.now()}`,
+              conversationId,
+              content: aiMessageContent,
+              role: 'assistant',
+              createdAt: new Date().toISOString(),
+              metadata: {
+                model: conversation.model,
+                tokens: tokensUsed,
+                finishReason: finishReason,
+                error: 'Failed to save to database',
+                errorDetails: error.message
+              }
+            }
+          },
+          warning: 'Response generated but not saved to database'
+        });
+      }
 
       // Update conversation's updatedAt and last message
       await FirestoreService.updateConversation(conversationId, {
@@ -591,15 +808,48 @@ class ChatController {
    */
   async listModels(req, res, next) {
     try {
+      logger.info('Fetching available models...');
+      
       // Get models from LLMService
       const models = await LLMService.listModels();
-      res.json({
+      
+      if (!models || Object.keys(models).length === 0) {
+        logger.warn('No models found');
+        return res.status(404).json({
+          success: false,
+          message: 'No models available',
+          data: {}
+        });
+      }
+      
+      logger.info(`Successfully retrieved models from ${Object.keys(models).length} providers`);
+      
+      // Format the response
+      const response = {
         success: true,
-        data: models,
-      });
+        data: {
+          models,
+          defaultModel: 'llama3-8b-8192' // Set a default model
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          providerCount: Object.keys(models).length
+        }
+      };
+      
+      res.json(response);
     } catch (error) {
-      logger.error('Error listing models:', error);
-      next(error);
+      logger.error('Error listing models:', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.uid || 'unauthenticated'
+      });
+      
+      next({
+        status: 500,
+        message: 'Failed to retrieve models',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   }
 
