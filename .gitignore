@@ -8,3 +8,6 @@ node_modules
 .env.production.local
 frontend/.env
 backend/.env
+
+# Log files
+backend/logs/*.log
