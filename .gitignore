@@ -10,5 +10,4 @@ frontend/.env
 backend/.env
 
 # Log files
-backend/logs/combined.log
-backend/logs/error.log
+backend/logs
