@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { debounce } from 'lodash';
 import { ConfirmationDialog } from '../components/common/ConfirmationDialog';
+import { generateChatTitle, getTitleFromFirstMessage } from '../utils/titleGenerator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,26 +23,31 @@ import useAuth from '../auth/hooks/useAuth';
 
 // Services
 import { auth } from "../config/firebase";
-import apiClient from '../services/api';
+import api from '../services/api';
 
 // API methods
 const chatApi = {
-  getConversations: () => apiClient.get('chat/conversations'),
-  getConversation: (id) => apiClient.get(`chat/conversations/${id}`),
+  getConversations: (params) => api.getConversations(params),
+  getConversation: (id) => api.getConversation(id),
   saveConversation: (conversation) => {
     // Ensure model has the correct format (add :latest if needed for llama3)
-    let model = conversation.model || 'llama3:8B';
+    let model = conversation.model || 'llama3-8b-8192';
     if (model === 'llama3' || model.startsWith('llama3:')) {
-      model = 'llama3:8B';
+      model = 'llama3-8b-8192';
     }
     
     const sanitizedConversation = {
       ...conversation,
       model
     };
-    return apiClient.post('chat/conversations', sanitizedConversation);
+    
+    if (conversation.id) {
+      return api.updateConversation(conversation.id, sanitizedConversation);
+    } else {
+      return api.createConversation(sanitizedConversation);
+    }
   },
-  deleteConversation: (id) => apiClient.delete(`chat/conversations/${id}`),
+  deleteConversation: (id) => api.deleteConversation(id),
   sendMessage: (messageData) => {
     // Add null/undefined check for messageData
     if (!messageData) {
@@ -60,7 +66,7 @@ const chatApi = {
       conversationId, 
       content, 
       message, 
-      model = 'llama3:8B', 
+      model = 'llama3-8b-8192', 
       style = 'empathetic' 
     } = messageData;
     
@@ -88,7 +94,8 @@ const chatApi = {
       style
     });
     
-    return apiClient.post(`chat/conversations/${conversationId}/messages`, {
+    return api.sendMessage({
+      conversationId,
       content: messageContent,
       model,
       style,
@@ -121,12 +128,9 @@ const formatConversationDate = (dateString) => {
 // Debug helper function
 const debugLog = (message, data = {}) => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`, Object.keys(data).length ? data : '');
 };
 
-const ChatPage = () => {
-  debugLog('=== CHAT PAGE RENDER ===');
-  
+const ChatPage = () => {  
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: currentUser, loading: authLoading, logout } = useAuth();
@@ -494,17 +498,24 @@ const ChatPage = () => {
         
         // Use provided values or fall back to defaults
         const currentStyle = conversationData.style || conversationStyle;
-        const currentModel = conversationData.model || 'llama3:8B';
+        const currentModel = conversationData.model || 'llama3-8b';
         
+        // Generate title from first message if available
+        const firstMessage = conversationData.messages?.[0]?.content || '';
+        const conversationTitle = firstMessage 
+          ? getTitleFromFirstMessage(firstMessage)
+          : 'New Chat';
+          
         // Prepare the conversation data with conversation settings or defaults
         const newConversationData = {
-          title: title,
+          title: conversationTitle,
           model: currentModel,
           style: currentStyle,
-          lastMessage: conversationData.messages?.[0]?.content || '',
+          lastMessage: firstMessage,
           createdAt: now,
           updatedAt: now,
-          messages: conversationData.messages || []
+          messages: conversationData.messages || [],
+          isNew: false // Mark as not new since we're creating it with messages
         };
         
         console.log('Creating conversation with data:', newConversationData);
@@ -560,126 +571,187 @@ const ChatPage = () => {
     }
   });
 
-  // Send message mutation
+  // Send message mutation with optimized updates
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ content, conversationId, model = 'llama3:8B', style = 'empathetic' }) => {
-      console.log('sendMessage mutation called with:', { 
-        conversationId, 
-        contentLength: content?.length || 0,
-        contentType: typeof content,
-        model,
-        style
-      });
-      
+    mutationFn: async ({ content, conversationId, model = 'llama3-8b-8192', style = 'empathetic' }) => {
+      // Input validation
       if (!conversationId) {
-        console.error('No conversation ID provided for message');
         throw new Error('No conversation ID provided for message');
       }
       
       // Ensure content is a non-empty string after trimming
       const messageContent = typeof content === 'string' ? content.trim() : String(content).trim();
       if (!messageContent) {
-        console.error('Message content is empty');
         throw new Error('Message content cannot be empty');
       }
 
+      // Verify user is authenticated
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
-        console.error('User not authenticated');
         throw new Error('User not authenticated');
       }
 
-      // Get a fresh token
-      const token = await firebaseUser.getIdToken(true);
+      // Get current timestamp for optimistic updates
+      const now = new Date().toISOString();
       
-      try {
-        console.log('Sending message with content:', { content, type: typeof content });
-        
-        // Ensure content is a string
-        const messageContent = typeof content === 'string' ? content : String(content);
-        
-        // Show sending state to user
-        toast.loading('Sending message...', { id: 'sending-message' });
-        
-        try {
-          // Send the message to the backend with a timeout
-          const response = await Promise.race([
-            chatApi.sendMessage({
-              content: messageContent,
-              conversationId,
-              stream: false
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Request took too long. The server might be busy.')), 180000)
-            )
-          ]);
+      // Generate temporary IDs for optimistic updates
+      const tempMessageId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const tempAIMessageId = `temp-ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Generate title if this is the first message in a new conversation
+      const isFirstMessage = activeConversationData?.isNew || 
+                           (!activeConversationData?.messages?.length);
+      
+      let title = activeConversationData?.title || 'New Chat';
+      if (isFirstMessage) {
+        title = getTitleFromFirstMessage(messageContent);
+      }
 
-          if (!response?.success) {
-            throw new Error('Failed to get a valid response from the server');
-          }
+      // Create optimistic updates
+      const optimisticUserMessage = {
+        id: tempMessageId,
+        content: messageContent,
+        role: 'user',
+        timestamp: now,
+        status: 'sending',
+        isOptimistic: true
+      };
 
-          // Get the updated conversation with the AI response
-          const updatedConversation = await chatApi.getConversation(conversationId);
-          
-          if (!updatedConversation) {
-            throw new Error('Failed to get updated conversation');
-          }
-
-          // Update the local cache with the server response
-          queryClient.setQueryData(['conversation', conversationId], (old) => ({
-            ...(old || {}),
-            ...updatedConversation,
-            messages: updatedConversation.messages || []
-          }));
-          
-          // Update the conversations list to show the latest message
-          queryClient.setQueryData(['conversations', firebaseUser.uid], (old) => {
-            if (!old) return [updatedConversation];
-            
+      const optimisticAIMessage = {
+        id: tempAIMessageId,
+        content: '...',
+        role: 'assistant',
+        timestamp: now,
+        status: 'sending',
+        isOptimistic: true
+      };
+      
+      // Get current conversation data
+      const previousData = queryClient.getQueryData(['conversation', conversationId]) || {
+        id: conversationId,
+        messages: [],
+        title: 'New Chat',
+        model,
+        style,
+        createdAt: now,
+        updatedAt: now
+      };
+      
+      // Create optimistic update
+      const optimisticUpdate = {
+        ...previousData,
+        title: title, // Use generated title
+        lastMessage: messageContent,
+        updatedAt: now,
+        messages: [
+          ...(previousData.messages || []),
+          optimisticUserMessage,
+          optimisticAIMessage
+        ],
+        isNew: false // Clear the new flag after first message
+      };
+      
+      // Update both queries at once to minimize re-renders
+      queryClient.setQueriesData(
+        [['conversation', conversationId], ['conversations', firebaseUser.uid]],
+        (old) => {
+          if (Array.isArray(old)) {
+            // Update conversations list
             const index = old.findIndex(c => c.id === conversationId);
             if (index >= 0) {
-              const newConversations = [...old];
-              newConversations[index] = {
-                ...newConversations[index],
-                ...updatedConversation,
-                lastMessage: updatedConversation.lastMessage || newConversations[index].lastMessage,
-                updatedAt: updatedConversation.updatedAt || newConversations[index].updatedAt
+              const updated = [...old];
+              updated[index] = {
+                ...updated[index],
+                lastMessage: messageContent,
+                updatedAt: now,
+                model,
+                style
               };
-              return newConversations;
+              return updated;
             }
-            return [updatedConversation, ...old];
-          });
-
-          return updatedConversation;
-        } catch (error) {
-          console.error('Error in sendMessage API call:', error);
-          
-          // Remove the sending state from the UI
-          queryClient.setQueryData(['conversation', conversationId], (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              messages: old.messages.filter(m => !m.isSending)
-            };
-          });
-          
-          throw error;
-        } finally {
-          toast.dismiss('sending-message');
+            return [{
+              ...optimisticUpdate,
+              title: messageContent.substring(0, 30) + (messageContent.length > 30 ? '...' : '')
+            }, ...old];
+          }
+          // Update single conversation
+          return optimisticUpdate;
         }
+      );
+      
+      try {
+        // Send the message to the backend
+        const response = await Promise.race([
+          chatApi.sendMessage({
+            content: messageContent,
+            conversationId,
+            model,
+            style,
+            stream: false
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timed out')), 60000)
+          )
+        ]);
+
+        if (!response?.success) {
+          throw new Error(response?.message || 'Failed to get a valid response');
+        }
+
+        // Invalidate queries to refetch fresh data
+        await Promise.all([
+          queryClient.invalidateQueries(['conversation', conversationId]),
+          queryClient.invalidateQueries(['conversations', firebaseUser.uid])
+        ]);
+
+        return response.data;
+        
       } catch (error) {
-        console.error('Error in sendMessage mutation:', error);
+        console.error('Error sending message:', error);
         
-        // Show user-friendly error message
-        const errorMessage = error.message.includes('time') || error.message.includes('timeout') || error.message.includes('long')
-          ? 'The request took too long. The server might be busy. Please try again in a moment.'
-          : 'Failed to send message. Please try again.';
-          
-        toast.error(errorMessage);
+        // Revert optimistic updates on error
+        queryClient.setQueriesData(
+          [['conversation', conversationId], ['conversations', firebaseUser.uid]],
+          (old) => {
+            if (Array.isArray(old)) {
+              // Revert conversations list
+              return old.map(conv => 
+                conv.id === conversationId 
+                  ? { ...conv, updatedAt: previousData.updatedAt, lastMessage: previousData.lastMessage }
+                  : conv
+              );
+            }
+            // Revert single conversation
+            return {
+              ...(old || {}),
+              messages: (old?.messages || []).filter(m => 
+                m.id !== tempMessageId && m.id !== tempAIMessageId
+              )
+            };
+          }
+        );
         
-        // Re-throw to trigger onError in the mutation
         throw error;
       }
+    },
+    onError: (error, variables, context) => {
+      console.error('Message send error:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = 'Failed to send message';
+      if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
+        errorMessage = 'Request timed out. The server might be busy.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please log in again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
+    },
+    onSettled: () => {
+      // Clean up any loading states
+      toast.dismiss();
     },
     onMutate: async ({ content, conversationId }) => {
       if (!conversationId) return;
@@ -696,66 +768,27 @@ const ChatPage = () => {
         updatedAt: new Date().toISOString()
       };
       
-      // Optimistically update the UI
-      const optimisticMessage = {
-        id: `temp-${Date.now()}`,
-        content,
-        role: 'user',
-        timestamp: new Date().toISOString(),
-        isOptimistic: true
-      };
-      
-      const updatedConversation = {
-        ...previousConversation,
-        lastMessage: content,
-        updatedAt: new Date().toISOString(),
-        messages: [...(previousConversation.messages || []), optimisticMessage],
-      };
-      
-      queryClient.setQueryData(['conversation', conversationId], updatedConversation);
-      
-      // Update the conversations list to show the latest message
-      queryClient.setQueryData(['conversations', currentUser?.uid], (old) => {
-        if (!old) return [updatedConversation];
-        
-        const index = old.findIndex(c => c.id === conversationId);
-        if (index >= 0) {
-          const newConversations = [...old];
-          newConversations[index] = updatedConversation;
-          return newConversations;
-        }
-        return [updatedConversation, ...old];
-      });
-      
+      // Return context with previous conversation data
       return { previousConversation };
     },
     onError: (error, variables, context) => {
-      console.error('Error sending message:', error);
+      console.error('Mutation error:', error);
       
-      // Revert to the previous state on error
-      if (context?.previousConversation && variables.conversationId) {
+      // If we have previous data, revert to it
+      if (context?.previousConversation) {
         queryClient.setQueryData(
           ['conversation', variables.conversationId],
           context.previousConversation
         );
-        
-        // Also revert the conversations list
-        queryClient.setQueryData(['conversations', currentUser?.uid], (old) => {
-          if (!old) return [context.previousConversation];
-          
-          const index = old.findIndex(c => c.id === variables.conversationId);
-          if (index >= 0) {
-            const newConversations = [...old];
-            newConversations[index] = context.previousConversation;
-            return newConversations;
-          }
-          return old;
-        });
       }
-      
-      // Show error to user
-      alert(`Failed to send message: ${error.message}`);
     },
+    onSettled: (data, error, variables) => {
+      // Always refetch conversation after error or success to ensure we have latest data
+      if (variables.conversationId) {
+        queryClient.invalidateQueries(['conversation', variables.conversationId]);
+        queryClient.invalidateQueries(['conversations', currentUser?.uid]);
+      }
+    }
   });
 
   // Handle new chat
@@ -771,7 +804,7 @@ const ChatPage = () => {
       // Create a new conversation with default settings
       const newConversation = await createConversationMutation.mutateAsync({
         title: 'New Chat',
-        model: 'llama3:8B',  // Default model
+        model: 'llama3-8b-8192',  // Default model
         style: conversationStyle, // Default style
         messages: []
       });
@@ -995,122 +1028,138 @@ const ChatPage = () => {
     }
     
     // Define default values
-    const defaultModel = 'llama3:8B';
+    const defaultModel = 'llama3-8b-8192'; // Updated to valid Groq model name
     const defaultStyle = 'empathetic';
+
+    // Function to send a message with retry logic
+    const sendMessageWithRetry = async (messageData, isNewConversation = false) => {
+      try {
+        // If it's a new conversation, create it first
+        if (isNewConversation) {
+          console.log('Creating new conversation for message...');
+          
+          const newConversation = await createConversationMutation.mutateAsync({
+            title: messageData.content.slice(0, 30) + (messageData.content.length > 30 ? '...' : ''),
+            lastMessage: messageData.content,
+            model: messageData.model,
+            style: messageData.style,
+            messages: [{
+              content: messageData.content,
+              role: 'user',
+              timestamp: new Date().toISOString()
+            }]
+          });
+          
+          console.log('New conversation created:', {
+            id: newConversation?.id,
+            title: newConversation?.title,
+            style: newConversation?.style,
+            model: newConversation?.model
+          });
+          
+          if (newConversation?.id) {
+            console.log('Setting active conversation to:', newConversation.id);
+            setActiveConversation(newConversation.id);
+            setIsNewChat(false);
+            
+            // Now send the first message to the new conversation
+            console.log('Sending first message to new conversation:', {
+              conversationId: newConversation.id,
+              model: messageData.model,
+              style: messageData.style,
+              content: messageData.content
+            });
+            
+            return sendMessageMutation.mutateAsync({
+              content: messageData.content,
+              conversationId: newConversation.id,
+              model: messageData.model,
+              style: messageData.style
+            });
+          }
+        } else {
+          // For existing conversation, just send the message
+          return sendMessageMutation.mutateAsync(messageData);
+        }
+      } catch (error) {
+        console.error('Error in message sending:', error);
+        
+        // If it's an authentication error, refresh the token and retry once
+        if (error?.response?.status === 401 && !messageData.retried) {
+          console.log('Authentication error, refreshing token and retrying...');
+          try {
+            // Refresh the token
+            const user = auth.currentUser;
+            if (user) {
+              const newToken = await user.getIdToken(true);
+              console.log('Token refreshed, retrying message send...');
+              
+              // Retry with the new token
+              return sendMessageWithRetry({
+                ...messageData,
+                retried: true,
+                headers: {
+                  ...messageData.headers,
+                  Authorization: `Bearer ${newToken}`
+                }
+              }, isNewConversation);
+            }
+          } catch (refreshError) {
+            console.error('Error refreshing token:', refreshError);
+            toast.error('Session expired. Please log in again.');
+            window.location.href = '/login';
+            return;
+          }
+        }
+        
+        // For other errors, show a user-friendly message
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to send message';
+        toast.error(errorMessage);
+        throw error;
+      }
+    };
     
-    if (!activeConversation || isNewChat) {
-      console.log('Creating new conversation for message...');
-      
-      // Safely get style and model with fallbacks
+    try {
+      // Get current conversation settings with fallbacks
       const currentStyle = activeConversationData?.style || conversationStyle || defaultStyle;
       const currentModel = activeConversationData?.model || defaultModel;
       
-      console.log('Creating new conversation with settings:', {
-        currentStyle,
-        currentModel,
-        hasActiveConversationData: !!activeConversationData,
-        content: content.substring(0, 50) + (content.length > 50 ? '...' : '')
-      });
-      
-      try {
-        const newConversation = await createConversationMutation.mutateAsync({
-          title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
-          lastMessage: content,
+      if (!activeConversation || isNewChat) {
+        // For new conversations
+        if (!messageContent.trim()) return;
+        
+        await sendMessageWithRetry({
+          content: messageContent,
           model: currentModel,
           style: currentStyle,
-          messages: [{
-            content: content,
-            role: 'user',
-            timestamp: new Date().toISOString()
-          }]
-        });
-        
-        console.log('New conversation created:', {
-          id: newConversation?.id,
-          title: newConversation?.title,
-          style: newConversation?.style,
-          model: newConversation?.model
-        });
-        
-        if (newConversation?.id) {
-          console.log('Setting active conversation to:', newConversation.id);
-          setActiveConversation(newConversation.id);
-          setIsNewChat(false);
-          
-          // Now send the first message to the new conversation
-          console.log('Sending first message to new conversation:', {
-            conversationId: newConversation.id,
-            model: currentModel,
-            style: currentStyle,
-            content: content
-          });
-          
-          await sendMessageMutation.mutateAsync({
-            content: content,
-            conversationId: newConversation.id,
-            model: currentModel,
-            style: currentStyle
-          });
-        }
-      } catch (error) {
-        console.error('Error in conversation creation:', error);
-        throw error;
-      }
-    } else {
-      // Existing conversation, send message with current conversation settings
-      console.log('Sending message to existing conversation:', {
-        conversationId: activeConversation,
-        hasActiveConversationData: !!activeConversationData,
-        content: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : '')
-      });
-      
-      try {
-        // Safely get the current conversation's style and model with fallbacks
-        const currentStyle = activeConversationData?.style || conversationStyle || defaultStyle;
-        const currentModel = activeConversationData?.model || defaultModel;
-        
+          retried: false
+        }, true);
+      } else {
+        // For existing conversations
         if (!activeConversation) {
           console.error('No active conversation ID available');
           toast.error('No active conversation');
           return;
         }
         
-        console.log('Sending message with settings:', {
-          style: currentStyle,
-          model: currentModel,
-          conversationId: activeConversation
+        console.log('Sending message to existing conversation:', {
+          conversationId: activeConversation,
+          content: messageContent.substring(0, 30) + (messageContent.length > 30 ? '...' : '')
         });
         
-        const messageData = {
+        await sendMessageWithRetry({
           content: messageContent,
           conversationId: activeConversation,
           model: currentModel,
-          style: currentStyle
-        };
-        
-        console.log('Sending message with data:', {
-          ...messageData,
-          content: messageData.content.substring(0, 30) + (messageData.content.length > 30 ? '...' : '')
+          style: currentStyle,
+          retried: false
         });
-        
-        await sendMessageMutation.mutateAsync(messageData).catch(error => {
-          console.error('Error in sendMessageMutation:', error);
-          throw error; // Re-throw to be caught by the outer catch
-        });
-      } catch (error) {
-        console.error('Error sending message:', error);
-        toast.error(error.message || 'Failed to send message');
-        throw error; // Re-throw to allow calling code to handle the error if needed
       }
+    } catch (error) {
+      console.error('Error in message sending flow:', error);
+      // Error is already handled in sendMessageWithRetry
     }
-  }, [
-    activeConversation,
-    isNewChat,
-    activeConversationData,
-    conversationStyle,
-    createConversationMutation,
-    sendMessageMutation
-  ]);
+  }, [activeConversation, isNewChat, activeConversationData, conversationStyle, createConversationMutation, sendMessageMutation]);
 
   // Handle style change with immediate UI update and optimistic updates
   const handleStyleChange = useCallback((newStyle) => {

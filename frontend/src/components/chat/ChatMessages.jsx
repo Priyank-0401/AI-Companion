@@ -45,8 +45,14 @@ const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
         <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`} style={{ maxWidth: 'calc(100% - 6rem)' }}>
           {/* Sender Name */}
           {isFirstInGroup && (
-            <div className={`text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 ${isUser ? 'mr-1' : 'ml-1'}`}>
-              {isUser ? displayName : 'Seriva'}
+            <div className={`mb-1 ${isUser ? 'text-right' : 'text-left'}`}>
+              <span className={`text-sm font-medium ${
+                isUser 
+                  ? 'text-blue-600 dark:text-blue-400' 
+                  : 'text-purple-600 dark:text-purple-400'
+              }`}>
+                {isUser ? displayName : 'Seriva'}
+              </span>
             </div>
           )}
           

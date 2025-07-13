@@ -1401,43 +1401,6 @@ const AvatarCallPage = () => {
               </div>
             </div>
 
-            {/* Microphone Button with speech recognition state */}
-            <div className="relative">
-              <button
-                onClick={toggleListening}
-                disabled={!isCallActive || isProcessing || !isSpeechAvailable}
-                className={`p-3 rounded-full ${
-                  isListening
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                } ${!isSpeechAvailable ? 'opacity-50 cursor-not-allowed' : ''} transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-                title={
-                  !isSpeechAvailable 
-                    ? 'Speech recognition not available in this browser' 
-                    : isListening 
-                      ? 'Stop Listening' 
-                      : 'Start Listening'
-                }
-              >
-                {isListening ? <MicOff size={24} /> : <Mic size={24} />}
-              </button>
-              
-              {/* Visual indicator when listening */}
-              {isListening && (
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                </span>
-              )}
-              
-              {/* Error tooltip */}
-              {speechError && (
-                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded text-xs whitespace-nowrap">
-                  {speechError}
-                </div>
-              )}
-            </div>
-
             {/* Camera Toggle Button */}
             <div className="relative group">
               <button 

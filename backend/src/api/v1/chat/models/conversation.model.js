@@ -9,7 +9,7 @@ class Conversation {
     id = uuidv4(),
     userId,
     title = 'New Chat',
-    model = 'llama3:8B',
+    model = 'llama3-8b-8192',
     style = 'empathetic',
     createdAt = new Date(),
     updatedAt = new Date(),

@@ -219,7 +219,7 @@ class ChatController {
               id: conversationId,
               userId: userId,
               title: req.body.title || 'New Chat',
-              model: req.body.model || 'llama3:8B',
+              model: req.body.model || 'llama3-8b-8192',
               style: req.body.style || 'empathetic',
               messages: []
             });
