@@ -31,8 +31,10 @@ export default class GroqService extends BaseProvider {
    * @returns {Promise<Object>} Completion response
    */
   async chatCompletion(messages, options = {}) {
+    // Ensure options is always an object
+    const safeOptions = typeof options === 'object' && options !== null ? options : {};
     const startTime = Date.now();
-    const model = options.model || 'llama3-8b-8192';
+    const model = safeOptions.model || 'llama3-8b-8192';
     const requestId = Math.random().toString(36).substring(2, 8);
     
     try {
@@ -40,9 +42,9 @@ export default class GroqService extends BaseProvider {
       logger.info(`[GroqService] [${requestId}] Starting chat completion with model: ${model}`, {
         model,
         messageCount: messages.length,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        stream: options.stream || false
+        temperature: safeOptions.temperature,
+        maxTokens: safeOptions.maxTokens,
+        stream: safeOptions.stream || false
       });
 
       // Prepare the request data
@@ -52,10 +54,19 @@ export default class GroqService extends BaseProvider {
           role: msg.role,
           content: msg.content
         })),
-        temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 2000,
-        stream: options.stream || false
+        temperature: safeOptions.temperature || 0.7,
+        max_tokens: safeOptions.maxTokens || 2000,
+        stream: safeOptions.stream || false
       };
+
+      // Log the request data for debugging
+      logger.debug(`[GroqService] [${requestId}] Sending request data:`, {
+        model: requestData.model,
+        messageCount: requestData.messages.length,
+        temperature: requestData.temperature,
+        max_tokens: requestData.max_tokens,
+        stream: requestData.stream
+      });
 
       // Log the request payload (without sensitive data)
       logger.debug(`[GroqService] [${requestId}] Request payload:`, {
@@ -279,36 +290,54 @@ export default class GroqService extends BaseProvider {
    * @private
    */
   async _makeRequest(endpoint, data) {
+    // Ensure data is an object
+    const requestData = typeof data === 'object' && data !== null ? data : {};
     const url = `${this.baseUrl}${endpoint}`;
     const requestId = Math.random().toString(36).substring(2, 8);
     const startTime = Date.now();
     
-    // Log the request details (without sensitive data)
-    logger.debug(`[GroqService] [${requestId}] Making request to: ${url}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer [REDACTED]' // Don't log the actual API key
-      },
-      body: {
-        model: data.model,
-        temperature: data.temperature,
-        max_tokens: data.max_tokens,
-        stream: data.stream,
-        messageCount: data.messages?.length || 0,
-        // Include a sample of the first message for debugging
-        sampleMessage: data.messages?.[0]?.content?.substring(0, 50) || ''
-      }
-    });
-
     try {
+      // Log the request details (without sensitive data)
+      const logData = {
+        method: 'POST',
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer [REDACTED]' // Don't log the actual API key
+        },
+        body: {
+          model: requestData.model,
+          temperature: requestData.temperature,
+          max_tokens: requestData.max_tokens,
+          stream: requestData.stream,
+          messageCount: Array.isArray(requestData.messages) ? requestData.messages.length : 0,
+          // Include a sample of the first message for debugging
+          sampleMessage: Array.isArray(requestData.messages) && requestData.messages[0]?.content 
+            ? String(requestData.messages[0].content).substring(0, 50)
+            : ''
+        }
+      };
+      
+      logger.debug(`[GroqService] [${requestId}] Making request`, logData);
+
+      // Ensure we have a valid API key
+      if (!this.apiKey) {
+        throw new Error('Groq API key is not configured. Please set the GROQ_API_KEY environment variable.');
+      }
+
+      // Ensure we have valid request data
+      if (!requestData || typeof requestData !== 'object') {
+        throw new Error('Invalid request data: expected an object');
+      }
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Accept': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(requestData)
       });
 
       const responseTime = Date.now() - startTime;

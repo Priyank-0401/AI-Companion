@@ -43,12 +43,15 @@ class LLMService {
    * @returns {Promise<Object>} Completion response
    */
   async chatCompletion(messages, options = {}) {
+    // Ensure options is always an object
+    const safeOptions = typeof options === 'object' && options !== null ? options : {};
+    
     const { 
       provider: preferredProvider = 'groq', // Default to groq if not specified
       model: preferredModel = 'llama3-8b-8192',
       fallback = true,
       ...providerOptions 
-    } = options;
+    } = safeOptions;
 
     // Determine the list of providers to try
     let providersToTry = [];

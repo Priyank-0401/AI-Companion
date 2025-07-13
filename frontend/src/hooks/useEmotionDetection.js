@@ -34,9 +34,9 @@ export const useEmotionDetection = (options = {}) => {
   const videoRef = useRef(null);
   const detectionInterval = useRef(null);
   const modelsLoaded = useRef(false);
-  const lastEmotionChange = useRef(Date.now());
+  const lastEmotionCheck = useRef(Date.now());
   const currentDetectedEmotion = useRef('neutral');
-  const EMOTION_CHANGE_COOLDOWN = 5000; // 5 seconds cooldown between emotion changes
+  const EMOTION_CHECK_INTERVAL = 5000; // Check for emotion changes every 5 seconds
 
   // Load face-api.js models
   const loadModels = useCallback(async () => {
@@ -211,7 +211,7 @@ export const useEmotionDetection = (options = {}) => {
     // Reset emotion state
     setEmotion('neutral');
     currentDetectedEmotion.current = 'neutral';
-    lastEmotionChange.current = Date.now();
+    lastEmotionCheck.current = Date.now();
     
     return wasStreaming;
   }, []);
@@ -221,12 +221,26 @@ export const useEmotionDetection = (options = {}) => {
     return modelsLoaded.current;
   }, []);
 
+  // Track the last emotion that was logged/displayed
+  const lastLoggedEmotion = useRef('neutral');
+  const lastReportedEmotion = useRef('neutral');
+  
   // Detect emotions from video stream
   const detectEmotions = useCallback(async () => {
+    const now = Date.now();
+    
+    // Only proceed if 5 seconds have passed since last check
+    if (now - lastEmotionCheck.current < EMOTION_CHECK_INTERVAL) {
+      return currentDetectedEmotion.current;
+    }
+    
+    // Update the last check time at the start to ensure consistent intervals
+    lastEmotionCheck.current = now;
+    
     try {
       if (!videoRef.current) {
         console.log('Video ref not ready');
-        return 'neutral';
+        return currentDetectedEmotion.current;
       }
       
       // Ensure models are loaded
@@ -235,7 +249,7 @@ export const useEmotionDetection = (options = {}) => {
         const loaded = await loadModels();
         if (!loaded) {
           console.error('Failed to load models');
-          return 'neutral';
+          return currentDetectedEmotion.current;
         }
       }
       
@@ -316,8 +330,6 @@ export const useEmotionDetection = (options = {}) => {
 
       if (detections.length > 0) {
         const detection = detections[0];
-        const now = Date.now();
-        const timeSinceLastChange = now - lastEmotionChange.current;
         
         if (detection.expressions) {
           const expressions = detection.expressions;
@@ -327,25 +339,28 @@ export const useEmotionDetection = (options = {}) => {
             .filter(([_, value]) => typeof value === 'number' && value > EMOTION_THRESHOLD)
             .sort(([, a], [, b]) => b - a);
 
-          if (sortedExpressions.length > 0) {
-            const [dominantEmotion] = sortedExpressions[0];
-            const mappedEmotion = EMOTION_MAPPING[dominantEmotion] || 'neutral';
+        if (sortedExpressions.length > 0) {
+          const [dominantEmotion] = sortedExpressions[0];
+          const mappedEmotion = EMOTION_MAPPING[dominantEmotion] || 'neutral';
+          
+          // Only update if the emotion has changed and we're not already reporting this emotion
+          if (mappedEmotion !== lastLoggedEmotion.current) {
+            lastLoggedEmotion.current = mappedEmotion;
+            currentDetectedEmotion.current = mappedEmotion;
             
-            // Only update emotion if cooldown has passed or if we're changing to neutral
-            if (timeSinceLastChange >= EMOTION_CHANGE_COOLDOWN || currentDetectedEmotion.current === 'neutral') {
-              if (mappedEmotion !== currentDetectedEmotion.current) {
-                console.log(`Emotion changing from ${currentDetectedEmotion.current} to ${mappedEmotion}`);
-                currentDetectedEmotion.current = mappedEmotion;
-                lastEmotionChange.current = now;
-                setEmotion(mappedEmotion);
-                onEmotionDetected(mappedEmotion);
-              }
-            } else {
-              console.log(`Emotion change on cooldown. Time remaining: ${Math.ceil((EMOTION_CHANGE_COOLDOWN - timeSinceLastChange) / 1000)}s`);
+            // Only call onEmotionDetected if the emotion has actually changed from last reported
+            if (mappedEmotion !== lastReportedEmotion.current) {
+              console.log(`[${new Date().toISOString()}] Emotion detected: ${mappedEmotion}`);
+              lastReportedEmotion.current = mappedEmotion;
+              onEmotionDetected(mappedEmotion);
             }
             
-            return currentDetectedEmotion.current;
-          } else {
+            // Always update the local state to ensure UI consistency
+            setEmotion(mappedEmotion);
+          }
+          
+          return mappedEmotion;
+        } else {
             console.log('No expressions above confidence threshold');
             return currentDetectedEmotion.current;
           }
@@ -426,7 +441,7 @@ export const useEmotionDetection = (options = {}) => {
       }
       setEmotion('neutral');
       currentDetectedEmotion.current = 'neutral';
-      lastEmotionChange.current = Date.now();
+      lastEmotionCheck.current = Date.now();
     };
 
     if (!isReady || !enabled || !hasCameraAccess) {

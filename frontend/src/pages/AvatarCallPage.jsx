@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiClient } from '../services/api';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
 import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volume lip sync hook
 import { useEmotionDetection } from '../hooks/useEmotionDetection'; // Import the emotion detection hook
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 // Removed expression hook import - keeping it simple
 import { 
   Mic, 
@@ -28,178 +30,296 @@ import {
 
 import voiceService from '../services/voiceService';
 
-// Send message to Ollama and get response
-const sendToOllama = async (message, conversationHistory, setConversationHistory, voiceEnabled, setVoiceEnabled, selectedVoice, speakText, setError, setIsProcessing, currentEmotion = 'neutral') => {
+// Debounce helper function
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
+// Process user message and get response from the backend
+const processUserMessage = async (message, speakText, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', setMessages, setEmotion, speak) => {
   if (!message || !message.trim()) {
-    console.warn('Empty message provided to sendToLLM');
+    console.warn('⚠️ Empty message provided to processUserMessage');
     return null;
   }
   
-  console.log('Sending to LLM:', { message, currentEmotion, conversationHistory });
-  setIsProcessing(true);
+  const trimmedMessage = message.trim();
+  console.log('📩 New message to process:', trimmedMessage);
   
-  const abortController = new AbortController();
+  // Generate a unique ID for this request
+  const requestId = Date.now().toString();
+  if (currentRequestId) {
+    currentRequestId.current = requestId;
+  }
   
   try {
-    // Create emotion context message
-    const emotionContext = {
-      happy: "The user appears happy. Respond with an upbeat and positive tone, matching their energy while staying professional.",
-      sad: "The user seems sad. Respond with extra empathy, kindness, and support. Offer gentle encouragement.",
-      angry: "The user seems frustrated or angry. Respond with patience, understanding, and a calming tone. Avoid being confrontational.",
-      surprised: "The user seems surprised. Acknowledge their reaction and provide clear, reassuring information.",
-      neutral: "The user's expression is neutral. Maintain a warm, professional, and engaging tone."
-    };
-
-    // Prepare messages array ensuring proper format for Ollama
-    const messages = [
-      // System message with emotion context
-      { 
-        role: 'system', 
-        content: `You are Seriva, an AI wellness companion. ${emotionContext[currentEmotion] || emotionContext.neutral}`
-      },
-      // Add conversation history (filter out any existing system messages to avoid duplicates)
-      ...conversationHistory
-        .filter(msg => msg.role !== 'system')
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-      // Add current user message
-      { 
-        role: 'user',
-        content: message
-      }
-    ];
-
-    const requestBody = {
-      model: 'llama3',
-      messages: messages,
-      stream: false,
-      options: {
-        temperature: 0.7,
-        top_p: 0.9,
-        num_ctx: 2048
-      }
-    };
-
-    console.log('Ollama Request:', JSON.stringify(requestBody, null, 2));
+    setIsProcessing?.(true);
+    setError?.('');
     
-    const startTime = Date.now();
-    const response = await fetch('http://localhost:11434/api/chat', {
+    console.log('🔍 Processing user message:', { 
+      message: trimmedMessage,
+      requestId,
+      emotion: currentEmotion 
+    });
+
+    // Create payload with required fields
+    const payload = {
+      message: trimmedMessage,
+      model: 'llama3-8b-8192',
+      style: 'empathetic',
+      context: { 
+        emotion: currentEmotion,
+        timestamp: new Date().toISOString(),
+        requestId
+      }
+    };
+
+    console.log('📤 Sending request to API:', { 
+      endpoint: '/api/v1/avatar-call/process',
+      payload: JSON.stringify(payload, null, 2) 
+    });
+    
+    // Make the API request with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    const response = await fetch(`${apiClient.baseURL}/api/v1/avatar-call/process`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(apiClient.getAuthHeader?.() || {})
       },
-      body: JSON.stringify(requestBody),
-      signal: abortController.signal,
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
     
-    const responseTime = Date.now() - startTime;
-    console.log(`Ollama response received in ${responseTime}ms`, { status: response.status });
+    clearTimeout(timeoutId);
     
+    // Check for HTTP errors
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Ollama API error:', { status: response.status, errorText });
-      throw new Error(`Ollama API error: ${response.status} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Ollama response data:', data);
-    
-    if (!data.message?.content) {
-      throw new Error('No content in Ollama response');
-    }
-    
-    // Update conversation history
-    const updatedHistory = [
-      ...conversationHistory,
-      { role: 'user', content: message },
-      { role: 'assistant', content: data.message.content }
-    ];
-    
-    setConversationHistory(updatedHistory);
-    
-    // Convert response to speech with proper voice
-    if (data.message.content) {
-      console.log('Preparing to speak response...');
-      
-      // Ensure voice is enabled (no artificial delay)
-      if (!voiceEnabled) {
-        console.log('Voice was disabled, enabling now...');
-        setVoiceEnabled(true);
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { message: `HTTP error! status: ${response.status}` };
       }
-      
-      // Set the selected voice if needed
-      if (selectedVoice) {
-        console.log('Setting voice to:', selectedVoice);
-        voiceService.setVoice(selectedVoice);
-      }
-      
-      // Speak the response without waiting for the voice to be fully ready
-      // The voice service will handle any necessary buffering
-      console.log('Initiating speech synthesis...');
-      speakText(data.message.content).catch(error => {
-        console.error('Error in speech synthesis:', error);
-      });
+      const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      error.details = errorData;
+      throw error;
     }
     
-    return data.message.content;
+    // Parse the response data once
+    const responseData = await response.json();
+    console.log('API Response:', responseData);
+    
+    // Handle the response
+    if (!responseData) {
+      throw new Error('No response data received from server');
+    }
+    
+    // Extract data from the success wrapper if it exists
+    let resultData = responseData;
+    if (responseData.success && responseData.data) {
+      console.log('Extracting data from success wrapper');
+      resultData = responseData.data;
+    }
+    
+    // Log the full response for debugging
+    console.log('Processed response data:', resultData);
+    
+    if (!resultData) {
+      throw new Error('No valid response data found in the API response');
+    }
+    
+    // Create a message object from the response
+    const messageObj = {
+      id: resultData.id || `msg-${Date.now()}`,
+      role: 'assistant',
+      content: resultData.content || resultData.message || 'I apologize, but I could not process your request.',
+      context: {
+        emotion: resultData.emotion || currentEmotion || 'neutral',
+        timestamp: resultData.timestamp || new Date().toISOString(),
+        ...(resultData.context || {})
+      },
+      metadata: {
+        model: resultData.model,
+        usage: resultData.usage,
+        ...(resultData.metadata || {})
+      }
+    };
+    
+    // Update messages with the assistant's response
+    if (setMessages) {
+      setMessages(prev => [...prev, messageObj]);
+    }
+    
+    // Update emotion state if available
+    const newEmotion = resultData.emotion || resultData.context?.emotion;
+    if (newEmotion && setEmotion) {
+      setEmotion(newEmotion);
+    }
+    
+    // Speak the response if speak function is provided
+    if (speak && messageObj.content) {
+      await speak(messageObj.content);
+    }
+    
+    return messageObj;
+    
   } catch (error) {
-    console.error('Error in sendToOllama:', error);
-    setError('Failed to get response from the AI. Please try again.');
-    return null;
+    console.error('Error in processUserMessage:', error);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Sorry, I encountered an error processing your request.';
+    console.error('API Error Details:', error.response?.data || error.details || 'No additional details');
+    
+    if (setError) {
+      setError(errorMessage);
+    }
+    
+    // Create a fallback error message
+    const errorResponse = {
+      id: `error-${Date.now()}`,
+      role: 'assistant',
+      content: errorMessage,
+      context: {
+        emotion: 'sad',
+        error: true,
+        timestamp: new Date().toISOString()
+      },
+      error: true
+    };
+    
+    // Add to messages if we have a setter
+    if (setMessages) {
+      setMessages(prev => [...prev, errorResponse]);
+    }
+    
+    // Speak the error message if we have text to speech
+    if (speakText && errorMessage) {
+      await speakText(errorMessage);
+    }
+    
+    return errorResponse;
+    
   } finally {
-    setIsProcessing(false);
+    if (currentRequestId?.current === requestId) {
+      setIsProcessing?.(false);
+    }
   }
 };
 
 const AvatarCallPage = () => {
-  const recognitionRef = useRef(null);
+  // Refs
   const audioRef = useRef(null);
   const audioContextRef = useRef(null);
+  const currentRequestId = useRef(null);
+  const isProcessingRef = useRef(false);
+  const lastProcessedText = useRef('');
+  const lastRequestTime = useRef(0);
+  const isInitialized = useRef(false);
+  const REQUEST_COOLDOWN = 2000; // 2 seconds cooldown between requests
   
+  // Speech recognition hook
+  const {
+    isListening,
+    transcript,
+    finalTranscript,
+    error: speechError,
+    isAvailable: isSpeechAvailable,
+    startListening,
+    stopListening,
+    toggleListening: toggleSpeechRecognition,
+    resetTranscript
+  } = useSpeechRecognition({
+    continuous: true,
+    lang: 'en-US',
+    confidenceThreshold: 0.8
+  });
+  
+  // UI State
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);  
-  const [isListening, setIsListening] = useState(false);
-  const [recognizedText, setRecognizedText] = useState('');
+  const [error, setError] = useState(null);
+  
+  // Call State
+  const [isCallActive, setIsCallActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [recognizedText, setRecognizedText] = useState('');
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [lastMessage, setLastMessage] = useState(null);
+  
+  // Handle final transcript changes
+  useEffect(() => {
+    if (finalTranscript) {
+      console.log('Final transcript received:', finalTranscript);
+      setRecognizedText(finalTranscript);
+      
+      // Process the final transcript if we're in a call and not already processing
+      if (isCallActive && !isProcessing) {
+        handleProcessText(finalTranscript);
+      }
+    }
+  }, [finalTranscript, isCallActive, isProcessing]);
+
+  // Handle speech recognition errors
+  useEffect(() => {
+    if (speechError) {
+      console.error('Speech recognition error:', speechError);
+      setError(`Speech recognition error: ${speechError}`);
+    }
+  }, [speechError]);
+
+  // Handle when voice playback ends
+  const handleVoiceEnd = useCallback(() => {
+    console.log('Voice playback ended');
+    setIsSpeaking(false);
+    // Reset lip-sync animation
+    if (volumeLipSyncRef.current) {
+      volumeLipSyncRef.current.reset();
+    }
+  }, []);
+  
+  // Audio State
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [delayedIsSpeaking, setDelayedIsSpeaking] = useState(false);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [systemVolume, setSystemVolume] = useState(80);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [conversationHistory, setConversationHistory] = useState([]);
-  const [audioElement, setAudioElement] = useState(null);
-  const [lastMessage, setLastMessage] = useState(''); // For expression system
-  const [voiceEnabled, setVoiceEnabled] = useState(false); // Voice control - START DISABLED
-  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState([]);  
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
-  const [selectedTone, setSelectedTone] = useState('empathetic'); // New tone selector state
-  const volumeLipSyncRef = useRef(null); // Add volume lip sync ref
+  const audioElement = useRef(null);
+  const volumeLipSyncRef = useRef(null);
   
-  // Emotion state
+  // Emotion state for avatar expressions
   const [emotion, setEmotion] = useState('neutral');
   
-  // Camera preview state
+  // Camera state for emotion detection
+  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
-  
-  // Camera state
-  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
 
+  // Track the last emotion that was displayed
+  const lastDisplayedEmotion = useRef('neutral');
+  
   // Emotion detection - starts with camera 
   const {
     videoRef: emotionVideoRef,
     isReady: isEmotionDetectionReady,
     hasCameraAccess,
     error: emotionError,
-    toggleVideo: toggleEmotionDetection,
     isDetecting: isEmotionDetectionActive,
     emotion: currentEmotion,
-    startDetection,
-    stopDetection,
+    detectEmotions,
     areModelsLoaded,
     loadModels,
     startVideo,
@@ -207,8 +327,12 @@ const AvatarCallPage = () => {
   } = useEmotionDetection({
     enabled: isCameraEnabled, // Only enable when camera is on
     onEmotionDetected: (emotion) => {
-      console.log('Detected emotion:', emotion);
-      setEmotion(emotion);
+      // Only log and update if the emotion has changed
+      if (emotion !== lastDisplayedEmotion.current) {
+        console.log(`[${new Date().toISOString()}] Detected emotion:`, emotion);
+        lastDisplayedEmotion.current = emotion;
+        setEmotion(emotion);
+      }
     },
   });
 
@@ -231,20 +355,36 @@ const AvatarCallPage = () => {
           }
         }
         
-        // Start video and detection
-        const stream = await startVideo();
-        if (stream && previewVideoRef.current) {
-          previewVideoRef.current.srcObject = stream;
-          // Small delay to ensure video is playing
-          setTimeout(() => {
-            startDetection();
-          }, 500);
+        // Start video
+        const success = await startVideo();
+        if (success && emotionVideoRef.current && emotionVideoRef.current.srcObject) {
+          // Get the stream from the emotion detection video element
+          const stream = emotionVideoRef.current.srcObject;
+          
+          // Stop any existing tracks in the preview
+          if (previewVideoRef.current && previewVideoRef.current.srcObject) {
+            const oldStream = previewVideoRef.current.srcObject;
+            const tracks = oldStream.getTracks();
+            tracks.forEach(track => track.stop());
+          }
+          
+          // Set the preview source to the same stream
+          if (previewVideoRef.current) {
+            previewVideoRef.current.srcObject = stream;
+            previewVideoRef.current.play().catch(err => {
+              console.error('Error playing preview video:', err);
+            });
+          }
         }
       } else {
-        // Stop video and detection
-        stopDetection();
+        // Stop video (this will also stop detection)
         await stopVideo();
-        if (previewVideoRef.current) {
+        
+        // Stop preview tracks
+        if (previewVideoRef.current && previewVideoRef.current.srcObject) {
+          const stream = previewVideoRef.current.srcObject;
+          const tracks = stream.getTracks();
+          tracks.forEach(track => track.stop());
           previewVideoRef.current.srcObject = null;
         }
       }
@@ -255,7 +395,7 @@ const AvatarCallPage = () => {
       console.error('Error toggling camera:', error);
       setError(error.message || 'Failed to toggle camera');
     }
-  }, [isCameraEnabled, areModelsLoaded, loadModels, toggleEmotionDetection, startVideo, stopVideo, startDetection, stopDetection]);
+  }, [isCameraEnabled, areModelsLoaded, loadModels, startVideo, stopVideo]);
   
   // Update preview video source when stream changes
   useEffect(() => {
@@ -295,33 +435,16 @@ const AvatarCallPage = () => {
     };
   }, [emotionVideoRef, previewVideoRef]);
 
-  // Handle delayed animation state
-  useEffect(() => {
-    let timeout;
-    if (isSpeaking) {
-      timeout = setTimeout(() => {
-        setDelayedIsSpeaking(true); // Start animation after 2 seconds
-      }, 500);
-    } else {
-      setDelayedIsSpeaking(false); // Reset immediately if AI stops talking
-      clearTimeout(timeout);
-    }
-
-    return () => clearTimeout(timeout);
-  }, [isSpeaking]);
-
-  // Voice tone options
-  const voiceTones = [
-    { id: 'empathetic', name: 'Empathetic', description: 'Caring & supportive', voice: 'en-US-JennyNeural' },
-    { id: 'cheerful', name: 'Cheerful', description: 'Upbeat & energetic', voice: 'en-US-AriaNeural' },
-    { id: 'calm', name: 'Calm', description: 'Professional & measured', voice: 'en-US-MichelleNeural' },
-    { id: 'friendly', name: 'Friendly', description: 'Casual & warm', voice: 'en-US-MonicaNeural' }
-  ];
-
   // Handle text-to-speech functionality
   const speakText = useCallback(async (text) => {
     if (!text) {
       console.error('Cannot speak: no text provided');
+      return false;
+    }
+    
+    // Skip if we're already processing this text
+    if (isProcessingRef.current) {
+      console.log('Skipping duplicate speak request:', text);
       return false;
     }
     
@@ -332,31 +455,32 @@ const AvatarCallPage = () => {
 
     console.log('🔊 Starting to speak text:', text);
     
-    // Set voice and speaking state immediately
+    // Set voice if available
     if (selectedVoice) {
       console.log('🎙️ Setting voice to:', selectedVoice.displayName);
       voiceService.setVoice(selectedVoice);
     }
-    
-    // Set the last message but don't start speaking yet
-    setLastMessage(text);
 
     try {
+      isProcessingRef.current = true;
+      
       // Use the voiceService to speak the text
       await voiceService.speak(text, {
         onStart: () => {
           console.log('🎤 Speech started, starting talking animation');
-          // Start the talking animation after delay
           setIsSpeaking(true);
         },
         onEnd: () => {
           console.log('✅ Speech ended');
           setIsSpeaking(false);
-          setLastMessage(''); // Clear the last message when done speaking
+          isProcessingRef.current = false;
+          lastProcessedText.current = ''; // Reset after completion
         },
         onError: (error) => {
           console.error('❌ Error in speech synthesis:', error);
           setIsSpeaking(false);
+          isProcessingRef.current = false;
+          lastProcessedText.current = ''; // Reset on error
           setError('Failed to speak the response. Please check your audio settings.');
         }
       });
@@ -419,408 +543,429 @@ const AvatarCallPage = () => {
     
     console.log('🎵 Selected Azure Neural voice:', voice.displayName, '(' + voice.name + ')');
   }, [voiceEnabled]);
-  // Voice enable/disable handler with immediate talking activation
-  const toggleVoiceEnabled = useCallback(() => {
+  // Start recognition function with retry logic
+  const startRecognition = useCallback(async () => {
+    console.log('🚀 Starting speech recognition...');
+    
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      console.error('❌ Speech recognition not initialized');
+      setError('Speech recognition not initialized. Please refresh the page and try again.');
+      return false;
+    }
+
+    // Check microphone permissions first
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+      console.log('🎤 Microphone permission state:', permissionStatus.state);
+      
+      if (permissionStatus.state === 'denied') {
+        const errorMsg = 'Microphone access was denied. Please allow microphone access in your browser settings.';
+        console.error('❌', errorMsg);
+        setError(errorMsg);
+        setVoiceEnabled(false);
+        return false;
+      }
+      
+      // Listen for permission changes
+      permissionStatus.onchange = () => {
+        console.log('🎤 Microphone permission changed to:', permissionStatus.state);
+        if (permissionStatus.state === 'granted' && voiceEnabled) {
+          startRecognition();
+        }
+      };
+    } catch (error) {
+      console.warn('⚠️ Could not check microphone permission status:', error);
+      // Continue anyway as some browsers might not support the permissions API
+    }
+    
+    // If already listening, no need to start again
+    if (isListening) {
+      console.log('ℹ️ Speech recognition is already active');
+      return true;
+    }
+
+    // Use a promise to handle the async nature of recognition start
+    return new Promise((resolve) => {
+      let retryCount = 0;
+      const MAX_RETRIES = 3;
+      
+      const attemptStart = () => {
+        if (retryCount >= MAX_RETRIES) {
+          console.error(`❌ Failed to start after ${MAX_RETRIES} attempts`);
+          setError('Failed to start speech recognition. Please try again.');
+          setVoiceEnabled(false);
+          resolve(false);
+          return;
+        }
+        
+        console.log(`🔄 Attempt ${retryCount + 1}/${MAX_RETRIES}: Starting recognition...`);
+        
+        try {
+          recognition.start();
+          console.log('✅ Started speech recognition');
+          setIsListening(true);
+          setError(null);
+          resolve(true);
+        } catch (error) {
+          retryCount++;
+          console.warn(`⚠️ Attempt ${retryCount} failed:`, error);
+          
+          if (retryCount < MAX_RETRIES) {
+            console.log(`⏳ Retrying in ${retryCount * 500}ms...`);
+            setTimeout(attemptStart, retryCount * 500);
+          } else {
+            console.error('❌ Max retry attempts reached');
+            setError('Could not access the microphone. Please check your microphone settings.');
+            setVoiceEnabled(false);
+            resolve(false);
+          }
+        }
+      };
+      
+      // Initial start attempt
+      attemptStart();
+    });
+  }, [isListening, voiceEnabled, setError, setVoiceEnabled]);
+  
+  // Stop recognition function
+  const stopRecognition = useCallback(() => {
+    console.log('🛑 Stopping speech recognition...');
+    
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      console.warn('No recognition instance to stop');
+      return;
+    }
+    
+    try {
+      recognition.stop();
+      console.log('✅ Stopped speech recognition');
+      setIsListening(false);
+    } catch (error) {
+      console.error('❌ Error stopping recognition:', error);
+    }
+  }, []);
+  
+  // Toggle voice on/off
+  const toggleVoiceEnabled = useCallback(async () => {
     const newVoiceState = !voiceEnabled;
+    console.log(`🔄 Toggling voice ${newVoiceState ? 'ON' : 'OFF'}`);
+    
+    // Update the state first
     setVoiceEnabled(newVoiceState);
     
-    if (newVoiceState) {      // When enabling voice, prepare welcome message but don't set it yet
-      const welcomeMessage = "Hey! I am Seriva, your AI companion. I'm ready to talk with you!";
+    if (newVoiceState) {
+      // When enabling voice
+      console.log('🔊 Enabling voice features...');
       
-      // Import and use the voice service to speak immediately
-      import('../services/voiceService').then(({ default: voiceService }) => {
-        if (selectedVoice) {
-          voiceService.setVoice(selectedVoice);
-        }
-          // Set up the audio element reference for lip sync
+      try {
+        // Set up the audio element for lip sync
         const audioElement = voiceService.getAudioElement();
         if (audioElement && audioRef.current !== audioElement) {
           audioRef.current = audioElement;
           setupVolumeAnalysis(audioElement);
           console.log('🎵 Audio element connected to lip sync system');
         }
+        
+        // Start speech recognition
+        if (recognitionRef.current) {
+          console.log('🎤 Starting speech recognition...');
+          const started = await startRecognition();
           
-        // Speak the welcome message with synchronized animation
-        voiceService.speak(welcomeMessage, {
-          onStart: () => {
-            // Only switch to talking mode when voice actually starts
-            setLastMessage(welcomeMessage);
-            
-            // Get the audio element again in case it changed
-            const currentAudioElement = voiceService.getAudioElement();
-            if (currentAudioElement && currentAudioElement !== audioRef.current) {
-              audioRef.current = currentAudioElement;
-              setupVolumeAnalysis(currentAudioElement);
-            }
-            
-            startLipSync(); // Start lip sync when speaking begins
-            console.log('🎵 Welcome message started - Avatar switching to talking mode and lip sync enabled');
-          },
-          onEnd: () => {
-            // When message ends, turn off voice and return to idle
+          if (!started) {
+            console.warn('⚠️ Failed to start speech recognition');
             setVoiceEnabled(false);
-            setLastMessage(''); // Clear message to return to idle
-            stopLipSync(); // Stop lip sync when speaking ends
-            console.log('🎵 Welcome message ended - Avatar returning to idle, voice disabled, and lip sync stopped');
-          },
-          onError: (error) => {
-            console.error('❌ Welcome message failed:', error);
-            // On error, also turn off voice
-            setVoiceEnabled(false);
-            setLastMessage('');
-            stopLipSync(); // Stop lip sync on error
           }
-        });
-      });
-      
-      console.log('✅ Voice enabled - Preparing welcome message...');    } else {
-      // When disabling voice, stop any ongoing speech and clear message
-      setLastMessage(''); // Clear message to return to idle immediately
-      stopLipSync(); // Stop lip sync when voice is disabled
-      import('../services/voiceService').then(({ default: voiceService }) => {
-        voiceService.stop();
-        console.log('🔇 Voice disabled - stopping any ongoing speech and lip sync');
-      });
-    }
-  }, [voiceEnabled, selectedVoice, setupVolumeAnalysis, startLipSync, stopLipSync]);
-  
-  // Tone selection handler
-  const selectTone = useCallback((tone) => {
-    setSelectedTone(tone.id);
-    
-    // Find the corresponding voice from available voices
-    const toneVoice = availableVoices.find(v => v.name === tone.voice);
-    if (toneVoice && voiceEnabled) {
-      setSelectedVoice(toneVoice);
-      
-      // Test the selected tone with a sample phrase
-      import('../services/voiceService').then(({ default: voiceService }) => {
-        voiceService.setVoice(toneVoice);
-        const sampleMessage = `Hi! I'm Seriva in ${tone.name.toLowerCase()} mode. ${tone.description}.`;
-        voiceService.speak(sampleMessage).catch(error => {
-          console.error('❌ Tone test failed:', error);
-        });
-      });
-    }
-  }, [availableVoices, voiceEnabled]);
-  // Callback for when voice ends - turns off voice button
-  const handleVoiceEnd = useCallback(() => {
-    setVoiceEnabled(false);
-    setLastMessage(''); // Clear message to return to idle
-    stopLipSync(); // Stop lip sync when voice ends
-    console.log('🔇 Voice ended - Avatar voice disabled, returning to idle, and lip sync stopped');
-  }, [stopLipSync]);
-  
-  // Initialize speech recognition on component mount
-  useEffect(() => {
-    // Initialize speech recognition
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      const errorMsg = 'Speech recognition not supported in this browser';
-      console.error(errorMsg);
-      setError('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-    
-
-    let isStarting = false;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-    let recognitionCleanup = null;
-
-    const startRecognition = () => {
-      if (isStarting || retryCount >= MAX_RETRIES) return;
-      isStarting = true;
-      
-      recognition.start().then(() => {
-        retryCount = 0; // Reset retry count on success
-        setError(null); // Clear any previous errors
-      }).catch(error => {
-        console.error('Failed to start speech recognition:', error);
-        retryCount++;
-        
-        if (retryCount < MAX_RETRIES) {
-          console.log(`Retrying in 1 second... (${retryCount}/${MAX_RETRIES})`);
-          setTimeout(() => {
-            if (isListening) startRecognition();
-          }, 1000);
-        } else {
-          console.error('Max retries reached, giving up');
-          setIsListening(false);
         }
-      }).finally(() => {
-        isStarting = false;
-      });
-    };
-
-    // Set up audio element for lip sync
-    try {
-      const audioElement = voiceService.getAudioElement();
-      if (audioElement && audioRef.current !== audioElement) {
-        audioRef.current = audioElement;
+      } catch (error) {
+        console.error('❌ Error enabling voice features:', error);
+        setError('Failed to enable voice features. Please try again.');
+        setVoiceEnabled(false);
       }
-    } catch (error) {
-      console.error('Error processing speech recognition result:', error);
-    }
-
-    // Handle recognition results
-    recognition.onresult = (event) => {
-      console.log('🎤 Speech recognition result received');
+    } else {
+      // When disabling voice
+      console.log('🔇 Disabling voice features...');
       
-      let interimTranscript = '';
-      let finalTranscript = '';
-
-      // Process all results
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0]?.transcript || '';
-        
-        if (result.isFinal) {
-          finalTranscript += transcript;
-          console.log('✅ Final transcript:', finalTranscript);
-          
-          // Update the recognized text state
-          setRecognizedText(prev => {
-            // Only update if the text is different to avoid unnecessary re-renders
-            const newText = finalTranscript.trim();
-            return prev !== newText ? newText : prev;
-          });
-          
-        } else {
-          interimTranscript += transcript;
-          console.log('⏳ Interim transcript:', interimTranscript);
-        }
-      }
-    };
-
-    // Handle when recognition ends
-    recognition.onend = () => {
-      console.log('🔴 Speech recognition ended');
-      if (isListening) {
-        console.log('🔄 Restarting speech recognition...');
-        try {
-          recognition.start();
-        } catch (error) {
-          console.error('❌ Error restarting recognition:', error);
-          setIsListening(false);
-        }
-      }
-    };
-
-    // Handle recognition errors
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', {
-        error: event.error,
-        message: event.message || 'No error message',
-        time: new Date().toISOString()
-      });
+      // Stop any ongoing speech
+      voiceService.stop();
+      stopLipSync();
       
-      let errorMessage = 'Error with speech recognition';
-      
-      switch(event.error) {
-        case 'not-allowed':
-          errorMessage = 'Microphone access was denied. Please allow microphone access in your browser settings to use voice commands.';
-          console.warn('Microphone access was denied or blocked');
-          break;
-        case 'network':
-          errorMessage = 'Network error occurred with speech recognition. Please check your connection.';
-          console.warn('Network error occurred with speech recognition');
-          break;
-        case 'no-speech':
-          errorMessage = 'No speech was detected. Please try speaking again.';
-          console.log('No speech detected');
-          break;
-        case 'audio-capture':
-          errorMessage = 'No microphone was found. Please ensure a microphone is connected.';
-          console.error('No microphone found');
-          break;
-        default:
-          console.warn('Speech recognition error:', event.error);
+      // Process any pending recognized text
+      if (recognizedText) {
+        console.log('🎤 Processing final message before turning off mic:', recognizedText);
+        processUserMessage(
+          recognizedText,
+          speakText,
+          setError,
+          setIsProcessing,
+          lastProcessedText,
+          currentRequestId,
+          emotion,
+          setConversationHistory,
+          setEmotion,
+          voiceService.speak.bind(voiceService)
+        );
       }
       
-      setError(errorMessage);
-      setIsListening(false);
-      
-      // Additional debug information
-      if (navigator.mediaDevices) {
-        navigator.mediaDevices.enumerateDevices()
-          .then(devices => {
-            console.log('Available devices:', devices);
-            const audioInputs = devices.filter(device => device.kind === 'audioinput');
-            console.log('Audio input devices:', audioInputs);
-          })
-          .catch(err => console.error('Error enumerating devices:', err));
-      }
-      setIsProcessing(false);
-    };
-
-    // When recognition ends, check if we should restart
-    recognition.onend = () => {
-      if (isListening) {
-        console.log('Speech recognition ended, restarting...');
-        try {
-          recognition.start();
-        } catch (error) {
-          console.error('Error restarting recognition:', error);
-          setIsListening(false);
-        }
-      }
-    };
-
-    recognitionRef.current = recognition;
-
-    // Store recognition in ref for cleanup
-    recognitionRef.current = recognition;
-    
-    // Cleanup function
-    return () => {
+      // Stop recognition
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (e) {
-          console.error('Error stopping recognition during cleanup:', e);
-        } finally {
-          recognitionRef.current = null;
+          console.log('Error stopping recognition:', e);
         }
+        setIsListening(false);
       }
       
-      // Clean up any ongoing speech synthesis
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+      // Stop any ongoing speech
+      voiceService.stop();
+      stopLipSync();
+      
+      // Clear any pending timers and reset state
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
       }
       
-      // Clean up any ongoing processing
-      setIsProcessing(false);
-      setIsListening(false);
-    };
-  }, []);
+      // Clear the recognized text
+      setRecognizedText('');
+      console.log('🔇 Voice disabled - processing complete');
+    }
+  }, [voiceEnabled, setupVolumeAnalysis, stopLipSync, startRecognition, recognizedText, processUserMessage, speakText, setError, setIsProcessing, lastProcessedText, currentRequestId, emotion, setConversationHistory, setEmotion]);
 
-  // Handle recognized text and update conversation
-  useEffect(() => {
-    if (!recognizedText || recognizedText.trim() === '') return;
-    
-    // Check if this is a duplicate message to prevent infinite loops
-    const lastMessage = conversationHistory[conversationHistory.length - 1]?.content;
-    if (lastMessage === recognizedText) return;
-    
-    console.log('🎤 Processing recognized text:', recognizedText);
-    
-    const processText = async () => {
-      try {
-        console.log('🔄 Adding message to conversation history...');
-        const userMessage = { role: 'user', content: recognizedText, timestamp: Date.now() };
-        const updatedHistory = [...conversationHistory, userMessage];
-        
-        setConversationHistory(updatedHistory);
-        console.log('✅ Successfully updated conversation history');
-        
-        // Reset recognizedText to prevent reprocessing
-        setRecognizedText('');
-        
-        // Ensure voice is enabled before proceeding
-        let finalVoiceEnabled = voiceEnabled;
-        if (!finalVoiceEnabled) {
-          console.log('🔊 Voice was disabled, enabling now...');
-          setVoiceEnabled(true);
-          finalVoiceEnabled = true;
-          // Small delay to allow voice to initialize
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        // Call Ollama API to get response
-        console.log('📡 Sending to Ollama API with emotion:', emotion);
-        const response = await sendToOllama(
-          recognizedText,
-          updatedHistory,
-          setConversationHistory,
-          finalVoiceEnabled, // Use the local variable instead of state
-          setVoiceEnabled,
-          selectedVoice,
-          speakText,
-          setError,
-          setIsProcessing,
-          emotion // Pass the current emotion to the LLM
-        );
-        
-        if (response) {
-          console.log('🤖 Ollama response received successfully');
-        } else {
-          console.warn('⚠️ No response received from Ollama');
-        }
-        
-      } catch (error) {
-        console.error('❌ Error processing recognized text:', error);
-        setError('Failed to process the message. Please try again.');
-      }
-    };
-    
-    processText();
-  }, [recognizedText, conversationHistory, setConversationHistory, setError, voiceEnabled, selectedVoice, speakText]);
-  
-  // Handle starting/stopping recognition when isListening changes
-  useEffect(() => {
-    const recognition = recognitionRef.current;
-    if (!recognition) {
-      console.warn('Speech recognition not available');
+  // Create the processFinalTranscript function with useCallback to prevent recreation on every render
+  const processFinalTranscript = useCallback(debounce((transcript) => {
+    // Skip if we're still processing
+    if (isProcessingRef.current) {
+      console.log('⏳ Currently processing another request, skipping...');
       return;
     }
     
-    let isMounted = true;
-    
-    const startRecognition = async () => {
-      if (!isListening || !isMounted) return;
-      
-      try {
-        recognition.start();
-      } catch (error) {
-        console.error('❌ Failed to start speech recognition:', error);
-        if (isMounted) {
-          setIsListening(false);
-          setError('Failed to start speech recognition. Please check your microphone settings.');
-        }
-      }
-    };
-    
-    const stopRecognition = () => {
-      try {
-        recognition.stop();
-      } catch (error) {
-        console.error('Error stopping recognition:', error);
-      }
-    };
-    
-    if (isListening) {
-      startRecognition();
-    } else {
-      stopRecognition();
+    // Skip empty or whitespace only transcripts
+    const trimmedTranscript = transcript.trim();
+    if (!trimmedTranscript) {
+      console.log('⚠️ Empty transcript received, skipping...');
+      return;
     }
     
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      stopRecognition();
+    // Check cooldown period (1 second)
+    const now = Date.now();
+    if (now - lastRequestTime.current < 1000) {
+      console.log('⏳ Request too frequent, skipping...');
+      return;
+    }
+    
+    // Only check for duplicates if the last processed text was very recent (within 2 seconds)
+    const isDuplicate = lastProcessedText.current === trimmedTranscript && 
+                       (now - lastRequestTime.current < 2000);
+    
+    if (isDuplicate) {
+      console.log('🔄 Duplicate message detected, skipping...');
+      return;
+    }
+    
+    console.log('📨 Processing final transcript:', trimmedTranscript);
+    lastRequestTime.current = now;
+    lastProcessedText.current = trimmedTranscript;
+    
+    // Process the user message with the recognized text
+    processUserMessage(
+      trimmedTranscript,
+      speakText,
+      setError,
+      setIsProcessing,
+      lastProcessedText,
+      currentRequestId,
+      emotion,
+      setConversationHistory,
+      setEmotion,
+      voiceService.speak.bind(voiceService)
+    ).catch(error => {
+      console.error('❌ Error processing message:', error);
+      setError('Failed to process your message. Please try again.');
+    });
+  }, 500), [speakText, setError, setIsProcessing, emotion, setConversationHistory, setEmotion, currentRequestId]);
+
+  // Process recognized text
+  const handleProcessText = useCallback(async (text) => {
+    if (!text || !text.trim() || isProcessing) return;
+    
+    const trimmedText = text.trim();
+    
+    // Check if we've already processed this text
+    if (lastProcessedText.current === trimmedText) {
+      console.log('Skipping duplicate text:', trimmedText);
+      return;
+    }
+    
+    // Update last processed text
+    lastProcessedText.current = trimmedText;
+    
+    // Add user message to chat
+    const userMessage = {
+      id: Date.now(),
+      text: trimmedText,
+      sender: 'user',
+      timestamp: new Date().toISOString(),
     };
-  }, [isListening, setError]);
+    
+    setConversationHistory(prev => [...prev, userMessage]);
+    
+    // Process the message
+    setIsProcessing(true);
+    
+    try {
+      const response = await processUserMessage(
+        trimmedText,
+        speakText,  // Using speakText instead of speak
+        setError,
+        setIsProcessing,
+        lastProcessedText,
+        currentRequestId,
+        emotion,
+        setConversationHistory,
+        setEmotion,
+        speakText  // Using speakText instead of speak
+      );
+      
+      if (response) {
+        // Add AI response to chat
+        setConversationHistory(prev => [...prev, response]);
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+      setError('Failed to process your message. Please try again.');
+    } finally {
+      setIsProcessing(false);
+      // Reset the transcript after processing
+      resetTranscript();
+    }
+  }, [isProcessing, speakText, setConversationHistory, setError, emotion, resetTranscript]);
+
+  // Speech recognition is handled by the useSpeechRecognition hook
+  // The hook manages initialization, event handling, and cleanup
+
+  // Set up audio element for lip sync if available
+  useEffect(() => {
+    try {
+      const audioElement = voiceService.getAudioElement();
+      if (audioElement && audioRef.current !== audioElement) {
+        audioRef.current = audioElement;
+        setupVolumeAnalysis(audioElement);
+      }
+    } catch (error) {
+      console.error('Error setting up audio element:', error);
+    }
+  }, []);
+
+  // Handle speech recognition results
+  const handleFinalTranscript = useCallback(async (text) => {
+    if (!text?.trim() || isProcessingRef.current) return;
+    
+    const trimmedText = text.trim();
+    console.log('🎤 Processing speech input:', trimmedText);
+    
+    // Prevent duplicate processing
+    if (lastProcessedText.current === trimmedText) {
+      console.log('Skipping duplicate transcript');
+      return;
+    }
+    
+    lastProcessedText.current = trimmedText;
+    isProcessingRef.current = true;
+    setIsProcessing(true);
+    
+    try {
+      // Add user message to chat
+      const userMessage = {
+        id: Date.now(),
+        text: trimmedText,
+        sender: 'user',
+        timestamp: new Date().toISOString(),
+      };
+      
+      setConversationHistory(prev => [...prev, userMessage]);
+      
+      // Process the message through the API
+      console.log('📡 Sending to API...');
+      const response = await processUserMessage(
+        trimmedText,
+        speakText,
+        setError,
+        setIsProcessing,
+        lastProcessedText,
+        currentRequestId,
+        emotion,
+        setConversationHistory,
+        setEmotion,
+        voiceService.speak.bind(voiceService)
+      );
+      
+      if (response) {
+        console.log('✅ API response received');
+        setConversationHistory(prev => [...prev, response]);
+        
+        // Handle different response formats
+        if (typeof response === 'string') {
+          await speakText(response);
+        } else if (response.message?.content) {
+          await speakText(response.message.content);
+          const newEmotion = response.emotion || response.message.emotion;
+          if (newEmotion) setEmotion(newEmotion);
+        } else if (response.content) {
+          await speakText(response.content);
+          if (response.emotion) setEmotion(response.emotion);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setError('Failed to process your message. Please try again.');
+    } finally {
+      isProcessingRef.current = false;
+      setIsProcessing(false);
+      setRecognizedText('');
+    }
+  }, [speakText, setError, emotion, setConversationHistory, setEmotion, currentRequestId]);
   
-  // Toggle voice recognition
-  const toggleListening = useCallback(() => {
+  // Process new final transcripts
+  useEffect(() => {
+    if (finalTranscript?.trim() && finalTranscript !== lastProcessedText.current) {
+      handleFinalTranscript(finalTranscript);
+    }
+  }, [finalTranscript, handleFinalTranscript]);
+  
+  // Toggle voice recognition using the hook
+  const toggleListening = useCallback(async () => {
     if (isProcessing) {
       // If currently processing, cancel the current request
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
       setIsProcessing(false);
-      setIsListening(false);
+      stopListening();
       return;
     }
     
-    setIsListening(prev => !prev);
-  }, [isProcessing]);
+    if (isListening) {
+      stopListening();
+    } else {
+      // Reset previous transcript when starting new recognition
+      resetTranscript();
+      setRecognizedText('');
+      
+      try {
+        const started = await startListening();
+        if (!started) {
+          setError('Failed to start speech recognition. Please check microphone permissions.');
+        }
+      } catch (err) {
+        console.error('Error starting speech recognition:', err);
+        setError(`Error starting speech recognition: ${err.message}`);
+      }
+    }
+  }, [isListening, isProcessing, startListening, stopListening, resetTranscript]);
 
   // Volume lip sync setup
   const { 
@@ -898,32 +1043,23 @@ const AvatarCallPage = () => {
     detectedEmotion: emotion
   }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive, emotion]);
   
+  // Handle ending the call
   const endCall = () => {
-    // Handle ending the call
     console.log('Ending call...');
-  };  // Demo messages for expression system (without automatic talking)
-  useEffect(() => {
-    if (isLoading || error) return;
-
-    const demoMessages = [
-      "Hello! I'm so happy to see you today!",
-      "How are you feeling right now?",
-      "That's wonderful to hear!",
-      "I understand how you feel.",
-      "Oh no, I'm sorry to hear that.",
-      "That's amazing! Congratulations!",
-      "I'm here to listen and support you.",
-      "What would you like to talk about?",
-      "You're doing great!",
-      "I appreciate you sharing that with me."
-    ];    let messageIndex = 0;
-    const messageInterval = setInterval(() => {
-      setLastMessage(demoMessages[messageIndex]);
-      messageIndex = (messageIndex + 1) % demoMessages.length;
-    }, 8000); // New message every 8 seconds
-
-    return () => clearInterval(messageInterval);
-  }, [isLoading, error]);
+    // Stop any ongoing speech
+    if (voiceService) {
+      voiceService.stop();
+    }
+    // Stop speech recognition
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    // Reset states
+    setIsListening(false);
+    setVoiceEnabled(false);
+    setRecognizedText('');
+    setError(null);
+  };
 
   // Stop avatar speaking when voice is disabled
   useEffect(() => {
@@ -943,20 +1079,18 @@ const AvatarCallPage = () => {
       import('../services/voiceService').then(({ AZURE_NEURAL_VOICES }) => {
         setAvailableVoices(AZURE_NEURAL_VOICES);
         
-        // Set default voice based on selected tone (empathetic = Jenny)
+        // Set default voice if not already set
         if (AZURE_NEURAL_VOICES.length > 0 && !selectedVoice) {
-          const defaultTone = voiceTones.find(t => t.id === selectedTone);
-          const defaultVoice = AZURE_NEURAL_VOICES.find(v => 
-            v.name === defaultTone?.voice
-          ) || AZURE_NEURAL_VOICES[0];
-          
-          setSelectedVoice(defaultVoice);
+          // Default to the first available voice
+          setSelectedVoice(AZURE_NEURAL_VOICES[0]);
         }
       });
     };
 
     loadVoices();
-  }, [selectedVoice, selectedTone]);  // Close voice selector when clicking outside
+  }, [selectedVoice]);
+  
+  // Close voice selector when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showVoiceSelector && !event.target.closest('.voice-selector-container')) {
@@ -970,6 +1104,27 @@ const AvatarCallPage = () => {
     };
   }, [showVoiceSelector]);
 
+  // Handle delayed speaking state for smoother animations
+  useEffect(() => {
+    let timeoutId;
+    
+    if (isSpeaking) {
+      // When speaking starts, update the delayed state immediately
+      setDelayedIsSpeaking(true);
+    } else {
+      // When speaking stops, delay the state update for a smoother transition
+      timeoutId = setTimeout(() => {
+        setDelayedIsSpeaking(false);
+      }, 300); // 300ms delay for a smoother transition
+    }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isSpeaking]);
+  
   // Cleanup volume hover timeout on unmount
   useEffect(() => {
     return () => {
@@ -1113,6 +1268,22 @@ const AvatarCallPage = () => {
           onError={(e) => console.error('Emotion detection video error:', e)}
         />
         
+        {/* Preview video element - visible to user */}
+        <video
+          ref={previewVideoRef}
+          className="fixed left-4 top-24 z-50 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 transition-all duration-300"
+          style={{
+            width: isPreviewExpanded ? '500px' : '320px',
+            height: isPreviewExpanded ? '375px' : '240px',
+            transform: 'scaleX(-1)', // Mirror the preview
+            display: isCameraEnabled ? 'block' : 'none',
+            objectFit: 'cover'
+          }}
+          autoPlay
+          playsInline
+          muted
+        />
+        
         <motion.div 
           className="absolute inset-0"
           initial={{ opacity: 0 }}
@@ -1198,10 +1369,10 @@ const AvatarCallPage = () => {
         )}
       </AnimatePresence>
 
-      {/* Enhanced Bottom Controls */}
+      {/* Bottom Controls */}
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white/80 dark:from-black/80 to-transparent backdrop-blur-sm z-40 border-t border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-center space-x-2 md:space-x-4">
+          <div className="flex items-center justify-center space-x-4">
             {/* Voice Input Button */}
             <div className="relative group">
               <button 
@@ -1211,179 +1382,132 @@ const AvatarCallPage = () => {
                     ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 scale-110 text-white' 
                     : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
-                title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
+                title={isListening ? 'Stop Listening' : 'Start Listening'}
+                disabled={isProcessing}
               >
                 {isListening ? (
-                  <Volume2 className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
+                  <Mic className="w-6 h-6 text-white" />
+                ) : isProcessing ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-900 dark:text-white" />
                 ) : (
-                  <MicOff className="w-6 h-6 text-gray-900 dark:text-white/80" />
+                  <MicOff className="w-6 h-6 text-gray-900 dark:text-white" />
                 )}
               </button>
               {isListening && (
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping"></div>
               )}
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
-                {isListening ? 'Listening...' : 'Voice Input'}
+                {isListening ? 'Listening...' : isProcessing ? 'Processing...' : 'Start Listening'}
               </div>
             </div>
 
-            {/* Voice Tone Selector */}
-            <div className="relative group">
-              <button 
-                onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                disabled={!voiceEnabled}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
-                  voiceEnabled
-                    ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/30 hover:scale-105' 
-                    : 'bg-white/10 dark:bg-white/10 opacity-50 cursor-not-allowed'
-                }`}
-                title={voiceEnabled ? 'Change Voice Tone' : 'Enable voice first'}
+            {/* Microphone Button with speech recognition state */}
+            <div className="relative">
+              <button
+                onClick={toggleListening}
+                disabled={!isCallActive || isProcessing || !isSpeechAvailable}
+                className={`p-3 rounded-full ${
+                  isListening
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                } ${!isSpeechAvailable ? 'opacity-50 cursor-not-allowed' : ''} transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                title={
+                  !isSpeechAvailable 
+                    ? 'Speech recognition not available in this browser' 
+                    : isListening 
+                      ? 'Stop Listening' 
+                      : 'Start Listening'
+                }
               >
-                <User className="w-6 h-6 text-gray-900 dark:text-white" />
-                {voiceEnabled && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
-                )}
+                {isListening ? <MicOff size={24} /> : <Mic size={24} />}
               </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
-                Voice Tone
-              </div>
-
-              {/* Voice Tone Dropdown */}
-              <AnimatePresence>
-                {showVoiceSelector && voiceEnabled && (
-                  <motion.div 
-                    className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800/95 backdrop-blur-lg rounded-xl shadow-2xl p-2 min-w-64 z-50 border border-gray-700/50"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    <div className="text-white text-sm font-medium mb-2 px-2">Select Voice Tone</div>
-                    <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
-                      {voiceTones.map((tone) => (
-                        <button
-                          key={tone.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectTone(tone);
-                            setShowVoiceSelector(false);
-                          }}
-                          className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center ${
-                            selectedTone === tone.id
-                              ? 'bg-gradient-to-r from-blue-600/80 to-blue-700/80 text-white shadow-md'
-                              : 'text-gray-200 hover:bg-gray-700/80'
-                          }`}
-                        >
-                          <div className="flex-1">
-                            <div className="font-medium">{tone.name}</div>
-                            <div className="text-xs text-gray-400">{tone.description}</div>
-                          </div>
-                          {selectedTone === tone.id && (
-                            <Check className="w-4 h-4 text-blue-300" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              
+              {/* Visual indicator when listening */}
+              {isListening && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
+              
+              {/* Error tooltip */}
+              {speechError && (
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded text-xs whitespace-nowrap">
+                  {speechError}
+                </div>
+              )}
             </div>
 
             {/* Camera Toggle Button */}
             <div className="relative group">
               <button 
                 onClick={toggleCamera}
-                disabled={!isEmotionDetectionReady}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isCameraEnabled 
-                    ? 'bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/30 scale-110 text-white' 
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white' 
                     : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
                 title={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
               >
-                {isEmotionDetectionReady ? (
-                  isCameraEnabled ? (
-                    <VideoOff className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
-                  ) : (
-                    <Video className="w-6 h-6 text-gray-900/80 dark:text-white/80" />
-                  )
-                ) : (
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-900/80 dark:text-white/80" />
-                )}
+                {isCameraEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
               </button>
-              {isCameraEnabled && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 rounded-full animate-ping"></div>
-              )}
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
-                {!isEmotionDetectionReady 
-                  ? 'Loading models...' 
-                  : isCameraEnabled 
-                    ? 'Turn off camera' 
-                    : 'Turn on camera'}
+                {isCameraEnabled ? 'Turn off' : 'Turn on'}
               </div>
             </div>
 
-            {/* Volume Control */}
-            <div 
-              className="relative group"
-              onMouseEnter={showVolumeSliderOnHover}
-              onMouseLeave={hideVolumeSliderAfterDelay}
-            >
+            {/* Voice Volume Control */}
+            <div className="relative group">
               <button 
-                onClick={toggleMute}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
-                  isMuted || systemVolume === 0
-                    ? 'bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/30 scale-105' 
-                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-md shadow-md hover:scale-105'
+                onClick={() => setIsMuted(!isMuted)}
+                onMouseEnter={showVolumeSliderOnHover}
+                onMouseLeave={hideVolumeSliderAfterDelay}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isMuted 
+                    ? 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600' 
+                    : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md'
                 }`}
-                title={isMuted ? 'Unmute' : `Volume: ${systemVolume}%`}
+                title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {getVolumeIcon()}
               </button>
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
-                {isMuted ? 'Unmute' : 'Volume'}
-              </div>
-
+              
               {/* Volume Slider */}
-              <AnimatePresence>
-                {showVolumeSlider && (
-                  <motion.div 
-                    className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800/95 backdrop-blur-lg rounded-xl p-4 shadow-2xl z-50 border border-gray-700/50"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
+              <div 
+                className={`absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-3 mb-3 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl transition-all duration-200 ${
+                  showVolumeSlider ? 'opacity-100 visible' : 'opacity-0 invisible'
+                }`}
+                onMouseEnter={showVolumeSliderOnHover}
+                onMouseLeave={hideVolumeSliderOnLeave}
+              >
+                <div className="flex items-center h-24">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={isMuted ? 0 : systemVolume}
+                    onChange={handleVolumeChange}
                     onMouseEnter={showVolumeSliderOnHover}
                     onMouseLeave={hideVolumeSliderAfterDelay}
-                  >
-                    <div className="w-8 h-32 flex items-center justify-center">
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        step="1"
-                        value={systemVolume}
-                        onChange={handleVolumeChange}
-                        className="volume-slider w-32 h-2 bg-gray-700 rounded-full appearance-none cursor-pointer transform -rotate-90"
-                        style={{
-                          background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${systemVolume}%, #4b5563 ${systemVolume}%, #4b5563 100%)`
-                        }}
-                      />
-                    </div>
-                    <div className="text-center text-xs text-gray-300 mt-2">{systemVolume}%</div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    className="h-24 w-6 -rotate-90 origin-center"
+                    aria-label="Volume control"
+                  />
+                </div>
+              </div>
+              
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
+               {isMuted ? 'Unmute' : 'Volume'}
+              </div>
             </div>
 
             {/* End Call Button */}
             <div className="relative group">
               <button 
                 onClick={endCall}
-                className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all duration-300 transform hover:scale-110 hover:shadow-red-500/50"
+                className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30 hover:scale-105 transition-all duration-300"
                 title="End Call"
               >
-                <PhoneOff className="w-7 h-7 text-white" />
+                <PhoneOff className="w-6 h-6" />
               </button>
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 End Call

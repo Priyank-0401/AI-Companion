@@ -17,7 +17,7 @@ import {
   Activity as ActivityIcon
 } from 'lucide-react';
 import useAuth from '../auth/hooks/useAuth';
-import { journalApi, chatApi } from '../services/api';
+import chatApi from '../services/api';
 import { useMoodTracking } from '../hooks/useMoodTracking';
 
 // Dashboard Components

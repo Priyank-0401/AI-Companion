@@ -230,15 +230,20 @@ class VoiceService {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
   }  async speak(text, options = {}) {
-    if (!text || this._isSpeaking) {
-      return Promise.reject('Cannot speak: empty text or already speaking');
+    if (!text) {
+      return Promise.reject('Cannot speak: empty text');
+    }
+
+    // If already speaking, stop current speech first
+    if (this._isSpeaking) {
+      this.stop();
+      // Small delay to allow the stop to take effect
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     try {
-      // Stop any current audio
-      this.stop();
-
       this._isSpeaking = true;
+      options.onStart?.();
 
       // Check cache first for instant response
       const cacheKey = `${text}-${this.selectedVoice?.name}`;
@@ -293,10 +298,13 @@ class VoiceService {
     }
     
     return new Promise((resolve, reject) => {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
       const utterance = new SpeechSynthesisUtterance(text);
       
       // Find a good female voice from system
-      const voices = speechSynthesis.getVoices();
+      const voices = window.speechSynthesis.getVoices();
       const femaleVoice = voices.find(v => 
         v.lang.startsWith('en') && 
         (v.name.toLowerCase().includes('female') || 
@@ -307,33 +315,55 @@ class VoiceService {
       if (femaleVoice) {
         utterance.voice = femaleVoice;
       }
-        utterance.rate = 0.9;
+      
+      utterance.rate = 0.9;
       utterance.pitch = 1.1;
       utterance.volume = options.volume !== undefined ? options.volume : 0.8;
       
+      // Set a timeout to handle cases where onend doesn't fire
+      const timeout = setTimeout(() => {
+        this._isSpeaking = false;
+        this.currentAudio = null;
+        reject(new Error('Speech synthesis timed out'));
+      }, 30000); // 30 second timeout
+      
       utterance.onstart = () => {
+        clearTimeout(timeout);
         this._isSpeaking = true;
-        // Create a dummy audio element for consistency with Azure TTS
         this.currentAudio = new Audio();
-        options.onStart?.();
+        if (options.onStart) {
+          options.onStart();
+        }
       };
       
       utterance.onend = () => {
+        clearTimeout(timeout);
         this._isSpeaking = false;
         this.currentAudio = null;
-        options.onEnd?.();
+        if (options.onEnd) {
+          options.onEnd();
+        }
         resolve();
       };
       
       utterance.onerror = (error) => {
+        clearTimeout(timeout);
         this._isSpeaking = false;
         this.currentAudio = null;
         console.error('❌ Web Speech synthesis error:', error);
-        options.onError?.(error);
+        if (options.onError) {
+          options.onError(error);
+        }
         reject(error);
       };
       
-      speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        clearTimeout(timeout);
+        this._isSpeaking = false;
+        reject(e);
+      }
     });
   }  // Play audio blob with buffer-aware playback system
   async playAudioBlob(audioBlob, options = {}) {

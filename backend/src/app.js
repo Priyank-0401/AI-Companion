@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Router } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -13,6 +13,7 @@ import config from './config/index.js';
 import { errorHandler } from './middleware/error.js';
 import { logger } from './utils/logger.js';
 import { chatRoutes, llmRoutes } from './api/v1/chat/index.js';
+import { router as avatarCallRoutes } from './api/v1/avatar-call/index.js';
 
 // Get the directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -126,6 +127,19 @@ app.use('/chat', chatRoutes);
 const llmPath = apiPrefix + '/llm';
 logger.info(`Mounting LLM routes at ${llmPath}`);
 app.use(llmPath, llmRoutes);
+
+// Mount API v1 routes
+const apiV1Router = Router();
+apiV1Router.use('/chat', chatRoutes);
+apiV1Router.use('/avatar-call', avatarCallRoutes);
+
+// Mount the API v1 router at /api/v1
+app.use(apiPrefix + '/v1', apiV1Router);
+
+// Mount Avatar Call routes at /api/avatar-call for backward compatibility
+const avatarCallPath = apiPrefix + '/avatar-call';
+logger.info(`Mounting Avatar Call routes at ${avatarCallPath}`);
+app.use(avatarCallPath, avatarCallRoutes);
 
 // Enhanced route debugging
 const logRoutes = (router, prefix = '') => {

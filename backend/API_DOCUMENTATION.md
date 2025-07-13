@@ -4,7 +4,8 @@
 1. [Authentication](#authentication)
 2. [Base URL](#base-url)
 3. [Endpoints](#endpoints)
-   - [Chat](#chat)
+   - [Conversations](#conversations)
+   - [Messages](#messages)
    - [Models](#models)
    - [Usage](#usage)
    - [Status](#status)
@@ -24,32 +25,25 @@ Authorization: Bearer <firebase_id_token>
 ## Base URL
 
 ```
-http://localhost:3001/api/v1
+http://localhost:3001/api/v1/chat
 ```
 
 ## Endpoints
 
-### Chat
+### Conversations
 
-#### Send Message (Non-streaming)
+#### Create a New Conversation
 
 ```
-POST /chat
+POST /conversations
 ```
 
 **Request Body:**
 ```json
 {
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hello, how are you?"
-    }
-  ],
-  "provider": "groq",
-  "model": "llama3-70b-8192",
-  "temperature": 0.7,
-  "max_tokens": 1000
+  "title": "Therapy Session",
+  "model": "llama3-8b-8192",
+  "systemMessage": "You are Seriva, a kind and empathetic human-like friend and therapist."
 }
 ```
 
@@ -58,45 +52,100 @@ POST /chat
 {
   "success": true,
   "data": {
-    "id": "chatcmpl-123",
-    "object": "chat.completion",
-    "created": 1677652288,
-    "model": "llama3-70b-8192",
-    "choices": [
-      {
-        "index": 0,
-        "message": {
-          "role": "assistant",
-          "content": "I'm doing well, thank you! How can I assist you today?"
-        },
-        "finish_reason": "stop"
-      }
-    ],
-    "usage": {
-      "prompt_tokens": 10,
-      "completion_tokens": 12,
-      "total_tokens": 22
-    }
+    "id": "674fbcfe-9676-4d0c-b74d-e5d33a69fac5",
+    "title": "Therapy Session",
+    "model": "llama3-8b-8192",
+    "createdAt": "2025-07-09T08:51:49.531Z",
+    "updatedAt": "2025-07-09T08:51:49.531Z"
   }
 }
 ```
 
-#### Stream Message (SSE)
+#### Get Conversation
 
 ```
-POST /chat/stream
+GET /conversations/:conversationId
 ```
-
-**Request Body:** (Same as non-streaming, with `"stream": true`)
 
 **Response:**
-Server-Sent Events (SSE) stream with the following format:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "674fbcfe-9676-4d0c-b74d-e5d33a69fac5",
+    "title": "Therapy Session",
+    "model": "llama3-8b-8192",
+    "messages": [
+      {
+        "id": "41fc309f-e94f-416b-8076-3f893a766ac0",
+        "role": "user",
+        "content": "Tell me a short story about a robot learning to paint",
+        "timestamp": "2025-07-09T08:51:49.531Z"
+      },
+      {
+        "id": "8f6ced71-b6fc-47c2-87f1-f39e46c5e7e8",
+        "role": "assistant",
+        "content": "In a small studio nestled in the heart of the city...",
+        "timestamp": "2025-07-09T08:51:49.881Z",
+        "metadata": {
+          "model": "llama3-8b-8192",
+          "tokens": 20,
+          "isEdited": false
+        }
+      }
+    ],
+    "createdAt": "2025-07-09T08:51:49.531Z",
+    "updatedAt": "2025-07-09T08:51:49.881Z"
+  }
+}
 ```
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"llama3-70b-8192","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"llama3-70b-8192","choices":[{"index":0,"delta":{"content":" there"},"finish_reason":null}]}
+### Messages
 
-data: [DONE]
+#### Send a Message
+
+```
+POST /conversations/:conversationId/messages
+```
+
+**Request Body:**
+```json
+{
+  "content": "Tell me a short story about a robot learning to paint"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "userMessage": {
+      "id": "41fc309f-e94f-416b-8076-3f893a766ac0",
+      "conversationId": "674fbcfe-9676-4d0c-b74d-e5d33a69fac5",
+      "content": "Tell me a short story about a robot learning to paint",
+      "role": "user",
+      "timestamp": "2025-07-09T08:51:49.531Z"
+    },
+    "aiMessage": {
+      "id": "8f6ced71-b6fc-47c2-87f1-f39e46c5e7e8",
+      "conversationId": "674fbcfe-9676-4d0c-b74d-e5d33a69fac5",
+      "content": "In a small studio nestled in the heart of the city...",
+      "role": "assistant",
+      "timestamp": "2025-07-09T08:51:49.881Z",
+      "metadata": {
+        "model": "llama3-8b-8192",
+        "tokens": 20,
+        "isEdited": false
+      }
+    },
+    "conversation": {
+      "id": "674fbcfe-9676-4d0c-b74d-e5d33a69fac5",
+      "title": "Therapy Session",
+      "updatedAt": "2025-07-09T08:51:49.881Z"
+    }
+  }
+}
 ```
 
 ### Models
@@ -111,31 +160,17 @@ GET /models
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": "llama3-70b-8192",
-      "name": "LLaMA 3 70B",
-      "provider": "groq",
-      "max_tokens": 8192,
-      "supports_streaming": true
-    },
-    {
-      "id": "mixtral-8x7b-32768",
-      "name": "Mixtral 8x7B",
-      "provider": "groq",
-      "max_tokens": 32768,
-      "supports_streaming": true
-    },
-    {
-      "id": "openai/gpt-4-turbo",
-      "name": "GPT-4 Turbo",
-      "provider": "openrouter",
-      "max_tokens": 128000,
-      "supports_streaming": true
-    }
-  ]
+  "data": {
+    "groq": [
+      "llama3-8b-8192",
+      "llama3-70b-8192"
+    ],
+    "openrouter": []
+  }
 }
 ```
+
+**Note:** The `mixtral-8x7b-32768` model has been decommissioned and is no longer available.
 
 ### Usage
 
@@ -161,30 +196,26 @@ GET /usage
     "total_cost": 0.42,
     "daily_usage": [
       {
-        "date": "2023-03-01",
+        "date": "2025-07-09",
         "requests": 10,
         "tokens": 3000,
-        "cost": 0.1
-      },
-      {
-        "date": "2023-03-02",
-        "requests": 32,
-        "tokens": 9000,
-        "cost": 0.32
+        "cost": 0.03
       }
     ],
     "by_model": [
       {
-        "model": "llama3-70b-8192",
+        "model": "llama3-8b-8192",
+        "provider": "groq",
         "requests": 30,
         "tokens": 8000,
-        "cost": 0.3
+        "cost": 0.08
       },
       {
-        "model": "mixtral-8x7b-32768",
+        "model": "llama3-70b-8192",
+        "provider": "groq",
         "requests": 12,
         "tokens": 4000,
-        "cost": 0.12
+        "cost": 0.31
       }
     ]
   }
@@ -204,17 +235,23 @@ GET /status
 {
   "success": true,
   "data": {
-    "groq": {
-      "status": "operational",
-      "models": ["llama3-70b-8192", "mixtral-8x7b-32768"],
-      "rate_limit": 1000,
-      "remaining_requests": 950
+    "status": "operational",
+    "version": "1.0.0",
+    "uptime": 123456,
+    "providers": {
+      "groq": {
+        "status": "operational",
+        "models": ["llama3-8b-8192", "llama3-70b-8192"],
+        "default_model": "llama3-8b-8192"
+      },
+      "openrouter": {
+        "status": "disabled",
+        "reason": "API key not configured"
+      }
     },
-    "openrouter": {
-      "status": "operational",
-      "models": ["openai/gpt-4-turbo", "anthropic/claude-3-opus"],
-      "rate_limit": 500,
-      "remaining_requests": 500
+    "rate_limiting": {
+      "enabled": true,
+      "max_requests_per_minute": 60
     }
   }
 }
@@ -255,6 +292,20 @@ All responses follow this format:
 | 429 | `rate_limit_exceeded` | Rate limit exceeded |
 | 500 | `server_error` | Internal server error |
 | 503 | `service_unavailable` | Service temporarily unavailable |
+
+### Model-Specific Errors
+
+When a model is not available (e.g., decommissioned), you might see:
+
+```json
+{
+  "success": false,
+  "error": "Failed to generate AI response",
+  "errorDetails": "Groq API error: The model `mixtral-8x7b-32768` has been decommissioned and is no longer supported.",
+  "errorType": "api_error",
+  "retryable": true
+}
+```
 
 ## Rate Limiting
 
