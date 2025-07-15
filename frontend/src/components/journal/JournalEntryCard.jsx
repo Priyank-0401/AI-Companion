@@ -1,7 +1,45 @@
 import { Clock, Play, Mic } from 'lucide-react';
 import { MediaAttachment } from './MediaAttachment';
 
-export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete }) => {
+export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, theme = 'light' }) => {
+  const themeClasses = {
+    light: {
+      bg: 'bg-white',
+      border: 'border-gray-200',
+      hoverBorder: 'hover:border-blue-500',
+      text: 'text-gray-800',
+      textSecondary: 'text-gray-600',
+      divider: 'border-gray-100',
+      mediaBg: 'bg-gray-50',
+      audioBg: 'bg-blue-50',
+      audioIcon: 'text-blue-600',
+      playButton: 'bg-white/80 text-gray-800',
+      moodBg: 'bg-gray-100',
+      moodText: 'text-gray-700',
+      timeText: 'text-gray-500',
+      actionHover: 'hover:bg-gray-100',
+      actionText: 'text-gray-600',
+    },
+    dark: {
+      bg: 'bg-gray-800',
+      border: 'border-gray-700',
+      hoverBorder: 'hover:border-blue-400',
+      text: 'text-gray-100',
+      textSecondary: 'text-gray-300',
+      divider: 'border-gray-700',
+      mediaBg: 'bg-gray-700',
+      audioBg: 'bg-blue-900/30',
+      audioIcon: 'text-blue-400',
+      playButton: 'bg-white/20 text-white',
+      moodBg: 'bg-gray-700',
+      moodText: 'text-gray-200',
+      timeText: 'text-gray-400',
+      actionHover: 'hover:bg-gray-700',
+      actionText: 'text-gray-300',
+    }
+  };
+  
+  const colors = themeClasses[theme] || themeClasses.light;
   const formatDate = (dateString) => {
     const options = { 
       year: 'numeric',
@@ -22,21 +60,21 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete }) =>
 
   return (
     <div 
-      className="bg-background-secondary/80 backdrop-blur-lg rounded-2xl overflow-hidden border border-background-tertiary hover:border-primary-500/30 transition-colors cursor-pointer flex flex-col h-full"
+      className={`${colors.bg} rounded-xl overflow-hidden border ${colors.border} ${colors.hoverBorder} transition-colors cursor-pointer flex flex-col h-full`}
       onClick={onClick}
     >
       {/* Media Thumbnail */}
       {firstMedia && (
-        <div className="relative h-32 bg-background-tertiary overflow-hidden">
+        <div className={`relative h-32 ${firstMedia.type === 'audio' ? colors.audioBg : colors.mediaBg} overflow-hidden`}>
           {firstMedia.type === 'video' ? (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Play className="w-5 h-5 text-white" />
+              <div className={`w-10 h-10 rounded-full ${colors.playButton} backdrop-blur-sm flex items-center justify-center`}>
+                <Play className="w-5 h-5" />
               </div>
             </div>
           ) : firstMedia.type === 'audio' ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-blue-500/10">
-              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-full ${colors.audioBg} flex items-center justify-center ${colors.audioIcon}`}>
                 <Mic className="w-5 h-5" />
               </div>
             </div>
@@ -56,53 +94,52 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete }) =>
         </div>
       )}
 
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-3">
-          <h3 className="text-lg font-semibold text-text-primary line-clamp-2">
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className={`font-medium ${colors.text} line-clamp-1`}>
             {entry.title || 'Untitled Entry'}
           </h3>
-          <div className="flex-shrink-0 ml-2">
-            <div className={`px-3 py-1 rounded-full text-xs font-medium ${moods[entry.mood]?.bg} text-text-primary`}>
-              {moods[entry.mood]?.label}
-            </div>
-          </div>
+          <span className={`text-xs px-2 py-1 rounded-full ${moods[entry.mood]?.bg} ${moods[entry.mood]?.color.replace('from-', 'text-').split(' ')[0]}`}>
+            {moods[entry.mood]?.label || entry.mood}
+          </span>
         </div>
         
-        <p className="text-text-secondary text-sm mb-4 line-clamp-3 flex-1">
+        <p className={`text-sm ${colors.textSecondary} line-clamp-2 mb-3`}>
           {entry.content}
         </p>
-      
-        <div className="flex items-center justify-between text-xs text-text-tertiary mt-auto pt-3 border-t border-background-tertiary">
-          <span>{formatDate(entry.date)}</span>
-          <div className="flex items-center">
-            <Clock className="w-3 h-3 mr-1" />
-            <span>{getReadingTime(entry.content)} min read</span>
-            {entry.media?.length > 0 && (
-              <span className="ml-2 flex items-center">
-                {entry.media.some(m => m.type === 'video') && (
-                  <Video className="w-3 h-3 mr-1 text-text-tertiary" />
-                )}
-                {entry.media.some(m => m.type === 'audio') && (
-                  <Mic className="w-3 h-3 mr-1 text-text-tertiary" />
-                )}
-              </span>
-            )}
+        
+        <div className={`mt-auto pt-2 border-t ${colors.divider} flex justify-between items-center`}>
+          <div className={`flex items-center text-xs ${colors.timeText}`}>
+            <Clock className="w-3.5 h-3.5 mr-1" />
+            {formatDate(entry.date)}
+            <span className="mx-1">•</span>
+            {getReadingTime(entry.content)} min read
           </div>
+          {entry.media?.length > 0 && (
+            <div className="flex items-center">
+              {entry.media.some(m => m.type === 'video') && (
+                <Video className="w-3.5 h-3.5 ml-2" />
+              )}
+              {entry.media.some(m => m.type === 'audio') && (
+                <Mic className="w-3.5 h-3.5 ml-2" />
+              )}
+            </div>
+          )}
         </div>
       </div>
       
         {entry.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3 pt-3 px-5 pb-4 border-t border-background-tertiary">
+          <div className={`flex flex-wrap gap-2 p-4 pt-3 border-t ${colors.divider}`}>
             {entry.tags.slice(0, 3).map((tag, i) => (
               <span 
                 key={i}
-                className="px-2 py-0.5 bg-background-tertiary rounded-full text-xs text-text-secondary"
+                className={`px-2 py-0.5 rounded-full text-xs ${colors.moodBg} ${colors.textSecondary}`}
               >
                 {tag}
               </span>
             ))}
             {entry.tags.length > 3 && (
-              <span className="px-2 py-0.5 bg-background-tertiary rounded-full text-xs text-text-tertiary">
+              <span className={`px-2 py-0.5 rounded-full text-xs ${colors.moodBg} ${colors.textSecondary}`}>
                 +{entry.tags.length - 3}
               </span>
             )}

@@ -11,6 +11,7 @@ import {
   Video,
   X
 } from 'lucide-react';
+import { useTheme } from '../contexts/useTheme';
 import { JournalHeader } from '../components/journal/JournalHeader';
 import { JournalFilters } from '../components/journal/JournalFilters';
 import { JournalEntryList } from '../components/journal/JournalEntryList';
@@ -94,10 +95,41 @@ const getInitialEntries = () => {
 };
 
 const JournalPage = () => {
-  // State management
+  // Theme and state management
+  const { theme } = useTheme();
   const [entries, setEntries] = useState(getInitialEntries);
   const [entryType, setEntryType] = useState(null); // 'text', 'audio', 'video'
   const [showEntrySelector, setShowEntrySelector] = useState(false);
+  
+  // Theme colors
+  const themeColors = {
+    light: {
+      bg: 'bg-gray-50',
+      cardBg: 'bg-white',
+      text: 'text-gray-800',
+      textSecondary: 'text-gray-600',
+      border: 'border-gray-200',
+      inputBg: 'bg-white',
+      inputBorder: 'border-gray-300',
+      hoverBg: 'hover:bg-gray-100',
+      activeBg: 'bg-gray-100',
+      divider: 'border-gray-200',
+    },
+    dark: {
+      bg: 'bg-gray-900',
+      cardBg: 'bg-gray-800',
+      text: 'text-gray-100',
+      textSecondary: 'text-gray-300',
+      border: 'border-gray-700',
+      inputBg: 'bg-gray-700',
+      inputBorder: 'border-gray-600',
+      hoverBg: 'hover:bg-gray-700',
+      activeBg: 'bg-gray-700',
+      divider: 'border-gray-700',
+    }
+  };
+  
+  const colors = themeColors[theme] || themeColors.light;
   const [isWriting, setIsWriting] = useState(false);
   const [viewEntry, setViewEntry] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -196,6 +228,11 @@ const JournalPage = () => {
     }
   };
 
+  // Handle viewing an entry
+  const handleViewEntry = (entry) => {
+    setViewEntry(entry);
+  };
+
   // Handle editing an entry
   const handleEditEntry = (entry) => {
     setEditingEntry(entry);
@@ -236,27 +273,34 @@ const JournalPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background-primary overflow-y-auto pt-4 pb-20">
+    <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200 pt-12`}>
       {/* Notification */}
-      <Notification 
-        notification={notification} 
-        onClose={() => setNotification(null)} 
-      />
+      {notification && (
+        <Notification 
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+          theme={theme}
+        />
+      )}
 
       {/* Entry Type Selector */}
       {showEntrySelector && (
         <EntryTypeSelector 
-          onSelect={handleEntryTypeSelect}
+          isOpen={showEntrySelector}
           onClose={() => setShowEntrySelector(false)}
+          onSelect={handleEntryTypeSelect}
+          theme={theme}
         />
       )}
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <JournalHeader 
           entryCount={filteredEntries.length} 
           onNewEntry={handleNewEntryClick}
+          theme={theme}
         />
 
         {/* Search and Filter */}
@@ -267,6 +311,7 @@ const JournalPage = () => {
           onMoodFilterChange={setSelectedMoodFilter}
           moods={MOODS}
           onClearFilters={handleClearFilters}
+          theme={theme}
         />
 
         {/* Entries List */}
@@ -276,17 +321,19 @@ const JournalPage = () => {
           searchTerm={searchTerm}
           selectedMoodFilter={selectedMoodFilter}
           onEntryClick={setViewEntry}
-          onNewEntry={() => setIsWriting(true)}
+          onDelete={handleDeleteEntry}
+          onView={handleViewEntry}
+          theme={theme}
         />
       </div>
 
       {/* Media Recorder */}
       {entryType && ['audio', 'video'].includes(entryType) && !isWriting && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-background-secondary rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl border border-background-tertiary">
-            <div className="px-6 py-5 border-b border-background-tertiary bg-background-secondary/80 backdrop-blur-sm">
+          <div className={`bg-background-secondary rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl border border-background-tertiary ${colors.cardBg}`}>
+            <div className={`px-6 py-5 border-b border-background-tertiary bg-background-secondary/80 backdrop-blur-sm ${colors.textSecondary}`}>
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-text-primary">
+                <h2 className={`text-2xl font-bold ${colors.text}`}>
                   New {entryType === 'audio' ? 'Audio' : 'Video'} Entry
                 </h2>
                 <button
@@ -297,7 +344,7 @@ const JournalPage = () => {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-sm text-text-secondary mt-1">
+              <p className={`text-sm ${colors.textSecondary} mt-1`}>
                 Record your {entryType} entry below
               </p>
             </div>
@@ -327,6 +374,7 @@ const JournalPage = () => {
           onSave={handleSaveEntry}
           onCancel={handleCancelEntry}
           isSaving={isSaving}
+          theme={theme}
         />
       )}
 
@@ -337,6 +385,7 @@ const JournalPage = () => {
           moods={MOODS}
           onEdit={() => handleEditEntry(viewEntry)}
           onClose={() => setViewEntry(null)}
+          theme={theme}
         />
       )}
 
@@ -346,7 +395,7 @@ const JournalPage = () => {
         className="md:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary-500 hover:bg-primary-600 text-white shadow-lg flex items-center justify-center transition-colors"
         aria-label="New entry"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="-ml-1 mr-2 h-5 w-5" />
       </button>
     </div>
   );

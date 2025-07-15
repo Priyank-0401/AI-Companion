@@ -38,7 +38,7 @@ function AppContent() {
   // Prevent body scrolling on specific pages - must be called unconditionally
   useEffect(() => {
     const isChatRoute = location.pathname.startsWith('/chat');
-    if (!isHomePage && !isDashboardPage && !isSettingsPage && !isChatRoute) {
+    if (!isHomePage && !isDashboardPage && !isChatRoute) {
       document.body.style.overflow = 'hidden';
       document.body.style.height = '100vh';
     } else {
@@ -122,7 +122,7 @@ function AppContent() {
           />
         </Routes>
       </motion.main>
-      {!isAuthPage && isHomePage && <Footer />}
+      {!['/login', '/signup', '/chat', '/avatar-call', '/settings'].some(path => location.pathname.startsWith(path)) && <Footer />}
     </div>
   );
 }

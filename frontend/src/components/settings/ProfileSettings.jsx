@@ -1,12 +1,29 @@
-import { useState, useEffect } from 'react';
-import { LogOut, User, Mail, Lock, Check, Edit } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  User,
+  Mail,
+  Edit,
+  Check,
+  ChevronDown,
+  Calendar,
+  Clock,
+  Shield,
+  Phone,
+  Globe,
+  MapPin,
+  Smartphone,
+} from 'lucide-react';
 
-const ProfileSettings = ({ user }) => {
+const ProfileSettings = ({ user, colors }) => {
+  // A helper function to build input classes
+  const inputStyle = `w-full px-3 py-2 bg-${colors.background} border border-${colors.border} rounded-lg focus:ring-2 focus:ring-${colors.primary} focus:border-${colors.primary} transition-all duration-200`;
+
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    displayName: user?.displayName || '',
-    email: user?.email || '',
-    photoURL: user?.photoURL || ''
+    displayName: '',
+    email: '',
+    photoURL: '',
+    uid: ''
   });
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -14,331 +31,251 @@ const ProfileSettings = ({ user }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Get user initials for avatar
+  // Load user data from localStorage and auth context
+  useEffect(() => {
+    const storedUserData = localStorage.getItem('user');
+    let initialData = {
+      displayName: '',
+      email: '',
+      photoURL: '',
+      uid: '',
+      age: '',
+      gender: '',
+      location: '',
+    };
+
+    if (storedUserData) {
+      const data = JSON.parse(storedUserData);
+      initialData = { ...initialData, ...data };
+    }
+
+    if (user) {
+      initialData = {
+        ...initialData,
+        displayName: user.displayName || initialData.displayName,
+        email: user.email || initialData.email,
+        photoURL: user.photoURL || initialData.photoURL,
+        uid: user.uid || initialData.uid,
+      };
+    }
+    setFormData(initialData);
+  }, [user]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // TODO: Implement actual save logic
+      setIsSaved(true);
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getUserInitials = (name) => {
     if (!name || name.trim() === '') return 'U';
     const parts = name.trim().split(' ');
     if (parts.length === 1) return parts[0][0].toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
-  
-  // Use a consistent background color for the avatar
+
   const getAvatarColor = () => 'bg-background-tertiary border border-border/50';
 
-  // Update form data when user prop changes
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        displayName: user.displayName || '',
-        email: user.email || '',
-        photoURL: user.photoURL || ''
-      });
-    }
-  }, [user]);
+  const getUserName = () => formData.displayName || '';
+  const getUserEmail = () => formData.email || '';
+  const getUserPhoto = () => formData.photoURL || '';
+  const isUserVerified = () => user?.emailVerified || false;
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      // Here you would typically make an API call to update the user's profile
-      // For now, we'll just simulate a successful update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setIsSaved(true);
-      setIsEditing(false);
-      setTimeout(() => setIsSaved(false), 3000);
-    } catch (err) {
-      setError(err.message || 'Failed to update profile');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-text-primary">Profile</h2>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="flex items-center space-x-1 text-primary hover:text-primary/80 transition-colors"
-          >
-            <Edit className="w-4 h-4" />
-            <span>Edit Profile</span>
-          </button>
-        )}
-      </div>
-      
-      <div className="space-y-6">
-        <div className="flex items-start space-x-6">
-          <div className="relative group">
-            <div 
-              className={`w-20 h-20 rounded-full ${getAvatarColor()} flex items-center justify-center overflow-hidden shadow-sm`}
+    <div className="space-y-10 px-4 md:px-10 py-6">
+      {/* Section 1: Personal Information */}
+      <section id="personal-info">
+        <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+          <h2 className={`text-xl font-bold text-${colors.textPrimary}`}>Personal Information</h2>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900 transition-all`}
             >
-              {user?.photoURL ? (
-                <img 
-                  src={user.photoURL} 
-                  alt={user.displayName || 'User'}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <span className={`text-2xl font-bold text-text-secondary ${user?.photoURL ? 'hidden' : 'flex'}`}>
-                {getUserInitials(user?.displayName || 'User')}
-              </span>
-            </div>
-            {isEditing && (
-              <div className="absolute -bottom-1 -right-1">
-                <button 
-                  className="bg-primary hover:bg-primary/90 text-white p-1.5 rounded-full shadow-lg transition-all transform hover:scale-110"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Handle avatar upload
-                  }}
-                  title="Change photo"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-          
-          <div>
-            {isEditing ? (
-              <input
-                type="text"
-                name="displayName"
-                value={formData.displayName}
-                onChange={handleInputChange}
-                className="text-2xl font-bold bg-background-secondary border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="Enter your name"
-              />
-            ) : (
-              <h3 className="text-2xl font-bold text-text-primary">
-                {user?.displayName || 'Anonymous User'}
-              </h3>
-            )}
-            <div className="flex items-center mt-1 text-text-secondary">
-              <Mail className="w-4 h-4 mr-1.5" />
-              <span>{user?.email || 'No email provided'}</span>
-            </div>
-            {user?.emailVerified && (
-              <span className="inline-flex items-center mt-1 text-xs text-green-500">
-                <Check className="w-3 h-3 mr-1" /> Verified
-              </span>
-            )}
-          </div>
+              <Edit className="w-3.5 h-3.5" />
+              <span>Edit Profile</span>
+            </button>
+          )}
         </div>
-
-        {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSave} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Full Name
-                {isEditing && <span className="text-red-500 ml-0.5">*</span>}
-              </label>
-              {isEditing ? (
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="displayName"
-                    value={formData.displayName}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 bg-background-secondary/80 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent text-text-primary placeholder-text-tertiary/60 transition-colors"
-                    placeholder="Enter your full name"
-                    required
-                  />
-                  {formData.displayName && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <Check className="w-4 h-4 text-green-500" />
-                    </div>
-                  )}
+        <div className={`bg-white dark:bg-gray-800/50 p-6 rounded-xl shadow-sm`}>
+          {isEditing ? (
+            <form onSubmit={handleSave} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Full Name</label>
+                  <input type="text" name="displayName" value={formData.displayName} onChange={handleInputChange} className={inputStyle} />
                 </div>
-              ) : (
-                <div className="px-4 py-2.5 bg-background-secondary/50 rounded-xl text-text-primary font-medium">
-                  {user?.displayName || 'Not set'}
+                <div>
+                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Email Address</label>
+                  <input type="email" name="email" value={formData.email} disabled className={`${inputStyle} bg-gray-100 dark:bg-gray-700/50`} />
                 </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Email Address
-              </label>
-              <div className="px-4 py-2.5 bg-background-secondary/50 rounded-xl flex items-center">
-                <Mail className="w-4 h-4 text-text-tertiary/80 mr-2 flex-shrink-0" />
-                <span className="text-text-primary font-medium">{user?.email || 'No email'}</span>
-                {user?.emailVerified ? (
-                  <span className="ml-2 text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full flex items-center flex-shrink-0">
-                    <Check className="w-3 h-3 mr-1" /> Verified
-                  </span>
-                ) : (
-                  <button 
-                    type="button" 
-                    className="ml-2 text-xs bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 px-2 py-0.5 rounded-full flex items-center transition-colors"
-                    onClick={() => {}}
-                  >
-                    Unverified
-                  </button>
-                )}
+                <div>
+                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Age</label>
+                  <input type="number" name="age" value={formData.age} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Gender</label>
+                  <select name="gender" value={formData.gender} onChange={handleInputChange} className={inputStyle}>
+                    <option value="">Select...</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Location</label>
+                  <input type="text" name="location" value={formData.location} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Profile Picture URL</label>
+                  <input type="text" name="photoURL" value={formData.photoURL} onChange={handleInputChange} className={inputStyle} />
+                </div>
               </div>
-            </div>
-          </div>
-
-          {isEditing && (
-            <div className="space-y-6 pt-6">
-              <div className="border-t border-border/50 pt-6">
-                <h3 className="text-lg font-semibold text-text-primary mb-4">Change Password</h3>
-                <p className="text-sm text-text-secondary/80 mb-4">
-                  Create a strong password to secure your account
-                </p>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Current Password
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-background-secondary/80 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent text-text-primary placeholder-text-tertiary/60 transition-colors"
-                      placeholder="Enter current password"
-                      required
-                    />
-                    {currentPassword && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <Check className="w-4 h-4 text-green-500" />
-                      </div>
-                    )}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button type="button" onClick={() => setIsEditing(false)} className={`px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg font-medium text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors`}>Cancel</button>
+                <button type="submit" disabled={isLoading} className={`px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors disabled:opacity-50`}>{isLoading ? 'Saving...' : 'Update Profile'}</button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className={`w-16 h-16 rounded-full ${getAvatarColor()} flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md border-2 border-white dark:border-gray-700`}>
+                {getUserPhoto() ? <img src={getUserPhoto()} alt={getUserName()} className="w-full h-full object-cover" /> : <span className={`text-2xl font-bold`}>{getUserInitials(getUserName())}</span>}
+              </div>
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                <div className="flex items-start gap-3">
+                  <User className="w-4 h-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className={`text-sm font-medium text-gray-500 dark:text-gray-400`}>Full Name</p>
+                    <p className={`font-semibold`}>{getUserName() || 'N/A'}</p>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    New Password
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-background-secondary/80 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent text-text-primary placeholder-text-tertiary/60 transition-colors"
-                      placeholder="Enter new password"
-                      required
-                    />
-                    {newPassword && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <Check className="w-4 h-4 text-green-500" />
-                      </div>
-                    )}
+                <div className="flex items-start gap-3">
+                  <Mail className="w-4 h-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className={`text-sm font-medium text-gray-500 dark:text-gray-400`}>Email</p>
+                    <p className={`font-semibold`}>{getUserEmail() || 'N/A'}</p>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Confirm New Password
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                          <div className="relative">
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-background-secondary/80 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent text-text-primary placeholder-text-tertiary/60 transition-colors"
-                      placeholder="Confirm new password"
-                      required
-                    />
-                    {confirmPassword && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <Check className="w-4 h-4 text-green-500" />
-                      </div>
-                    )}
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-4 h-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className={`text-sm font-medium text-gray-500 dark:text-gray-400`}>Age</p>
+                    <p className={`font-semibold`}>{formData.age || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <User className="w-4 h-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className={`text-sm font-medium text-gray-500 dark:text-gray-400`}>Gender</p>
+                    <p className={`font-semibold`}>{formData.gender || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="sm:col-span-2 flex items-start gap-3">
+                  <MapPin className="w-4 h-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className={`text-sm font-medium text-gray-500 dark:text-gray-400`}>Location</p>
+                    <p className={`font-semibold`}>{formData.location || 'N/A'}</p>
                   </div>
                 </div>
               </div>
             </div>
           )}
+        </div>
+      </section>
 
-          <div className="flex items-center justify-end space-x-3 pt-6">
-            {isEditing ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setError('');
-                    setCurrentPassword('');
-                    setNewPassword('');
-                    setConfirmPassword('');
-                  }}
-                  className="px-5 py-2.5 text-sm font-medium rounded-xl border border-border hover:bg-background-secondary/80 transition-colors text-text-primary hover:text-text-primary/90"
-                  disabled={isLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 text-sm font-medium text-white bg-primary rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center min-w-[140px] shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-1.5" />
-                      Save Changes
-                    </>
-                  )}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-primary rounded-xl hover:bg-primary/90 transition-colors flex items-center"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Profile
+      {/* Section 2: Account Security */}
+      <section id="account-security">
+        <h2 className={`text-xl font-bold text-${colors.textPrimary} mb-4 pb-2 border-b border-gray-200 dark:border-gray-700`}>Account Security</h2>
+        <div className={`bg-white dark:bg-gray-800/50 p-6 rounded-xl shadow-sm`}>
+          <button onClick={() => setShowPasswordChange(!showPasswordChange)} className="flex justify-between items-center w-full font-semibold">
+            <span>Change Password</span>
+            <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${showPasswordChange ? 'rotate-180' : ''}`} />
+          </button>
+          {showPasswordChange && (
+            <form className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-4">
+              <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputStyle} />
+              <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputStyle} />
+              <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputStyle} />
+              <div className="flex justify-end">
+                <button type="submit" className={`px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors`}>Update Password</button>
+              </div>
+            </form>
+          )}
+        </div>
+      </section>
+
+      {/* Section 3: Danger Zone */}
+      <section id="danger-zone">
+         <h2 className={`text-xl font-bold text-red-600 dark:text-red-500 mb-4 pb-2 border-b border-red-200 dark:border-red-800`}>Danger Zone</h2>
+        <div className={`bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-6 rounded-r-lg flex flex-col md:flex-row justify-between items-center gap-4`}>
+          <div>
+            <h3 className={`font-bold text-red-800 dark:text-red-300`}>Delete Your Account</h3>
+            <p className={`text-sm text-red-700 dark:text-red-400 mt-1`}>Once you delete your account, this action is permanent and cannot be undone.</p>
+          </div>
+          <button onClick={() => setShowDeleteModal(true)} className={`px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex-shrink-0`}>
+            Delete Account
+          </button>
+        </div>
+      </section>
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Confirm Deletion</h2>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
+                Are you sure you want to delete your account? This action is irreversible and all your data will be permanently lost.
+              </p>
+            </div>
+            <div className="mt-8 flex justify-center gap-4">
+              <button 
+                onClick={() => setShowDeleteModal(false)} 
+                className="px-6 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                Cancel
               </button>
-            )}
+              <button 
+                // Add deletion logic to onClick here
+                className="px-6 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
+                Delete Account
+              </button>
+            </div>
           </div>
-        </form>
-
-        {isSaved && (
-          <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-500 text-sm flex items-center">
-            <Check className="w-4 h-4 mr-2" />
-            <span>Profile updated successfully</span>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
