@@ -39,19 +39,19 @@ const QuoteCard = () => {
   }, [currentQuote]);
 
   return (
-    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 p-6">
+    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 p-6 h-full flex flex-col justify-center">
       <div className="absolute top-4 right-4 text-indigo-200 dark:text-indigo-700">
         <Sparkles className="w-6 h-6" />
       </div>
-      <div className="relative z-10">
+      <div className="relative z-10 text-center">
         <blockquote className="text-lg italic text-indigo-900 dark:text-indigo-100 mb-4">
           "{currentQuote.text}"
         </blockquote>
-        <p className="text-right text-sm font-medium text-indigo-800/70 dark:text-indigo-200/70">
+        <p className="text-sm font-medium text-indigo-800/70 dark:text-indigo-200/70">
           — {currentQuote.author}
         </p>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400/30 via-indigo-400/10 to-indigo-400/30"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-400/30 via-indigo-400/10 to-indigo-400/30"></div>
     </div>
   );
 };

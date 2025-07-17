@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { auth } from '../config/firebase';
 import { motion } from 'framer-motion';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { 
   Activity, 
   Calendar, 
@@ -17,8 +17,7 @@ import {
   Activity as ActivityIcon
 } from 'lucide-react';
 import useAuth from '../auth/hooks/useAuth';
-import chatApi from '../services/api';
-import { useMoodTracking } from '../hooks/useMoodTracking';
+import { getDashboardData, addMoodEntry } from '../services/api';
 
 // Dashboard Components
 import DashboardHeader from '../components/dashboard/DashboardHeader';
@@ -46,14 +45,12 @@ const item = {
 };
 
 const DashboardPage = () => {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
+  // const [timeRange, setTimeRange] = useState('7'); // No longer needed
   const [error, setError] = useState(null);
-  const [timeRange, setTimeRange] = useState('7'); // 7, 14, or 30 days;
-  
-  // Use the mood tracking hook
-  const { moodHistory, loading: moodLoading } = useMoodTracking(currentUser?.uid);
-  
+
+  // Use the mood tracking hook with date range filtering
   const [dashboardData, setDashboardData] = useState({
     moodStats: { current: 0, trend: 0 },
     journalStats: { total: 0, weekly: 0 },
@@ -62,105 +59,54 @@ const DashboardPage = () => {
     recentActivity: [],
   });
 
-  // Format date for API requests
-  const formatDate = (date) => {
-    return date.toISOString().split('T')[0];
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getDashboardData(); // Fetch all data
+      
+      const recentActivity = [
+        { icon: <Activity />, label: 'Recent Activity' },
+        { icon: <Calendar />, label: 'Upcoming Events' },
+        { icon: <Heart />, label: 'Mood Tracking' },
+        { icon: <MessageSquare />, label: 'Conversations' },
+        { icon: <BookOpen />, label: 'Journal Entries' },
+        { icon: <Target />, label: 'Goals' },
+        { icon: <Award />, label: 'Achievements' },
+        { icon: <Clock />, label: 'Time Management' },
+        { icon: <Smile />, label: 'Mood Insights' },
+        { icon: <Info />, label: 'Wellness Tips' },
+      ];
+
+      setDashboardData({ ...response, recentActivity });
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+      setError('Failed to load dashboard data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Calculate start of week
-  const getStartOfWeek = () => {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-    return new Date(now.setDate(diff));
+  const handleMoodSubmit = async (mood) => {
+    try {
+      await addMoodEntry({ mood });
+      // Refresh data to show the new entry instantly
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to submit mood:', err);
+      setError('Could not save your mood. Please try again.');
+    }
   };
 
-  // Process mood data when moodHistory or timeRange changes
   useEffect(() => {
-    if (!currentUser) return;
-
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const startDate = subDays(new Date(), parseInt(timeRange));
-        const startOfWeek = getStartOfWeek();
-
-        // Filter mood entries by selected time range
-        const filteredMoodEntries = moodHistory
-          .filter(entry => entry.date >= startDate)
-          .map(entry => ({
-            timestamp: entry.date.toISOString(),
-            mood: entry.mood,
-            notes: entry.notes || ''
-          }));
-
-        // Calculate mood stats
-        const currentMood = moodHistory[0]?.mood || 0;
-        const previousMood = moodHistory[1]?.mood || 0;
-        const moodTrend = moodHistory.length > 1 ? currentMood - previousMood : 0;
-
-        // Fetch other data in parallel
-        const [journalResponse, chatResponse] = await Promise.all([
-          journalApi.getStats().catch(() => ({ data: { total: 0, weekly: 0 } })),
-          chatApi.getConversations().catch(() => ({ data: [] })),
-        ]);
-
-        // Process journal stats
-        const journalStats = {
-          total: journalResponse.data?.total || 0,
-          weekly: journalResponse.data?.weekly || 0,
-        };
-
-        // Process chat stats
-        const chatStats = {
-          total: chatResponse.data?.length || 0,
-          weekly: chatResponse.data?.filter(chat => 
-            new Date(chat.updatedAt) >= startOfWeek
-          ).length || 0,
-        };
-
-        // Process recent activity
-        const recentActivity = [
-          { icon: <Activity />, label: 'Recent Activity' },
-          { icon: <Calendar />, label: 'Upcoming Events' },
-          { icon: <Heart />, label: 'Mood Tracking' },
-          { icon: <MessageSquare />, label: 'Conversations' },
-          { icon: <BookOpen />, label: 'Journal Entries' },
-          { icon: <Target />, label: 'Goals' },
-          { icon: <Award />, label: 'Achievements' },
-          { icon: <Clock />, label: 'Time Management' },
-          { icon: <Smile />, label: 'Mood Insights' },
-          { icon: <Info />, label: 'Wellness Tips' },
-        ];
-
-        setDashboardData({
-          moodStats: {
-            current: currentMood,
-            trend: moodTrend
-          },
-          journalStats,
-          chatStats,
-          moodEntries: filteredMoodEntries,
-          recentActivity,
-        });
-      } catch (err) {
-        console.error('Error loading dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [currentUser, timeRange, moodHistory]);
+    if (currentUser) {
+      fetchDashboardData();
+    }
+  }, [currentUser]);
 
   // Refresh dashboard data
   const refreshData = () => {
-    // The moodHistory will automatically update via the useMoodTracking hook
-    setLoading(true);
-    setTimeout(() => setLoading(false), 500);
+    fetchDashboardData();
   };
 
   const handleQuickAction = (action) => {
@@ -227,7 +173,7 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Mood Tracker */}
         <motion.div variants={item} className="lg:col-span-2">
-          <MoodTrackerCard />
+          <MoodTrackerCard onMoodSubmit={handleMoodSubmit} />
         </motion.div>
 
         {/* Quote Card */}
@@ -245,15 +191,6 @@ const DashboardPage = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400">Track your mood changes over time</p>
             </div>
             <div className="flex items-center space-x-2 mt-3 md:mt-0">
-              <select 
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-              >
-                <option value="7">Last 7 days</option>
-                <option value="14">Last 14 days</option>
-                <option value="30">Last 30 days</option>
-              </select>
               <button 
                 onClick={refreshData}
                 className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -264,7 +201,7 @@ const DashboardPage = () => {
             </div>
           </div>
           
-          <div className="h-80 w-full">
+          <div className="h-96 w-full">
             {dashboardData.moodEntries?.length > 0 ? (
               <MoodTimelineChart moodData={dashboardData.moodEntries} />
             ) : (

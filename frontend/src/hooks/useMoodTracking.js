@@ -7,11 +7,12 @@ import {
   where, 
   orderBy, 
   limit,
-  onSnapshot 
+  onSnapshot,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-export const useMoodTracking = (userId) => {
+export const useMoodTracking = (userId, startDate = null, endDate = null) => {
   const [mood, setMood] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -50,35 +51,74 @@ export const useMoodTracking = (userId) => {
     }
   };
 
-  // Fetch mood history
+  // Fetch mood history with optional date range
   useEffect(() => {
     if (!userId) return;
 
-    const q = query(
-      collection(db, 'moodEntries'),
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc'),
-      limit(7) // Last 7 entries
-    );
+    const fetchMoodHistory = async (startDate = null, endDate = null) => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Create base query with required filters
+        const baseQuery = [
+          where('userId', '==', userId),
+          orderBy('timestamp', 'desc')
+        ];
+        
+        // Add date range filters if provided
+        const queryConstraints = [...baseQuery];
+        if (startDate) {
+          queryConstraints.push(where('timestamp', '>=', Timestamp.fromDate(new Date(startDate))));
+        }
+        if (endDate) {
+          queryConstraints.push(where('timestamp', '<=', Timestamp.fromDate(new Date(endDate))));
+        }
+        
+        // Create the query
+        const q = query(collection(db, 'moodEntries'), ...queryConstraints);
+        
+        // Set up real-time listener
+        const unsubscribe = onSnapshot(q, 
+          (snapshot) => {
+            const entries = [];
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              entries.push({
+                id: doc.id,
+                ...data,
+                date: data.timestamp?.toDate()
+              });
+            });
+            setMoodHistory(entries);
+          }, 
+          (err) => {
+            console.error('Error fetching mood history:', err);
+            setError('Failed to load mood history. Please try again.');
+          }
+        );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const entries = [];
-      snapshot.forEach((doc) => {
-        entries.push({
-          id: doc.id,
-          ...doc.data(),
-          // Convert Firestore timestamp to Date
-          date: doc.data().timestamp?.toDate()
-        });
-      });
-      setMoodHistory(entries);
-    }, (err) => {
-      console.error('Error fetching mood history:', err);
-      setError('Failed to load mood history');
-    });
+        // Clean up listener on unmount
+        return () => {
+          try {
+            unsubscribe();
+          } catch (error) {
+            console.error('Error unsubscribing from mood history:', error);
+          }
+        };
+      } catch (err) {
+        console.error('Error setting up mood history listener:', err);
+        setError('Failed to load mood history. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
-  }, [userId]);
+    // Only fetch if we have valid dates
+    if (startDate && endDate) {
+      fetchMoodHistory(startDate, endDate);
+    }
+  }, [userId, startDate, endDate]);
 
   return {
     mood,

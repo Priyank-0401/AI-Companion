@@ -734,25 +734,6 @@ const ChatPage = () => {
         throw error;
       }
     },
-    onError: (error, variables, context) => {
-      console.error('Message send error:', error);
-      
-      // Show user-friendly error message
-      let errorMessage = 'Failed to send message';
-      if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
-        errorMessage = 'Request timed out. The server might be busy.';
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Session expired. Please log in again.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast.error(errorMessage);
-    },
-    onSettled: () => {
-      // Clean up any loading states
-      toast.dismiss();
-    },
     onMutate: async ({ content, conversationId }) => {
       if (!conversationId) return;
       
@@ -772,7 +753,7 @@ const ChatPage = () => {
       return { previousConversation };
     },
     onError: (error, variables, context) => {
-      console.error('Mutation error:', error);
+      console.error('Message send error:', error);
       
       // If we have previous data, revert to it
       if (context?.previousConversation) {
@@ -781,10 +762,22 @@ const ChatPage = () => {
           context.previousConversation
         );
       }
+      
+      // Show user-friendly error message
+      let errorMessage = 'Failed to send message';
+      if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
+        errorMessage = 'Request timed out. The server might be busy.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please log in again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     },
     onSettled: (data, error, variables) => {
       // Always refetch conversation after error or success to ensure we have latest data
-      if (variables.conversationId) {
+      if (variables?.conversationId) {
         queryClient.invalidateQueries(['conversation', variables.conversationId]);
         queryClient.invalidateQueries(['conversations', currentUser?.uid]);
       }

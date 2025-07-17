@@ -14,6 +14,8 @@ import { errorHandler } from './middleware/error.js';
 import { logger } from './utils/logger.js';
 import { chatRoutes, llmRoutes } from './api/v1/chat/index.js';
 import { router as avatarCallRoutes } from './api/v1/avatar-call/index.js';
+import { router as dashboardRoutes } from './api/v1/dashboard/index.js';
+import { moodRoutes } from './api/v1/mood/index.js';
 
 // Get the directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -45,30 +47,8 @@ app.use(hpp({
   whitelist: [] // Add any parameters that should be allowed to have duplicate values
 }));
 
-// Configure CORS with preflight handling
-app.options('*', cors(config.cors)); // Enable preflight for all routes
-
-// Enable CORS for all routes
-app.use((req, res, next) => {
-  // Set CORS headers
-  if (config.cors.origin.includes('*')) {
-    res.header('Access-Control-Allow-Origin', '*');
-  } else if (Array.isArray(config.cors.origin) && config.cors.origin.includes(req.headers.origin)) {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-  }
-  
-  res.header('Access-Control-Allow-Methods', config.cors.methods.join(','));
-  res.header('Access-Control-Allow-Headers', config.cors.allowedHeaders.join(','));
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', config.cors.maxAge);
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  next();
-});
+// Use the CORS configuration from config/index.js
+app.use(cors(config.cors));
 
 // Compress all responses
 app.use(compression());
@@ -132,6 +112,11 @@ app.use(llmPath, llmRoutes);
 const apiV1Router = Router();
 apiV1Router.use('/chat', chatRoutes);
 apiV1Router.use('/avatar-call', avatarCallRoutes);
+apiV1Router.use('/dashboard', dashboardRoutes);
+apiV1Router.use('/mood', moodRoutes);
+
+// Mount avatar-call routes at /api/avatar-call for backward compatibility
+app.use('/api/avatar-call', avatarCallRoutes);
 
 // Mount the API v1 router at /api/v1
 app.use(apiPrefix + '/v1', apiV1Router);

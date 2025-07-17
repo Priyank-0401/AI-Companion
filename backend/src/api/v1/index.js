@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { router as chatRoutes } from './chat';
 import { router as avatarCallRoutes } from './avatar-call';
+import { router as dashboardRoutes } from './dashboard';
+import { moodRoutes } from './mood';
 
 const router = Router();
 
@@ -12,5 +14,7 @@ router.get('/health', (req, res) => {
 // API routes
 router.use('/chat', chatRoutes);
 router.use('/avatar-call', avatarCallRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/mood', moodRoutes);
 
 export default router;

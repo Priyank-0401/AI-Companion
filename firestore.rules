@@ -25,7 +25,16 @@ service cloud.firestore {
     
     // Allow users to read and write their own mood entries
     match /moodEntries/{entryId} {
-      allow read, create: if request.auth != null && 
+      // Allow querying the collection with filters
+      allow list: if request.auth != null && 
+        request.auth.uid == request.query.get('userId', 'string');
+        
+      // Allow reading individual documents
+      allow get: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      
+      // Allow creating new entries
+      allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.userId;
       
       // Users can only update their own entries

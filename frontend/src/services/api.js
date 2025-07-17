@@ -1,41 +1,160 @@
-// API Base URL from environment variable
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+import axios from 'axios';
 import { auth } from '../config/firebase';
 
-// Default model configurations
-export const DEFAULT_MODEL = 'llama3-8b-8192';
-export const DEFAULT_STYLE = 'empathetic';
+// Create axios instance with base URL
+const api = axios.create({
+  baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/v1`,
+  timeout: 10000, // 10 second timeout
+});
 
-// Available models and their configurations
-const MODEL_CONFIGS = {
-  'llama3-8b-8192': {
-    name: 'Llama 3 8B',
-    provider: 'groq',
-    maxTokens: 8192,
-    supportsStreaming: true
-  },
-  'llama3-70b-8192': {
-    name: 'Llama 3 70B',
-    provider: 'groq',
-    maxTokens: 8192,
-    supportsStreaming: true
-  },
-  'mixtral-8x7b-32768': {
-    name: 'Mixtral 8x7B',
-    provider: 'openrouter',
-    maxTokens: 32768,
-    supportsStreaming: true,
-    deprecated: true
+// Function to get the current user's ID token
+const getAuthToken = async () => {
+  console.log('[Auth] Getting auth token...');
+  try {
+    await auth.authStateReady();
+    console.log('[Auth] Auth state is ready.');
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.warn('[Auth] No authenticated user found in auth.currentUser.');
+      return null;
+    }
+
+    console.log(`[Auth] User found: ${user.uid}. Requesting token...`);
+    const token = await user.getIdToken(true); // Force refresh
+    console.log(`[Auth] Token received: ${token ? token.substring(0, 30) + '...' : 'null'}`);
+    return token;
+
+  } catch (error) {
+    console.error('[Auth] Critical error in getAuthToken:', error);
+    return null;
   }
 };
 
-// Available conversation styles
-export const CONVERSATION_STYLES = [
-  { id: 'empathetic', name: 'Empathetic', description: 'Supportive and understanding responses' },
-  { id: 'coach', name: 'Coach', description: 'Motivational and goal-oriented responses' },
-  { id: 'playful', name: 'Playful', description: 'Fun and lighthearted responses' },
-  { id: 'mindful', name: 'Mindful', description: 'Thoughtful and reflective responses' }
+// Request interceptor to add auth token
+api.interceptors.request.use(async (config) => {
+  console.log(`[API Interceptor] Intercepting request to: ${config.url}`);
+  const token = await getAuthToken();
+
+  if (token) {
+    console.log('[API Interceptor] Token found. Attaching Authorization header.');
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    console.warn('[API Interceptor] No token found. Request will be sent without Authorization.');
+  }
+
+  console.log('[API Interceptor] Final headers:', config.headers);
+  return config;
+}, (error) => {
+  console.error('[API Interceptor] Request error:', error);
+  return Promise.reject(error);
+});
+
+// Response interceptor to handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If error is 401 and we haven't already tried to refresh the token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const newToken = await getAuthToken();
+        if (newToken) {
+          // Update the Authorization header
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          // Retry the original request with the new token
+          return api(originalRequest);
+        } else {
+          // If we can't get a new token, redirect to login
+          window.location.href = '/login';
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        window.location.href = '/login';
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Dashboard API
+/**
+ * Get dashboard data
+ * @param {Object} [params] - Query parameters
+ * @param {number} [params.timeRange=7] - The time range in days for the data
+ * @returns {Promise<Object>} Dashboard data
+ */
+export const getDashboardData = async (params) => {
+  try {
+    const response = await api.get('/dashboard', { params });
+    // The backend wraps the actual payload in a 'data' property
+    return response.data.data;
+  } catch (error) {
+    console.error('API Error getting dashboard data:', error.response?.data || error.message);
+    throw error.response?.data || new Error('Failed to fetch dashboard data');
+  }
+};
+
+// Mood API
+export const addMoodEntry = async (moodData) => {
+  try {
+    const response = await api.post('/mood', moodData);
+    return response.data;
+  } catch (error) {
+    console.error('API Error adding mood entry:', error.response?.data || error.message);
+    throw error.response?.data || { message: 'An unknown error occurred while saving your mood.' };
+  }
+};
+
+// Constants
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+export const DEFAULT_MODEL = 'llama3-8b-8192';
+export const DEFAULT_STYLE = 'empathetic';
+export const DEFAULT_MAX_TOKENS = 8192;
+
+// Available models and their configurations
+const MODEL_CONFIGS = {
+  'llama3-8b-8192': { maxTokens: 8192 },
+  'llama3-70b-8192': { maxTokens: 8192 },
+  'mixtral-8x7b-32768': { maxTokens: 32768 },
+  'gemini-1.5-pro': { maxTokens: 1048576 },
+  'gpt-3.5-turbo': { maxTokens: 16385 },
+  'gpt-4-turbo': { maxTokens: 128000 },
+  'claude-3-opus': { maxTokens: 200000 },
+  'claude-3-sonnet': { maxTokens: 200000 },
+  'mistral-7b-instruct': { maxTokens: 32768 },
+  'mixtral-8x22b-instruct': { maxTokens: 65536 },
+  'llama-2-7b-chat': { maxTokens: 4096 },
+  'llama-2-70b-chat': { maxTokens: 4096 },
+  'code-llama-34b-instruct': { maxTokens: 16384 },
+  'code-llama-70b-instruct': { maxTokens: 16384 },
+  'llama-3-70b-instruct': { maxTokens: 8192 },
+  'llama-3-8b-instruct': { maxTokens: 8192 }
+};
+
+// Available styles for chat responses
+const STYLES = [
+  'empathetic',
+  'professional',
+  'concise',
+  'elaborate',
+  'humorous',
+  'serious'
 ];
+
+// Get model configuration
+export const getModelConfig = (modelId) => {
+  return MODEL_CONFIGS[modelId] || { maxTokens: DEFAULT_MAX_TOKENS };
+};
+
+// Validate if a style is supported
+export const isValidStyle = (style) => {
+  return STYLES.includes(style);
+};
 
 // Default timeout for API requests (5 minutes)
 const DEFAULT_TIMEOUT = 5 * 60 * 1000;

@@ -7,7 +7,7 @@ const Footer = () => {
 
   const socialLinks = [
     { icon: <FaLinkedin />, href: 'https://linkedin.com/in/priyankpahwa41', 'aria-label': 'LinkedIn' },
-    { icon: <FaGithub />, href: 'https://github.com/priyank-0401/AI-Companion', 'aria-label': 'GitHub' },
+    { icon: <FaGithub />, href: 'https://github.com/priyank-0401', 'aria-label': 'GitHub' },
     { icon: <FaInstagram />, href: 'https://instagram.com/priyank.0401', 'aria-label': 'Instagram' },
   ];
 

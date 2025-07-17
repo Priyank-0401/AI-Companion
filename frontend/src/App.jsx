@@ -122,7 +122,7 @@ function AppContent() {
           />
         </Routes>
       </motion.main>
-      {!['/login', '/signup', '/chat', '/avatar-call', '/settings'].some(path => location.pathname.startsWith(path)) && <Footer />}
+      {!['/login', '/signup', '/chat', '/dashboard', '/avatar-call', '/settings'].some(path => location.pathname.startsWith(path)) && <Footer />}
     </div>
   );
 }
