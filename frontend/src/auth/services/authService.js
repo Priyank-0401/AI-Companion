@@ -238,7 +238,14 @@ export const getAuthUser = async (user) => {
   try {
     const userDoc = await getDoc(getUserDoc(user.uid));
     const userData = userDoc.exists() 
-      ? { ...user, ...userDoc.data() }
+      ? { 
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          emailVerified: user.emailVerified,
+          ...userDoc.data() 
+        }
       : await createUserProfile(user);
     
     // Store the updated user data
