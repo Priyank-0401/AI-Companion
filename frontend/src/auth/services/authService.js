@@ -257,7 +257,7 @@ export const getAuthUser = async (user) => {
 const ensureUserProfile = async (user) => {
   const userDoc = await getDoc(getUserDoc(user.uid));
   return userDoc.exists() 
-    ? updateUserProfile({ lastLoginAt: serverTimestamp() })
+    ? await updateUserProfile({ lastLoginAt: serverTimestamp() })
     : createUserProfile(user);
 };
 

@@ -3,7 +3,7 @@ import { auth } from '../config/firebase';
 
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}`, // Removed /api/v1 to allow flexible endpoint access
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}`, // Removed /api/v1 to allow flexible endpoint access
   timeout: 10000, // 10 second timeout
 });
 
