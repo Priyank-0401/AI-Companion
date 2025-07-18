@@ -315,6 +315,8 @@ const AvatarCallPage = () => {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [lastMessage, setLastMessage] = useState(null);
   const [emotion, setEmotion] = useState('neutral');
+  const [currentCaption, setCurrentCaption] = useState('');
+  const [showCaptions, setShowCaptions] = useState(true);
 
   // Audio & Voice State
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -412,19 +414,25 @@ const AvatarCallPage = () => {
           // Show a brief welcome back message if there's history
           const lastMessage = history[history.length - 1];
           if (lastMessage && lastMessage.role === 'assistant') {
+            const welcomeMessage = "Welcome back! I remember our previous conversations. How are you feeling today?";
             setLastMessage({
-              content: "Welcome back! I remember our previous conversations. How are you feeling today?",
+              content: welcomeMessage,
               context: { emotion: 'happy' }
             });
+            // Set initial caption for returning users
+            setCurrentCaption(welcomeMessage);
           }
         } else {
           console.log('📝 No previous conversation history found');
           setConversationHistory([]); // Explicitly set empty array
           // Set a welcome message for new users
+          const welcomeMessage = "Hello! I'm Seriva, your AI companion. I'm here to listen and support you. How are you feeling today?";
           setLastMessage({
-            content: "Hello! I'm Seriva, your AI companion. I'm here to listen and support you. How are you feeling today?",
+            content: welcomeMessage,
             context: { emotion: 'happy' }
           });
+          // Set initial caption for new users
+          setCurrentCaption(welcomeMessage);
         }
         
         conversationLoadedRef.current = true;
@@ -485,6 +493,10 @@ const AvatarCallPage = () => {
         onEnd: () => {
           console.log('✅ Speech ended');
           setIsSpeaking(false);
+          // Clear captions after a delay when speech ends
+          setTimeout(() => {
+            setCurrentCaption('');
+          }, 3000); // Keep captions for 3 seconds after speech ends
         },
         onError: (error) => {
           console.error('❌ Error in speech synthesis:', error);
@@ -1062,11 +1074,16 @@ const AvatarCallPage = () => {
         setEmotion
       );
 
-      // 2. If we got a valid response with content, speak it
+      // 2. If we got a valid response with content, speak it and show captions
       if (response?.content) {
         console.log('✅ API response received, preparing to speak.');
         // Add assistant response to history
         setConversationHistory(prev => [...prev, response]);
+        // Set captions to show the response text after a 2-second delay
+        setTimeout(() => {
+          setCurrentCaption(response.content);
+          setShowCaptions(true);
+        }, 2000);
         await speakText(response.content); // This will now work correctly
       } else {
         console.warn('⚠️ No valid content in API response to speak.');
@@ -1533,6 +1550,62 @@ const AvatarCallPage = () => {
         )}
       </AnimatePresence>
 
+      {/* Captions Area - Bottom Right Corner */}
+      <AnimatePresence>
+        {showCaptions && currentCaption && (
+          <motion.div 
+            className="fixed bottom-24 right-6 z-30 max-w-sm"
+            initial={{ opacity: 0, x: 20, y: 20 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 20, y: 20 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+          >
+            <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-4 relative overflow-hidden">
+              {/* Gradient accent */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+              
+              <div className="flex items-start space-x-3">
+                {/* Avatar Icon */}
+                <div className="flex-shrink-0 mt-1">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-white font-semibold text-xs">S</span>
+                  </div>
+                </div>
+                
+                {/* Caption Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Seriva</h4>
+                    <button 
+                      onClick={() => setShowCaptions(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+                      title="Hide captions"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <p className="text-gray-800 dark:text-gray-200 leading-relaxed text-sm">
+                    {currentCaption}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Typing indicator when processing */}
+              {isProcessing && (
+                <div className="flex items-center space-x-2 mt-3 pl-11">
+                  <div className="flex space-x-1">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Thinking...</span>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Bottom Controls */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-40">
         <div className="container mx-auto px-4 py-3">
@@ -1601,29 +1674,78 @@ const AvatarCallPage = () => {
               
               {/* Volume Slider */}
               <div 
-                className={`absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-3 mb-3 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl transition-all duration-200 ${
+                className={`absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-3 mb-3 transition-all duration-200 ${
                   showVolumeSlider ? 'opacity-100 visible' : 'opacity-0 invisible'
                 }`}
                 onMouseEnter={showVolumeSliderOnHover}
                 onMouseLeave={hideVolumeSliderOnLeave}
               >
-                <div className="flex items-center h-24">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={isMuted ? 0 : systemVolume}
-                    onChange={handleVolumeChange}
-                    onMouseEnter={showVolumeSliderOnHover}
-                    onMouseLeave={hideVolumeSliderAfterDelay}
-                    className="h-24 w-6 -rotate-90 origin-center"
-                    aria-label="Volume control"
-                  />
+                <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl shadow-xl border border-white/20 dark:border-gray-700/30 px-4 py-3">
+                  <div className="flex items-center space-x-3">
+                    {/* Volume percentage display */}
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 min-w-[2.5rem]">
+                      {isMuted ? 'Mute' : `${systemVolume}%`}
+                    </div>
+                    
+                    {/* Horizontal slider container */}
+                    <div className="relative w-24 h-6 flex items-center">
+                      {/* Background track */}
+                      <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                      
+                      {/* Progress track */}
+                      <div 
+                        className="absolute h-2 bg-blue-500 rounded-full transition-all duration-200"
+                        style={{
+                          width: `${isMuted ? 0 : systemVolume}%`
+                        }}
+                      ></div>
+                      
+                      {/* Slider input */}
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={isMuted ? 0 : systemVolume}
+                        onChange={handleVolumeChange}
+                        onMouseEnter={showVolumeSliderOnHover}
+                        onMouseLeave={hideVolumeSliderAfterDelay}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        aria-label="Volume control"
+                      />
+                      
+                      {/* Slider thumb */}
+                      <div 
+                        className="absolute w-4 h-4 bg-white dark:bg-gray-200 rounded-full shadow-md border-2 border-blue-500 transition-all duration-200 pointer-events-none"
+                        style={{
+                          left: `${isMuted ? 0 : systemVolume}%`,
+                          transform: 'translateX(-50%)'
+                        }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                {isMuted ? 'Unmute' : 'Volume'}
+              </div>
+            </div>
+
+            {/* Captions Toggle Button */}
+            <div className="relative group">
+              <button 
+                onClick={() => setShowCaptions(!showCaptions)}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  showCaptions 
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                    : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
+                }`}
+                title={showCaptions ? 'Hide captions' : 'Show captions'}
+              >
+                <MessageSquare className="w-6 h-6" />
+              </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
+                {showCaptions ? 'Hide captions' : 'Show captions'}
               </div>
             </div>
 
