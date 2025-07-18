@@ -90,14 +90,17 @@ class LLMController {
         res.end();
       });
 
+      // Inject Seriva's system prompt into messages
+      const processedMessages = LLMService.injectSerivaSystemPrompt(messages);
+
       // Choose the appropriate streaming method based on provider
       const stream = provider === 'groq' 
-        ? LLMService.providers.groq.streamChatCompletion(messages, {
+        ? LLMService.providers.groq.streamChatCompletion(processedMessages, {
             model,
             temperature: temperature || 0.7,
             maxTokens: maxTokens || 2000
           })
-        : LLMService.providers.openrouter.streamChatCompletion(messages, {
+        : LLMService.providers.openrouter.streamChatCompletion(processedMessages, {
             model: model || 'anthropic/claude-3-haiku',
             temperature: temperature || 0.7,
             maxTokens: maxTokens || 2000

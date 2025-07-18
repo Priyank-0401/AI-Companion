@@ -3,7 +3,7 @@ import { auth } from '../config/firebase';
 
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/v1`,
+  baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}`, // Removed /api/v1 to allow flexible endpoint access
   timeout: 10000, // 10 second timeout
 });
 
@@ -365,14 +365,6 @@ class ApiClient {
       status,
       ...details
     });
-
-    // Debug log for request
-    console.log(`[API] Making request to ${endpoint}`, {
-      method: options.method || 'GET',
-      retryCount,
-      hasBody: !!options.body
-    });
-
     // Set up timeout only if not already aborted
     if (!controller.signal.aborted) {
       timeoutId = setTimeout(() => {
@@ -1018,4 +1010,4 @@ const chatApi = {
 
 // Export the chat API object and API client
 export default chatApi;
-export { apiClient, ApiClient };
+export { apiClient, ApiClient, api };

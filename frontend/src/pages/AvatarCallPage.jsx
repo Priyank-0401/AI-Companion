@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiClient } from '../services/api';
+import chatApi, { api } from '../services/api';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
 import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volume lip sync hook
 import { useEmotionDetection } from '../hooks/useEmotionDetection'; // Import the emotion detection hook
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import useAuth from '../auth/hooks/useAuth';
+import avatarConversationService from '../services/avatarConversationService';
+import { auth } from '../config/firebase';
 // Removed expression hook import - keeping it simple
 import { 
   Mic, 
@@ -44,7 +47,7 @@ const debounce = (func, wait) => {
 };
 
 // Process user message and get response from the backend
-const processUserMessage = async (message, speakText, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', setMessages, setEmotion, speak) => {
+const processUserMessage = async (message, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', setMessages, setEmotion, conversationHistory = []) => {
   if (!message || !message.trim()) {
     console.warn('⚠️ Empty message provided to processUserMessage');
     return null;
@@ -69,55 +72,64 @@ const processUserMessage = async (message, speakText, setError, setIsProcessing,
       emotion: currentEmotion 
     });
 
-    // Create payload with required fields
+    // Create user message object
+    const userMessage = {
+      role: 'user',
+      content: trimmedMessage,
+      timestamp: new Date().toISOString(),
+      id: `user-${requestId}`
+    };
+
+    // Prepare messages array for LLM (include conversation history for context)
+    const messages = [
+      ...conversationHistory.slice(-10), // Include last 10 messages for context
+      userMessage
+    ];
+
     const payload = {
-      message: trimmedMessage,
+      messages: messages,
       model: 'llama3-8b-8192',
-      style: 'empathetic',
+      provider: 'groq',
+      temperature: 0.7,
+      maxTokens: 2000,
       context: { 
         emotion: currentEmotion,
         timestamp: new Date().toISOString(),
-        requestId
+        requestId,
+        isAvatarCall: true,
+        hasHistory: conversationHistory.length > 0
       }
     };
+    
+    console.log('📜 Sending conversation context to LLM:', {
+      historyCount: conversationHistory.length,
+      totalMessages: messages.length,
+      lastMessages: messages.slice(-3).map(m => ({
+        role: m.role,
+        content: m.content.substring(0, 30) + (m.content.length > 30 ? '...' : '')
+      }))
+    });
 
-    console.log('📤 Sending request to API:', { 
-      endpoint: '/api/v1/avatar-call/process',
-      payload: JSON.stringify(payload, null, 2) 
+    console.log('📤 Sending request to LLM API:', { 
+      endpoint: '/api/v1/chat/llm/send',
+      messageCount: messages.length,
+      lastMessages: messages.slice(-2).map(m => ({ role: m.role, content: m.content.substring(0, 50) + '...' }))
     });
     
     // Make the API request with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    const response = await fetch(`${apiClient.baseURL}/api/v1/avatar-call/process`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiClient.getAuthHeader?.() || {})
-      },
-      body: JSON.stringify(payload),
+    // Make the API request with timeout. axios automatically stringifies the payload.
+    const response = await api.post('/api/llm/chat', payload, {
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
-    
-    // Check for HTTP errors
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        errorData = { message: `HTTP error! status: ${response.status}` };
-      }
-      const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      error.status = response.status;
-      error.details = errorData;
-      throw error;
-    }
-    
-    // Parse the response data once
-    const responseData = await response.json();
+
+    // With axios, response data is in `response.data`.
+    // A non-2xx status will throw an error and be caught by the main try-catch block.
+    const responseData = response.data;
     console.log('API Response:', responseData);
     
     // Handle the response
@@ -139,40 +151,77 @@ const processUserMessage = async (message, speakText, setError, setIsProcessing,
       throw new Error('No valid response data found in the API response');
     }
     
-    // Create a message object from the response
-    const messageObj = {
-      id: resultData.id || `msg-${Date.now()}`,
+    // Extract assistant response from LLM API response
+    let assistantContent = '';
+    if (resultData.choices && resultData.choices[0] && resultData.choices[0].message) {
+      assistantContent = resultData.choices[0].message.content;
+    } else if (resultData.content) {
+      assistantContent = resultData.content;
+    } else if (resultData.message) {
+      assistantContent = resultData.message;
+    } else {
+      assistantContent = 'I apologize, but I could not process your request.';
+    }
+
+    // Create assistant message object
+    const assistantMessage = {
+      id: `assistant-${Date.now()}`,
       role: 'assistant',
-      content: resultData.content || resultData.message || 'I apologize, but I could not process your request.',
+      content: assistantContent,
+      timestamp: new Date().toISOString(),
       context: {
-        emotion: resultData.emotion || currentEmotion || 'neutral',
-        timestamp: resultData.timestamp || new Date().toISOString(),
-        ...(resultData.context || {})
+        emotion: currentEmotion || 'neutral',
+        requestId: requestId
       },
       metadata: {
-        model: resultData.model,
-        usage: resultData.usage,
-        ...(resultData.metadata || {})
+        model: resultData.model || 'llama3-8b-8192',
+        provider: resultData.provider || 'groq',
+        usage: resultData.usage
       }
     };
+
+    // Get the current user directly from Firebase auth
+    const currentUser = auth.currentUser;
+
+    // Save conversation to Firestore if user is authenticated
+    if (currentUser?.uid) {
+      try {
+        console.log('💾 Saving conversation to Firestore...', {
+          userId: currentUser.uid,
+          userMessage: userMessage.content?.substring(0, 50) + '...',
+          assistantMessage: assistantMessage.content?.substring(0, 50) + '...'
+        });
+        await avatarConversationService.saveMessagePair(
+          currentUser.uid,
+          userMessage,
+          assistantMessage
+        );
+        console.log('✅ Conversation saved successfully');
+      } catch (saveError) {
+        console.error('❌ Error saving conversation:', saveError);
+        // Don't throw here - we still want to return the response even if saving fails
+      }
+    } else {
+      console.warn('⚠️ No authenticated user found, skipping Firestore save');
+    }
     
-    // Update messages with the assistant's response
+    // Update local conversation history with both messages
     if (setMessages) {
-      setMessages(prev => [...prev, messageObj]);
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
     }
     
-    // Update emotion state if available
-    const newEmotion = resultData.emotion || resultData.context?.emotion;
-    if (newEmotion && setEmotion) {
-      setEmotion(newEmotion);
+    // Update emotion if provided
+    if (setEmotion && assistantMessage.context?.emotion) {
+      setEmotion(assistantMessage.context.emotion);
     }
     
-    // Speak the response if speak function is provided
-    if (speak && messageObj.content) {
-      await speak(messageObj.content);
-    }
+    console.log('✅ Message processed successfully:', {
+      id: assistantMessage.id,
+      content: assistantMessage.content.substring(0, 100) + '...',
+      emotion: assistantMessage.context?.emotion
+    });
     
-    return messageObj;
+    return assistantMessage;
     
   } catch (error) {
     console.error('Error in processUserMessage:', error);
@@ -202,11 +251,6 @@ const processUserMessage = async (message, speakText, setError, setIsProcessing,
       setMessages(prev => [...prev, errorResponse]);
     }
     
-    // Speak the error message if we have text to speech
-    if (speakText && errorMessage) {
-      await speakText(errorMessage);
-    }
-    
     return errorResponse;
     
   } finally {
@@ -217,6 +261,9 @@ const processUserMessage = async (message, speakText, setError, setIsProcessing,
 };
 
 const AvatarCallPage = () => {
+  // Authentication context
+  const { currentUser, loading: authLoading, initialized: authInitialized } = useAuth();
+  
   // Refs
   const audioRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -225,8 +272,12 @@ const AvatarCallPage = () => {
   const lastProcessedText = useRef('');
   const lastRequestTime = useRef(0);
   const isInitialized = useRef(false);
+  const recognitionRef = useRef(null);
+  const conversationLoadedRef = useRef(false);
+  const audioElement = useRef(null);
+  const volumeLipSyncRef = useRef(null);
   const REQUEST_COOLDOWN = 2000; // 2 seconds cooldown between requests
-  
+
   // Speech recognition hook
   const {
     isListening,
@@ -243,6 +294,15 @@ const AvatarCallPage = () => {
     lang: 'en-US',
     confidenceThreshold: 0.8
   });
+
+  // Initialize speech recognition ref
+  useEffect(() => {
+    recognitionRef.current = {
+      start: startListening,
+      stop: stopListening,
+      isListening: isListening
+    };
+  }, [startListening, stopListening, isListening]);
   
   // UI State
   const [isLoading, setIsLoading] = useState(false);
@@ -254,6 +314,19 @@ const AvatarCallPage = () => {
   const [recognizedText, setRecognizedText] = useState('');
   const [conversationHistory, setConversationHistory] = useState([]);
   const [lastMessage, setLastMessage] = useState(null);
+  const [emotion, setEmotion] = useState('neutral');
+
+  // Audio & Voice State
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [delayedIsSpeaking, setDelayedIsSpeaking] = useState(false);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [systemVolume, setSystemVolume] = useState(80);
+  const [isVolumeHovered, setIsVolumeHovered] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState(null);
   
   // Handle final transcript changes
   useEffect(() => {
@@ -276,6 +349,213 @@ const AvatarCallPage = () => {
     }
   }, [speechError]);
 
+  // Load conversation history when user is available
+  useEffect(() => {
+    const loadConversationHistory = async () => {
+      console.log('🔍 Auth state check:', {
+        authInitialized,
+        authLoading,
+        currentUser: currentUser ? {
+          uid: currentUser.uid,
+          email: currentUser.email
+        } : null,
+        firebaseCurrentUser: auth.currentUser ? {
+          uid: auth.currentUser.uid,
+          email: auth.currentUser.email
+        } : null
+      });
+      
+      // Wait for auth to be initialized
+      if (!authInitialized) {
+        console.log('⏳ Waiting for authentication to initialize...');
+        return;
+      }
+      
+      // Check if we have a user from Firebase directly
+      const firebaseUser = auth.currentUser;
+      const userToUse = currentUser || firebaseUser;
+      
+      if (!userToUse?.uid) {
+        console.log('⚠️ No user available for loading conversation history', {
+          currentUser: !!currentUser,
+          firebaseUser: !!firebaseUser,
+          authInitialized,
+          authLoading
+        });
+        return;
+      }
+      
+      if (conversationLoadedRef.current) {
+        console.log('📋 Conversation history already loaded, skipping...');
+        return;
+      }
+
+      try {
+        console.log('🔄 Loading conversation history for Seriva...', {
+          userId: userToUse.uid,
+          currentHistoryLength: conversationHistory.length,
+          usingFirebaseDirectly: !currentUser && !!firebaseUser
+        });
+        
+        const history = await avatarConversationService.loadConversationHistory(userToUse.uid);
+        
+        console.log('📊 Conversation history loaded:', {
+          historyLength: history.length,
+          firstMessage: history[0]?.content?.substring(0, 50) + '...' || 'none',
+          lastMessage: history[history.length - 1]?.content?.substring(0, 50) + '...' || 'none'
+        });
+        
+        if (history.length > 0) {
+          console.log(`✅ Setting ${history.length} messages to conversation history state`);
+          setConversationHistory(history);
+          
+          // Show a brief welcome back message if there's history
+          const lastMessage = history[history.length - 1];
+          if (lastMessage && lastMessage.role === 'assistant') {
+            setLastMessage({
+              content: "Welcome back! I remember our previous conversations. How are you feeling today?",
+              context: { emotion: 'happy' }
+            });
+          }
+        } else {
+          console.log('📝 No previous conversation history found');
+          setConversationHistory([]); // Explicitly set empty array
+          // Set a welcome message for new users
+          setLastMessage({
+            content: "Hello! I'm Seriva, your AI companion. I'm here to listen and support you. How are you feeling today?",
+            context: { emotion: 'happy' }
+          });
+        }
+        
+        conversationLoadedRef.current = true;
+        console.log('🏁 Conversation loading completed');
+      } catch (error) {
+        console.error('❌ Error loading conversation history:', error);
+        setError('Failed to load conversation history. Starting fresh.');
+        setConversationHistory([]); // Ensure we have an empty array on error
+        conversationLoadedRef.current = true;
+      }
+    };
+
+    loadConversationHistory();
+  }, [currentUser?.uid, authInitialized]);
+
+  // Debug conversation history changes
+  useEffect(() => {
+    console.log('🔍 Conversation history state changed:', {
+      length: conversationHistory.length,
+      messages: conversationHistory.slice(-3).map(m => ({
+        role: m.role,
+        content: m.content?.substring(0, 30) + '...',
+        timestamp: m.timestamp
+      }))
+    });
+  }, [conversationHistory]);
+
+  // Handle text-to-speech functionality
+  const speakText = useCallback(async (text) => {
+    if (!text) {
+      console.error('Cannot speak: no text provided');
+      return false;
+    }
+    
+    if (!voiceEnabled) {
+      console.log('Voice was disabled, enabling now...');
+      setVoiceEnabled(true);
+    }
+
+    console.log('🔊 Starting to speak text:', text);
+    
+    // Ensure the voice service is initialized with the selected voice
+    if (selectedVoice) {
+      voiceService.setVoice(selectedVoice);
+    }
+
+    try {
+      // Use the voiceService to speak the text
+      await voiceService.speak(text, {
+        onStart: () => {
+          console.log('🎤 Speech started, delaying talking animation for better sync');
+          // Add 1.5 second delay before starting talking animation to sync with audio
+          setTimeout(() => {
+            console.log('🎤 Starting talking animation after delay');
+            setIsSpeaking(true);
+          }, 2300); // 1.5 second delay for better audio/animation sync
+        },
+        onEnd: () => {
+          console.log('✅ Speech ended');
+          setIsSpeaking(false);
+        },
+        onError: (error) => {
+          console.error('❌ Error in speech synthesis:', error);
+          setIsSpeaking(false);
+          setError('Failed to speak the response. Please check your audio settings.');
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('❌ Error in speakText:', error);
+      setIsSpeaking(false); // Ensure this is reset on error
+      setError('Failed to speak the response. Please check your audio settings.');
+      return false;
+    }
+  }, [voiceEnabled, selectedVoice, setError]);
+
+  // Handle processing text input (from speech recognition or manual input)
+  const handleProcessText = useCallback(async (text) => {
+    if (!text || !text.trim() || isProcessing) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastRequestTime.current < REQUEST_COOLDOWN) {
+      console.log('⏳ Request cooldown active, skipping...');
+      return;
+    }
+
+    lastRequestTime.current = now;
+    console.log('🎯 Processing text:', text);
+
+    try {
+      const response = await processUserMessage(
+        text,
+        setError,
+        setIsProcessing,
+        lastProcessedText,
+        currentRequestId,
+        emotion,
+        setConversationHistory,
+        setEmotion,
+        conversationHistory
+      );
+
+      if (response && response.content) {
+        // Update last message for UI display
+        setLastMessage(response);
+        
+        // Update conversation history state
+        setConversationHistory(prev => [...prev, {
+          role: 'user',
+          content: text,
+          timestamp: new Date().toISOString(),
+          id: `user-${Date.now()}`
+        }, response]);
+        
+        // Speak the response if voice is enabled
+        if (voiceEnabled) {
+          await speakText(response.content);
+        }
+        
+        setLastProcessedText(text); // Update last processed text
+      } else {
+        console.warn('⚠️ No response content received from API.');
+      }
+    } catch (error) {
+      console.error('❌ Error processing text:', error);
+      setError('Failed to process your message. Please try again.');
+    }
+  }, [isProcessing, emotion, currentUser, conversationHistory, voiceEnabled, speakText, setError, setIsProcessing, setConversationHistory, setEmotion, setLastMessage]);
+
   // Handle when voice playback ends
   const handleVoiceEnd = useCallback(() => {
     console.log('Voice playback ended');
@@ -286,22 +566,9 @@ const AvatarCallPage = () => {
     }
   }, []);
   
-  // Audio State
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [delayedIsSpeaking, setDelayedIsSpeaking] = useState(false);
-  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [systemVolume, setSystemVolume] = useState(80);
-  const [isVolumeHovered, setIsVolumeHovered] = useState(false);
-  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState(null);
-  const audioElement = useRef(null);
-  const volumeLipSyncRef = useRef(null);
+
   
   // Emotion state for avatar expressions
-  const [emotion, setEmotion] = useState('neutral');
   
   // Camera state for emotion detection
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
@@ -310,6 +577,21 @@ const AvatarCallPage = () => {
 
   // Track the last emotion that was displayed
   const lastDisplayedEmotion = useRef('neutral');
+  const emotionUpdateTimeoutRef = useRef(null);
+  
+  // Debounced emotion update function
+  const updateEmotionDebounced = useCallback((newEmotion) => {
+    // Clear any pending emotion updates
+    if (emotionUpdateTimeoutRef.current) {
+      clearTimeout(emotionUpdateTimeoutRef.current);
+    }
+    
+    // Only update if the emotion has actually changed
+    if (newEmotion !== lastDisplayedEmotion.current) {
+      lastDisplayedEmotion.current = newEmotion;
+      setEmotion(newEmotion);
+    }
+  }, []);
   
   // Emotion detection - starts with camera 
   const {
@@ -326,14 +608,7 @@ const AvatarCallPage = () => {
     stopVideo
   } = useEmotionDetection({
     enabled: isCameraEnabled, // Only enable when camera is on
-    onEmotionDetected: (emotion) => {
-      // Only log and update if the emotion has changed
-      if (emotion !== lastDisplayedEmotion.current) {
-        console.log(`[${new Date().toISOString()}] Detected emotion:`, emotion);
-        lastDisplayedEmotion.current = emotion;
-        setEmotion(emotion);
-      }
-    },
+    onEmotionDetected: updateEmotionDebounced,
   });
 
   // Create a separate ref for the preview video
@@ -435,63 +710,7 @@ const AvatarCallPage = () => {
     };
   }, [emotionVideoRef, previewVideoRef]);
 
-  // Handle text-to-speech functionality
-  const speakText = useCallback(async (text) => {
-    if (!text) {
-      console.error('Cannot speak: no text provided');
-      return false;
-    }
-    
-    // Skip if we're already processing this text
-    if (isProcessingRef.current) {
-      console.log('Skipping duplicate speak request:', text);
-      return false;
-    }
-    
-    if (!voiceEnabled) {
-      console.log('Voice was disabled, enabling now...');
-      setVoiceEnabled(true);
-    }
 
-    console.log('🔊 Starting to speak text:', text);
-    
-    // Set voice if available
-    if (selectedVoice) {
-      console.log('🎙️ Setting voice to:', selectedVoice.displayName);
-      voiceService.setVoice(selectedVoice);
-    }
-
-    try {
-      isProcessingRef.current = true;
-      
-      // Use the voiceService to speak the text
-      await voiceService.speak(text, {
-        onStart: () => {
-          console.log('🎤 Speech started, starting talking animation');
-          setIsSpeaking(true);
-        },
-        onEnd: () => {
-          console.log('✅ Speech ended');
-          setIsSpeaking(false);
-          isProcessingRef.current = false;
-          lastProcessedText.current = ''; // Reset after completion
-        },
-        onError: (error) => {
-          console.error('❌ Error in speech synthesis:', error);
-          setIsSpeaking(false);
-          isProcessingRef.current = false;
-          lastProcessedText.current = ''; // Reset on error
-          setError('Failed to speak the response. Please check your audio settings.');
-        }
-      });
-      return true;
-    } catch (error) {
-      console.error('❌ Error in speakText:', error);
-      setIsSpeaking(false);
-      setError('Failed to speak the response. Please check your audio settings.');
-      return false;
-    }
-  }, [voiceEnabled, selectedVoice, setError]);
 
   // Volume lip sync integration
   const { 
@@ -696,7 +915,6 @@ const AvatarCallPage = () => {
         console.log('🎤 Processing final message before turning off mic:', recognizedText);
         processUserMessage(
           recognizedText,
-          speakText,
           setError,
           setIsProcessing,
           lastProcessedText,
@@ -704,7 +922,8 @@ const AvatarCallPage = () => {
           emotion,
           setConversationHistory,
           setEmotion,
-          voiceService.speak.bind(voiceService)
+          currentUser,
+          conversationHistory
         );
       }
       
@@ -737,7 +956,7 @@ const AvatarCallPage = () => {
   // Create the processFinalTranscript function with useCallback to prevent recreation on every render
   const processFinalTranscript = useCallback(debounce((transcript) => {
     // Skip if we're still processing
-    if (isProcessingRef.current) {
+    if (isProcessing) {
       console.log('⏳ Currently processing another request, skipping...');
       return;
     }
@@ -787,61 +1006,7 @@ const AvatarCallPage = () => {
     });
   }, 500), [speakText, setError, setIsProcessing, emotion, setConversationHistory, setEmotion, currentRequestId]);
 
-  // Process recognized text
-  const handleProcessText = useCallback(async (text) => {
-    if (!text || !text.trim() || isProcessing) return;
-    
-    const trimmedText = text.trim();
-    
-    // Check if we've already processed this text
-    if (lastProcessedText.current === trimmedText) {
-      console.log('Skipping duplicate text:', trimmedText);
-      return;
-    }
-    
-    // Update last processed text
-    lastProcessedText.current = trimmedText;
-    
-    // Add user message to chat
-    const userMessage = {
-      id: Date.now(),
-      text: trimmedText,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-    };
-    
-    setConversationHistory(prev => [...prev, userMessage]);
-    
-    // Process the message
-    setIsProcessing(true);
-    
-    try {
-      const response = await processUserMessage(
-        trimmedText,
-        speakText,  // Using speakText instead of speak
-        setError,
-        setIsProcessing,
-        lastProcessedText,
-        currentRequestId,
-        emotion,
-        setConversationHistory,
-        setEmotion,
-        speakText  // Using speakText instead of speak
-      );
-      
-      if (response) {
-        // Add AI response to chat
-        setConversationHistory(prev => [...prev, response]);
-      }
-    } catch (error) {
-      console.error('Error processing message:', error);
-      setError('Failed to process your message. Please try again.');
-    } finally {
-      setIsProcessing(false);
-      // Reset the transcript after processing
-      resetTranscript();
-    }
-  }, [isProcessing, speakText, setConversationHistory, setError, emotion, resetTranscript]);
+
 
   // Speech recognition is handled by the useSpeechRecognition hook
   // The hook manages initialization, event handling, and cleanup
@@ -859,75 +1024,62 @@ const AvatarCallPage = () => {
     }
   }, []);
 
-  // Handle speech recognition results
+  // Revised function to fix the deadlock
   const handleFinalTranscript = useCallback(async (text) => {
-    if (!text?.trim() || isProcessingRef.current) return;
-    
-    const trimmedText = text.trim();
+    const trimmedText = text?.trim();
+    if (!trimmedText || isProcessing) return; // Use the state variable 'isProcessing'
+
     console.log('🎤 Processing speech input:', trimmedText);
-    
-    // Prevent duplicate processing
+
+    // Prevent duplicate processing of the exact same text
     if (lastProcessedText.current === trimmedText) {
       console.log('Skipping duplicate transcript');
       return;
     }
     
     lastProcessedText.current = trimmedText;
-    isProcessingRef.current = true;
-    setIsProcessing(true);
-    
+    setIsProcessing(true); // Set processing to TRUE here
+
     try {
-      // Add user message to chat
+      // Add user message to chat immediately for better UX
       const userMessage = {
-        id: Date.now(),
-        text: trimmedText,
-        sender: 'user',
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: trimmedText,
         timestamp: new Date().toISOString(),
       };
-      
       setConversationHistory(prev => [...prev, userMessage]);
-      
-      // Process the message through the API
-      console.log('📡 Sending to API...');
+
+      // 1. Get the response from the API
       const response = await processUserMessage(
         trimmedText,
-        speakText,
         setError,
-        setIsProcessing,
+        setIsProcessing, // This is for internal state, but we control the main one
         lastProcessedText,
         currentRequestId,
         emotion,
         setConversationHistory,
-        setEmotion,
-        voiceService.speak.bind(voiceService)
+        setEmotion
       );
-      
-      if (response) {
-        console.log('✅ API response received');
+
+      // 2. If we got a valid response with content, speak it
+      if (response?.content) {
+        console.log('✅ API response received, preparing to speak.');
+        // Add assistant response to history
         setConversationHistory(prev => [...prev, response]);
-        
-        // Handle different response formats
-        if (typeof response === 'string') {
-          await speakText(response);
-        } else if (response.message?.content) {
-          await speakText(response.message.content);
-          const newEmotion = response.emotion || response.message.emotion;
-          if (newEmotion) setEmotion(newEmotion);
-        } else if (response.content) {
-          await speakText(response.content);
-          if (response.emotion) setEmotion(response.emotion);
-        }
+        await speakText(response.content); // This will now work correctly
+      } else {
+        console.warn('⚠️ No valid content in API response to speak.');
       }
-      
+
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('❌ Error in handleFinalTranscript:', error);
       setError('Failed to process your message. Please try again.');
     } finally {
-      isProcessingRef.current = false;
-      setIsProcessing(false);
-      setRecognizedText('');
+      setIsProcessing(false); // Set processing to FALSE here
+      resetTranscript(); // Clear the transcript for the next input
     }
-  }, [speakText, setError, emotion, setConversationHistory, setEmotion, currentRequestId]);
+  }, [isProcessing, speakText, setError, emotion, setConversationHistory, setEmotion, currentRequestId, resetTranscript]);
   
   // Process new final transcripts
   useEffect(() => {
@@ -1029,7 +1181,7 @@ const AvatarCallPage = () => {
 
   // Memoize avatar props - simplified with voice support and lip sync
   const avatarProps = useMemo(() => ({
-    lastMessage: lastMessage,
+    lastMessage: lastMessage?.content || '',
     voiceEnabled: voiceEnabled && systemVolume > 0,
     selectedVoice: selectedVoice,
     onVoiceEnd: handleVoiceEnd,
@@ -1044,22 +1196,34 @@ const AvatarCallPage = () => {
   }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive, emotion]);
   
   // Handle ending the call
-  const endCall = () => {
+  const endCall = useCallback(() => {
     console.log('Ending call...');
+    
     // Stop any ongoing speech
     if (voiceService) {
       voiceService.stop();
     }
-    // Stop speech recognition
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
+    
+    // Stop speech recognition through the hook
+    if (stopListening) {
+      stopListening();
     }
+    
+    // Also stop through the ref if available
+    if (recognitionRef.current && recognitionRef.current.stop) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping recognition:', e);
+      }
+    }
+    
     // Reset states
-    setIsListening(false);
     setVoiceEnabled(false);
     setRecognizedText('');
     setError(null);
-  };
+    setIsCallActive(false);
+  }, []);
 
   // Stop avatar speaking when voice is disabled
   useEffect(() => {
@@ -1244,7 +1408,7 @@ const AvatarCallPage = () => {
       `}</style>
       
       {/* Main Video Area */}
-      <div className="relative w-full h-full overflow-hidden">
+      <div className="relative w-full h-full overflow-hidden bg-white dark:bg-black">
         {/* Hidden video element for emotion detection */}
         <video
           ref={emotionVideoRef}
@@ -1370,7 +1534,7 @@ const AvatarCallPage = () => {
       </AnimatePresence>
 
       {/* Bottom Controls */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white/80 dark:from-black/80 to-transparent backdrop-blur-sm z-40 border-t border-gray-200 dark:border-gray-700">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-40">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-center space-x-4">
             {/* Voice Input Button */}
@@ -1379,7 +1543,7 @@ const AvatarCallPage = () => {
                 onClick={toggleListening}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   isListening 
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 scale-110 text-white' 
+                    ? 'bg-green-500 shadow-lg shadow-green-500/30 scale-110 text-white' 
                     : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
                 title={isListening ? 'Stop Listening' : 'Start Listening'}

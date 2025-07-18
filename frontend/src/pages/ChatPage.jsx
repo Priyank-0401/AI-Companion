@@ -84,16 +84,6 @@ const chatApi = {
       throw new Error('Message content cannot be empty');
     }
     
-    // Log the request payload for debugging
-    console.log('Sending message with data:', {
-      content: messageContent.length > 50 ? 
-        `${messageContent.substring(0, 50)}...` : 
-        messageContent,
-      conversationId,
-      model,
-      style
-    });
-    
     return api.sendMessage({
       conversationId,
       content: messageContent,
@@ -234,12 +224,9 @@ const ChatPage = () => {
   // Debug auth state
   useEffect(() => {
     if (currentUser) {
-      console.log('Current user in ChatPage:', currentUser.uid);
-      // Get the current user from Firebase auth to access the token
       const firebaseUser = auth.currentUser;
       if (firebaseUser) {
         firebaseUser.getIdToken(true).then(token => {
-          console.log('Current user token:', token ? 'Token exists' : 'No token');
         }).catch(error => {
           console.error('Error getting user token:', error);
         });
@@ -444,14 +431,11 @@ const ChatPage = () => {
   } = useQuery({
     queryKey: ['conversation', activeConversation],
     queryFn: async () => {
-      console.log('Fetching active conversation:', activeConversation);
       if (!activeConversation) {
-        console.log('No active conversation ID, returning null');
         return null;
       }
       try {
         const data = await chatApi.getConversation(activeConversation);
-        console.log('Fetched conversation data:', data);
         return data?.data || null;
       } catch (error) {
         console.error('Error fetching conversation:', error);
@@ -460,14 +444,12 @@ const ChatPage = () => {
     },
     enabled: !!activeConversation && !isNewChat,
     onSuccess: (data) => {
-      console.log('Active conversation loaded:', data);
       // Always ensure we have a valid style
       const defaultStyle = 'empathetic';
       const newStyle = data?.style || defaultStyle;
       
       // Only update if different to prevent unnecessary re-renders
       if (newStyle !== conversationStyle) {
-        console.log('Setting conversation style to:', newStyle);
         setConversationStyle(newStyle);
       }
     },
@@ -518,7 +500,7 @@ const ChatPage = () => {
           isNew: false // Mark as not new since we're creating it with messages
         };
         
-        console.log('Creating conversation with data:', newConversationData);
+        // console.log('Creating conversation with data:', newConversationData);
         
         // Save to backend
         const response = await chatApi.saveConversation(newConversationData);
@@ -533,7 +515,7 @@ const ChatPage = () => {
           throw new Error(errorMsg);
         }
         
-        console.log('Successfully created conversation:', responseData.id);
+        // console.log('Successfully created conversation:', responseData.id);
         return responseData;
         
       } catch (error) {
@@ -918,7 +900,7 @@ const ChatPage = () => {
   // Handle delete conversation
   const deleteConversationMutation = useMutation({
     mutationFn: async (conversationId) => {
-      console.log('Starting delete mutation for:', conversationId);
+      // console.log('Starting delete mutation for:', conversationId);
       try {
         const response = await chatApi.deleteConversation(conversationId);
         
@@ -938,7 +920,7 @@ const ChatPage = () => {
       }
     },
     onMutate: async (conversationId) => {
-      console.log('Optimistic update for conversation:', conversationId);
+      // console.log('Optimistic update for conversation:', conversationId);
       // Cancel any outgoing refetches
       await queryClient.cancelQueries(['conversations']);
       
@@ -952,12 +934,12 @@ const ChatPage = () => {
           return [];
         }
         const newData = old.filter(conv => conv && conv.id !== conversationId);
-        console.log('Updated conversations after deletion:', newData);
+        // console.log('Updated conversations after deletion:', newData);
         return newData;
       });
       
       if (activeConversation === conversationId) {
-        console.log('Active conversation deleted, resetting state');
+        // console.log('Active conversation deleted, resetting state');
         setActiveConversation(null);
         setIsNewChat(false);
       }
@@ -976,11 +958,11 @@ const ChatPage = () => {
       toast.error(`Failed to delete conversation: ${error.message}`);
     },
     onSuccess: (conversationId) => {
-      console.log('Successfully deleted conversation:', conversationId);
+      // console.log('Successfully deleted conversation:', conversationId);
       toast.success('Conversation deleted successfully');
     },
     onSettled: () => {
-      console.log('Delete mutation settled, invalidating queries');
+      // console.log('Delete mutation settled, invalidating queries');
       // Always refetch after error or success to ensure consistency
       queryClient.invalidateQueries(['conversations', currentUser?.uid]);
     }
@@ -1001,7 +983,7 @@ const ChatPage = () => {
     if (!conversationToDelete) return;
     
     try {
-      console.log('Initiating delete for conversation:', conversationToDelete);
+      // console.log('Initiating delete for conversation:', conversationToDelete);
       await deleteConversationMutation.mutateAsync(conversationToDelete);
       setShowDeleteDialog(false);
       setConversationToDelete(null);
@@ -1029,7 +1011,7 @@ const ChatPage = () => {
       try {
         // If it's a new conversation, create it first
         if (isNewConversation) {
-          console.log('Creating new conversation for message...');
+          // console.log('Creating new conversation for message...');
           
           const newConversation = await createConversationMutation.mutateAsync({
             title: messageData.content.slice(0, 30) + (messageData.content.length > 30 ? '...' : ''),
@@ -1043,25 +1025,25 @@ const ChatPage = () => {
             }]
           });
           
-          console.log('New conversation created:', {
-            id: newConversation?.id,
-            title: newConversation?.title,
-            style: newConversation?.style,
-            model: newConversation?.model
-          });
+          // console.log('New conversation created:', {
+          //   id: newConversation?.id,
+          //   title: newConversation?.title,
+          //   style: newConversation?.style,
+          //   model: newConversation?.model
+          // });
           
           if (newConversation?.id) {
-            console.log('Setting active conversation to:', newConversation.id);
+            // console.log('Setting active conversation to:', newConversation.id);
             setActiveConversation(newConversation.id);
             setIsNewChat(false);
             
             // Now send the first message to the new conversation
-            console.log('Sending first message to new conversation:', {
-              conversationId: newConversation.id,
-              model: messageData.model,
-              style: messageData.style,
-              content: messageData.content
-            });
+            // console.log('Sending first message to new conversation:', {
+            //   conversationId: newConversation.id,
+            //   model: messageData.model,
+            //   style: messageData.style,
+            //   content: messageData.content
+            // });
             
             return sendMessageMutation.mutateAsync({
               content: messageData.content,
@@ -1134,11 +1116,6 @@ const ChatPage = () => {
           toast.error('No active conversation');
           return;
         }
-        
-        console.log('Sending message to existing conversation:', {
-          conversationId: activeConversation,
-          content: messageContent.substring(0, 30) + (messageContent.length > 30 ? '...' : '')
-        });
         
         await sendMessageWithRetry({
           content: messageContent,

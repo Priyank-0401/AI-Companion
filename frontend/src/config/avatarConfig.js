@@ -61,7 +61,7 @@ export const AVATAR_CONFIG = {
     SPEEDS: {
       GREET: 0.5,                      // Normal speed for greeting
       IDLE: 0.7,                   // Normal speed for idle
-      TALKING: 0.3,                    // Slower speed for talking
+      TALKING: 0.2,                    // Slower speed for talking
       NOD: 0.5,                        // Slightly slower for natural nod
     },
     LOOP_SETTINGS: {

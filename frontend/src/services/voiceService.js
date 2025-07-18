@@ -365,107 +365,93 @@ class VoiceService {
         reject(e);
       }
     });
-  }  // Play audio blob with buffer-aware playback system
+  }
+
+  // REVISED: Play audio blob with immediate playback
   async playAudioBlob(audioBlob, options = {}) {
-    console.log('🎵 Starting buffer-aware audio playback');
+    console.log('🎵 Starting immediate audio playback');
     const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio();
-    
-    // Set volume from options, default to 0.8
+    const audio = new Audio(audioUrl);
+
     audio.volume = options.volume !== undefined ? options.volume : 0.8;
-    
-    // Preload the audio
     audio.preload = 'auto';
-    audio.src = audioUrl;
-    
     this.currentAudio = audio;
-    this._isSpeaking = true;
-    
-    // Call onStart immediately to sync with avatar animation
-    options.onStart?.();
-    
-    // Start loading the audio
-    audio.load();
-    
+
+    // No need to call audio.load() explicitly when src is set
+
     return new Promise((resolve, reject) => {
-      // Function to start playback when ready
+      let playbackStarted = false;
+
+      // Function to start playback as soon as possible
       const startPlayback = () => {
-        console.log('🎵 Audio ready to play, starting playback');
+        if (playbackStarted) return;
+        playbackStarted = true;
+
+        console.log('🎵 Audio ready to play, starting playback...');
         
-        // Small delay to ensure avatar animation is in sync
+        // Reduced delay from 150ms to 50ms for faster response
         setTimeout(() => {
-          audio.play()
-            .then(() => {
-              console.log('▶️ Playback started successfully');
-            })
-            .catch(error => {
-              console.error('❌ Playback failed:', error);
-              this._handlePlaybackError(error, audioUrl, reject, options);
-            });
-        }, 150); // 150ms delay for visual sync
+          audio.play().catch(error => {
+            console.error('❌ Playback failed:', error);
+            this._handlePlaybackError(error, audioUrl, reject, options);
+          });
+        }, 50); // Reduced delay for faster response
       };
-      
-      // Try using canplaythrough first (most reliable)
+
+      // Use 'canplay' which fires much sooner than 'canplaythrough'
       const canPlayHandler = () => {
-        console.log('✅ Audio can play through');
-        audio.removeEventListener('canplaythrough', canPlayHandler);
+        console.log('✅ Audio can play (event fired)');
+        cleanupListeners();
         startPlayback();
       };
-      
-      audio.addEventListener('canplaythrough', canPlayHandler);
-      
-      // Fallback: Check ready state periodically
+
+      // Fallback check for readyState
       const readyStateCheck = setInterval(() => {
-        if (audio.readyState >= 4) { // HAVE_ENOUGH_DATA
+        // Use readyState >= 3 (HAVE_FUTURE_DATA) which is equivalent to 'canplay'
+        if (audio.readyState >= 3) {
           console.log('✅ Audio ready (via readyState check)');
-          clearInterval(readyStateCheck);
-          audio.removeEventListener('canplaythrough', canPlayHandler);
+          cleanupListeners();
           startPlayback();
         }
       }, 50);
-      
-      // Set a timeout to prevent hanging if audio never loads
+
+      // Timeout to prevent hanging if audio never loads
       const loadTimeout = setTimeout(() => {
-        clearInterval(readyStateCheck);
-        audio.removeEventListener('canplaythrough', canPlayHandler);
+        console.warn('⚠️ Load timeout reached, attempting to play anyway.');
+        cleanupListeners();
         startPlayback();
-      }, 5000); // 5 second timeout
-      
-      // Cleanup
+      }, 3000); // 3-second timeout is plenty
+
+      const cleanupListeners = () => {
+        clearInterval(readyStateCheck);
+        clearTimeout(loadTimeout);
+        audio.removeEventListener('canplay', canPlayHandler);
+        audio.removeEventListener('error', errorHandler);
+      };
+
+      const errorHandler = (error) => {
+        console.error('❌ Playback error:', error);
+        cleanupListeners();
+        this._handlePlaybackError(error, audioUrl, reject, options);
+      };
+
+      // Assign all event listeners once
+      audio.addEventListener('canplay', canPlayHandler);
+      audio.addEventListener('error', errorHandler);
+
+      audio.onplaying = () => {
+        console.log('▶️ Audio is now actively playing.');
+        this._isSpeaking = true;
+        options.onStart?.(); // Call onStart here for perfect animation sync
+      };
+
       audio.onended = () => {
         console.log('✅ Playback completed');
-        clearInterval(readyStateCheck);
-        clearTimeout(loadTimeout);
         this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
         options.onEnd?.();
         resolve();
-      };
-      
-      audio.onplay = () => {
-        console.log('▶️ Audio playback started');
-      };
-      
-      audio.onerror = (error) => {
-        console.error('❌ Playback error:', error);
-        clearInterval(readyStateCheck);
-        clearTimeout(loadTimeout);
-        this._handlePlaybackError(error, audioUrl, reject, options);
-      };
-
-      audio.onended = () => {
-        console.log('✅ Audio playback completed');
-        this._isSpeaking = false;
-        this.currentAudio = null;
-        URL.revokeObjectURL(audioUrl);
-        options.onEnd?.();
-        resolve();
-      };
-
-      audio.onerror = (error) => {
-        console.error('❌ Audio playback error:', error);
-        this._handlePlaybackError(error, audioUrl, reject, options);
       };
 
       audio.onpause = () => {

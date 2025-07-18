@@ -3,6 +3,7 @@ import OpenRouterService from './providers/OpenRouterService.js';
 import { logger } from '../../../../utils/logger.js';
 import { formatMessages, calculateTokenUsage } from '../../../../utils/llm-utils.js';
 import { ERROR_TYPES } from '../../../../utils/llm-errors.js';
+import SERIVA_CONFIG from '../../../../config/seriva.config.js';
 
 class LLMService {
   constructor() {
@@ -40,11 +41,18 @@ class LLMService {
    * @param {number} [options.maxTokens] - Maximum tokens to generate
    * @param {boolean} [options.stream] - Whether to stream the response
    * @param {boolean} [options.fallback] - Whether to fallback to another provider on failure
+   * @param {boolean} [options.skipSystemPrompt] - Whether to skip injecting Seriva's system prompt
    * @returns {Promise<Object>} Completion response
    */
   async chatCompletion(messages, options = {}) {
     // Ensure options is always an object
     const safeOptions = typeof options === 'object' && options !== null ? options : {};
+    
+    // Inject Seriva's system prompt unless explicitly disabled
+    let processedMessages = [...messages];
+    if (!safeOptions.skipSystemPrompt) {
+      processedMessages = this.injectSerivaSystemPrompt(messages);
+    }
     
     const { 
       provider: preferredProvider = 'groq', // Default to groq if not specified
@@ -125,7 +133,7 @@ class LLMService {
         });
 
         // Make the request
-        const response = await providerInstance.chatCompletion(messages, {
+        const response = await providerInstance.chatCompletion(processedMessages, {
           ...options,
           model: modelToUse,
           provider: provider
@@ -381,6 +389,33 @@ class LLMService {
     throw new Error(errorMessage);
   }
   
+  /**
+   * Inject Seriva's system prompt into the messages array
+   * @param {Array} messages - Original messages array
+   * @returns {Array} Messages array with system prompt injected
+   */
+  injectSerivaSystemPrompt(messages) {
+    // Check if there's already a system message
+    const hasSystemMessage = messages.some(msg => msg.role === 'system');
+    
+    // If there's already a system message, don't inject another one
+    if (hasSystemMessage) {
+      logger.debug('[LLM] System message already present, skipping Seriva prompt injection');
+      return messages;
+    }
+    
+    // Create the system message with Seriva's prompt
+    const systemMessage = {
+      role: 'system',
+      content: SERIVA_CONFIG.systemPrompt
+    };
+    
+    logger.debug('[LLM] Injecting Seriva system prompt');
+    
+    // Return messages with system prompt at the beginning
+    return [systemMessage, ...messages];
+  }
+
   /**
    * Track token usage and costs
    * @private

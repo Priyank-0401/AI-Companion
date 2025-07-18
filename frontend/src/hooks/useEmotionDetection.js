@@ -12,7 +12,7 @@ const EMOTION_MAPPING = {
 };
 
 const EMOTION_UPDATE_INTERVAL = 200; // Update emotions every 200ms (~5 FPS)
-const EMOTION_THRESHOLD = 0.7; // Minimum confidence threshold for emotion detection
+const EMOTION_THRESHOLD = 0.5; // Lower confidence threshold for better emotion detection sensitivity
 
 /**
  * Custom hook for detecting user emotions via webcam
@@ -36,7 +36,14 @@ export const useEmotionDetection = (options = {}) => {
   const modelsLoaded = useRef(false);
   const lastEmotionCheck = useRef(Date.now());
   const currentDetectedEmotion = useRef('neutral');
-  const EMOTION_CHECK_INTERVAL = 5000; // Check for emotion changes every 5 seconds
+  const neutralDetectionCount = useRef(0); // Count consecutive neutral detections
+  const lastNonNeutralEmotion = useRef('neutral');
+  const lastEmotionChangeTime = useRef(0);
+  
+  const EMOTION_CHECK_INTERVAL = 500; // Check for emotion changes (every 500ms)
+  const EMOTION_COOLDOWN = 5000; // 5-second cooldown between any emotion change
+  const NEUTRAL_THRESHOLD = 4; // Number of consecutive neutral detections required to switch to neutral
+  const EMOTION_CONFIDENCE_THRESHOLD = 0.6; // Stricter confidence threshold
 
   // Load face-api.js models
   const loadModels = useCallback(async () => {
@@ -335,33 +342,57 @@ export const useEmotionDetection = (options = {}) => {
           const expressions = detection.expressions;
           // console.log('Raw expressions:', JSON.stringify(expressions, null, 2));
           
+          // Get all expressions and sort them by confidence
           const sortedExpressions = Object.entries(expressions)
-            .filter(([_, value]) => typeof value === 'number' && value > EMOTION_THRESHOLD)
+            .filter(([emotion]) => emotion !== 'neutral') // Don't filter by threshold yet
             .sort(([, a], [, b]) => b - a);
-
-        if (sortedExpressions.length > 0) {
-          const [dominantEmotion] = sortedExpressions[0];
-          const mappedEmotion = EMOTION_MAPPING[dominantEmotion] || 'neutral';
-          
-          // Only update if the emotion has changed and we're not already reporting this emotion
-          if (mappedEmotion !== lastLoggedEmotion.current) {
-            lastLoggedEmotion.current = mappedEmotion;
-            currentDetectedEmotion.current = mappedEmotion;
             
-            // Only call onEmotionDetected if the emotion has actually changed from last reported
-            if (mappedEmotion !== lastReportedEmotion.current) {
-              console.log(`[${new Date().toISOString()}] Emotion detected: ${mappedEmotion}`);
-              lastReportedEmotion.current = mappedEmotion;
+          if (sortedExpressions.length > 0) {
+            const [dominantEmotion, confidence] = sortedExpressions[0];
+            // Only use neutral if no emotion meets the threshold, otherwise use the most likely emotion
+            const mappedEmotion = confidence > EMOTION_CONFIDENCE_THRESHOLD ? 
+              (EMOTION_MAPPING[dominantEmotion] || dominantEmotion) : 
+              'neutral';
+          
+          // console.log(`Detected expression: ${dominantEmotion} (${confidence.toFixed(2)}) -> ${mappedEmotion}`);
+          
+          const now = Date.now();
+          const timeSinceLastChange = now - lastEmotionChangeTime.current;
+
+          // If we are in cooldown, do nothing
+          if (timeSinceLastChange < EMOTION_COOLDOWN && lastReportedEmotion.current !== 'neutral') {
+            return;
+          }
+
+          // If we detect a non-neutral emotion
+          if (mappedEmotion !== 'neutral' && mappedEmotion !== lastReportedEmotion.current) {
+            lastReportedEmotion.current = mappedEmotion;
+            currentDetectedEmotion.current = mappedEmotion;
+            lastEmotionChangeTime.current = now;
+            neutralDetectionCount.current = 0;
+            if (onEmotionDetected) {
               onEmotionDetected(mappedEmotion);
             }
-            
-            // Always update the local state to ensure UI consistency
             setEmotion(mappedEmotion);
+          } 
+          // If we detect neutral
+          else if (mappedEmotion === 'neutral' && lastReportedEmotion.current !== 'neutral') {
+            neutralDetectionCount.current++;
+            
+            if (neutralDetectionCount.current >= NEUTRAL_THRESHOLD) {
+              lastReportedEmotion.current = 'neutral';
+              currentDetectedEmotion.current = 'neutral';
+              lastEmotionChangeTime.current = now;
+              neutralDetectionCount.current = 0; // Reset counter
+              if (onEmotionDetected) {
+                onEmotionDetected('neutral');
+              }
+              setEmotion('neutral');
+            }
           }
           
           return mappedEmotion;
         } else {
-            console.log('No expressions above confidence threshold');
             return currentDetectedEmotion.current;
           }
         }
@@ -375,7 +406,6 @@ export const useEmotionDetection = (options = {}) => {
       console.error('Error in emotion detection:', err);
       return 'neutral';
     } finally {
-      console.log('Emotion detection completed');
     }
   }, []);
 
