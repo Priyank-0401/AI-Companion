@@ -122,6 +122,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     initialized,
     error,
+    signIn: signInWithEmail, // Alias for compatibility
     signInWithEmail,
     signInWithGoogle,
     signUp,
