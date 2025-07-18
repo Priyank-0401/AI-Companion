@@ -330,6 +330,10 @@ const AvatarCallPage = () => {
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   
+  // Greeting State
+  const [isGreeting, setIsGreeting] = useState(true); // Start with greeting active
+  const [greetingComplete, setGreetingComplete] = useState(false);
+  
   // Handle final transcript changes
   useEffect(() => {
     if (finalTranscript) {
@@ -1107,6 +1111,12 @@ const AvatarCallPage = () => {
   
   // Toggle voice recognition using the hook
   const toggleListening = useCallback(async () => {
+    // Don't allow speech recognition during greeting
+    if (isGreeting) {
+      console.log('Speech recognition disabled during greeting');
+      return;
+    }
+    
     if (isProcessing) {
       // If currently processing, cancel the current request
       if (window.speechSynthesis) {
@@ -1134,7 +1144,7 @@ const AvatarCallPage = () => {
         setError(`Error starting speech recognition: ${err.message}`);
       }
     }
-  }, [isListening, isProcessing, startListening, stopListening, resetTranscript]);
+  }, [isListening, isProcessing, startListening, stopListening, resetTranscript, isGreeting]);
 
   // Volume lip sync setup
   const { 
@@ -1483,6 +1493,8 @@ const AvatarCallPage = () => {
               enableGreeting={true}
               onGreetingComplete={() => {
                 console.log('Greeting complete, transitioning to idle');
+                setIsGreeting(false);
+                setGreetingComplete(true);
               }}
               detectedEmotion={emotion}
             />
@@ -1615,33 +1627,37 @@ const AvatarCallPage = () => {
               <button 
                 onClick={toggleListening}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
-                  isListening 
-                    ? 'bg-green-500 shadow-lg shadow-green-500/30 scale-110 text-white' 
-                    : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
+                  isGreeting
+                    ? 'bg-red-500/70 cursor-not-allowed text-white/70' // Red and disabled during greeting
+                    : isListening 
+                      ? 'bg-green-500 shadow-lg shadow-green-500/30 scale-110 text-white' 
+                      : isProcessing
+                        ? 'bg-gray-500 cursor-not-allowed text-white/70'
+                        : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
-                title={isListening ? 'Stop Listening' : 'Start Listening'}
-                disabled={isProcessing}
+                title={isGreeting ? 'Mic disabled during greeting' : isListening ? 'Stop Listening' : isProcessing ? 'Processing...' : 'Start Listening'}
+                disabled={isProcessing || isGreeting}
               >
                 {isListening ? (
                   <Mic className="w-6 h-6 text-white" />
                 ) : isProcessing ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-900 dark:text-white" />
+                  <Loader2 className="w-6 h-6 animate-spin" />
                 ) : (
-                  <MicOff className="w-6 h-6 text-gray-900 dark:text-white" />
+                  <MicOff className={`w-6 h-6 ${isGreeting ? 'text-white/70' : 'text-gray-900 dark:text-white'}`} />
                 )}
               </button>
-              {isListening && (
+              {isListening && !isGreeting && (
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping"></div>
               )}
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
-                {isListening ? 'Listening...' : isProcessing ? 'Processing...' : 'Start Listening'}
+                {isGreeting ? 'Greeting...' : isListening ? 'Stop' : isProcessing ? 'Processing...' : 'Listen'}
               </div>
             </div>
 
             {/* Camera Toggle Button */}
             <div className="relative group">
               <button 
-                onClick={toggleCamera}
+                onClick={() => setIsCameraEnabled(!isCameraEnabled)}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isCameraEnabled 
                     ? 'bg-blue-500 hover:bg-blue-600 text-white' 
