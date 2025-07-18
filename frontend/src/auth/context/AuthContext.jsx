@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../config/firebase';
-import { signIn, signInWithGoogle as googleSignIn, getAuthUser, signOut as authSignOut } from '../services/authService';
+import { signIn, signUp as authSignUp, signInWithGoogle as googleSignIn, getAuthUser, signOut as authSignOut } from '../services/authService';
 import { AuthContext } from './auth-context';
 
 // Create a separate provider component
@@ -90,6 +90,19 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const signUp = useCallback(async (email, password, displayName) => {
+    try {
+      setLoading(true);
+      const user = await authSignUp(email, password, displayName);
+      return user;
+    } catch (error) {
+      console.error('Sign up error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       setLoading(true);
@@ -111,9 +124,10 @@ export const AuthProvider = ({ children }) => {
     error,
     signInWithEmail,
     signInWithGoogle,
+    signUp,
     signOut,
     refreshUser,
-  }), [user, loading, initialized, error, signInWithEmail, signInWithGoogle, signOut, refreshUser]);
+  }), [user, loading, initialized, error, signInWithEmail, signInWithGoogle, signUp, signOut, refreshUser]);
 
   // Debug log the context value
   useEffect(() => {
