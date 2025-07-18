@@ -1,5 +1,10 @@
 node_modules
 
+# Backend specific
+/backend/node_modules
+/backend/logs
+/backend/logs/
+
 # Environment files
 .env
 .env.local

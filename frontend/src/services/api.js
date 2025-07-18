@@ -90,7 +90,7 @@ api.interceptors.response.use(
  */
 export const getDashboardData = async (params) => {
   try {
-    const response = await api.get('/dashboard', { params });
+    const response = await api.get('/api/v1/dashboard', { params });
     // The backend wraps the actual payload in a 'data' property
     return response.data.data;
   } catch (error) {
@@ -102,7 +102,7 @@ export const getDashboardData = async (params) => {
 // Mood API
 export const addMoodEntry = async (moodData) => {
   try {
-    const response = await api.post('/mood', moodData);
+    const response = await api.post('/api/v1/mood', moodData);
     return response.data;
   } catch (error) {
     console.error('API Error adding mood entry:', error.response?.data || error.message);
