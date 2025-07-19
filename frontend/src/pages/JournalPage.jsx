@@ -12,6 +12,8 @@ import {
   X
 } from 'lucide-react';
 import { useTheme } from '../contexts/useTheme';
+import { journalService } from '../services/journalService';
+import { auth } from '../config/firebase';
 import { JournalHeader } from '../components/journal/JournalHeader';
 import { JournalFilters } from '../components/journal/JournalFilters';
 import { JournalEntryList } from '../components/journal/JournalEntryList';
@@ -55,49 +57,32 @@ const MOODS = {
   }
 };
 
-// Initial sample data
-const getInitialEntries = () => {
-  const savedEntries = localStorage.getItem('journalEntries');
-  if (savedEntries) {
-    try {
-      return JSON.parse(savedEntries);
-    } catch (e) {
-      console.error('Failed to parse saved entries', e);
+// Load entries from Firebase
+const loadEntriesFromFirebase = async () => {
+  try {
+    // Check if user is authenticated
+    if (!auth.currentUser) {
+      console.log('User not authenticated, returning empty entries');
+      return [];
     }
+    
+    const entries = await journalService.getEntries();
+    return entries.map(entry => ({
+      ...entry,
+      // Ensure date field exists for backward compatibility
+      date: entry.createdAt
+    }));
+  } catch (error) {
+    console.error('Error loading entries from Firebase:', error);
+    return [];
   }
-  
-  return [
-    {
-      id: 1,
-      date: new Date('2025-06-01').toISOString(),
-      title: 'First Day of Summer',
-      content: 'Today marks the beginning of summer, and I\'m feeling excited about the possibilities ahead. The weather is beautiful, and I spent some time in the garden this morning. The flowers are in full bloom, and the birds are singing. It\'s moments like these that make me appreciate the simple joys in life.',
-      mood: 'positive',
-      tags: ['gratitude', 'nature', 'summer']
-    },
-    {
-      id: 2,
-      date: new Date('2025-05-31').toISOString(),
-      title: 'Reflection on Growth',
-      content: 'Been thinking a lot about personal growth lately. It\'s amazing how much can change in just a few months when you\'re intentional about your development. I\'ve been working on being more present and mindful in my daily life, and I can already see the positive impact it\'s having on my relationships and overall well-being.',
-      mood: 'neutral',
-      tags: ['growth', 'reflection', 'mindfulness']
-    },
-    {
-      id: 3,
-      date: new Date('2025-05-28').toISOString(),
-      title: 'Overcoming Challenges',
-      content: 'Faced some unexpected challenges at work today. The project deadline was moved up, and we had to scramble to get everything done. While it was stressful, I\'m proud of how the team came together to deliver. It\'s in these challenging moments that we often discover our true strengths.',
-      mood: 'challenging',
-      tags: ['work', 'challenges', 'teamwork']
-    }
-  ];
 };
 
 const JournalPage = () => {
   // Theme and state management
   const { theme } = useTheme();
-  const [entries, setEntries] = useState(getInitialEntries);
+  const [entries, setEntries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [entryType, setEntryType] = useState(null); // 'text', 'audio', 'video'
   const [showEntrySelector, setShowEntrySelector] = useState(false);
   
@@ -106,26 +91,40 @@ const JournalPage = () => {
     light: {
       bg: 'bg-gray-50',
       cardBg: 'bg-white',
-      text: 'text-gray-800',
+      text: 'text-gray-900',
       textSecondary: 'text-gray-600',
+      textTertiary: 'text-gray-500',
       border: 'border-gray-200',
+      borderHover: 'hover:border-gray-300',
       inputBg: 'bg-white',
       inputBorder: 'border-gray-300',
+      inputFocus: 'focus:border-blue-500 focus:ring-blue-500/20',
       hoverBg: 'hover:bg-gray-100',
       activeBg: 'bg-gray-100',
       divider: 'border-gray-200',
+      shadow: 'shadow-sm',
+      shadowHover: 'hover:shadow-md',
+      overlay: 'bg-black/50',
+      backdropBlur: 'backdrop-blur-sm',
     },
     dark: {
       bg: 'bg-gray-900',
       cardBg: 'bg-gray-800',
       text: 'text-gray-100',
       textSecondary: 'text-gray-300',
+      textTertiary: 'text-gray-400',
       border: 'border-gray-700',
+      borderHover: 'hover:border-gray-600',
       inputBg: 'bg-gray-700',
       inputBorder: 'border-gray-600',
+      inputFocus: 'focus:border-blue-400 focus:ring-blue-400/20',
       hoverBg: 'hover:bg-gray-700',
       activeBg: 'bg-gray-700',
       divider: 'border-gray-700',
+      shadow: 'shadow-lg shadow-black/20',
+      shadowHover: 'hover:shadow-xl hover:shadow-black/30',
+      overlay: 'bg-black/60',
+      backdropBlur: 'backdrop-blur-sm',
     }
   };
   
@@ -139,14 +138,33 @@ const JournalPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [mediaBlob, setMediaBlob] = useState(null);
 
-  // Save entries to localStorage whenever they change
+  // Load entries from Firebase when component mounts or auth state changes
   useEffect(() => {
-    try {
-      localStorage.setItem('journalEntries', JSON.stringify(entries));
-    } catch (e) {
-      console.error('Failed to save entries to localStorage', e);
-    }
-  }, [entries]);
+    const loadEntries = async () => {
+      try {
+        setIsLoading(true);
+        const firebaseEntries = await loadEntriesFromFirebase();
+        setEntries(firebaseEntries);
+      } catch (error) {
+        console.error('Error loading entries:', error);
+        showNotification('Failed to load journal entries', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Load entries when user is authenticated
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        loadEntries();
+      } else {
+        setEntries([]);
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Filter entries based on search term and mood filter
   const filteredEntries = entries.filter(entry => {
@@ -163,68 +181,69 @@ const JournalPage = () => {
   };
 
   // Handle saving an entry (create or update)
-  const handleSaveEntry = (entryData) => {
+  const handleSaveEntry = async (entryData) => {
     setIsSaving(true);
     
-    // Simulate API call with timeout
-    setTimeout(() => {
-      try {
-        const entryToSave = {
-          ...entryData,
-          type: entryType || 'text',
-          ...(mediaBlob && { media: [mediaBlob] })
-        };
+    try {
+      const entryToSave = {
+        ...entryData,
+        type: entryType || 'text',
+        ...(mediaBlob && { media: [mediaBlob] })
+      };
 
-        if (entryData.id) {
-          // Update existing entry
-          setEntries(prev => prev.map(entry => 
-            entry.id === entryData.id ? { 
-              ...entry, 
-              ...entryToSave,
-              date: new Date().toISOString() 
-            } : entry
-          ));
-          showNotification('Entry updated successfully', 'success');
-        } else {
-          // Create new entry
-          const newEntry = {
-            ...entryToSave,
-            id: Date.now(),
-            date: new Date().toISOString()
-          };
-          setEntries(prev => [newEntry, ...prev]);
-          showNotification('New entry created', 'success');
-        }
-        
-        // Reset states
-        setIsWriting(false);
-        setEditingEntry(null);
-        setEntryType(null);
-        setMediaBlob(null);
-      } catch (error) {
-        console.error('Error saving entry:', error);
-        showNotification('Failed to save entry', 'error');
-      } finally {
-        setIsSaving(false);
+      if (entryData.id) {
+        // Update existing entry
+        const updatedEntry = await journalService.updateEntry(entryData.id, entryToSave);
+        setEntries(prev => prev.map(entry => 
+          entry.id === entryData.id ? { 
+            ...updatedEntry,
+            date: updatedEntry.createdAt // For compatibility
+          } : entry
+        ));
+        showNotification('Entry updated successfully', 'success');
+      } else {
+        // Create new entry
+        const newEntry = await journalService.createEntry(entryToSave);
+        setEntries(prev => [{
+          ...newEntry,
+          date: newEntry.createdAt // For compatibility
+        }, ...prev]);
+        showNotification('New entry created', 'success');
       }
-    }, 500);
+      
+      // Reset states
+      setIsWriting(false);
+      setEditingEntry(null);
+      setEntryType(null);
+      setMediaBlob(null);
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      showNotification('Failed to save entry', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Handle media recording completion
   const handleMediaRecorded = (mediaData) => {
-    setMediaBlob(mediaData);
+    // Extract the actual blob from mediaData and store it
+    setMediaBlob(mediaData.blob);
     setEntryType(mediaData.type);
     setIsWriting(true);
   };
 
   // Handle deleting an entry
-  const handleDeleteEntry = (id) => {
-    if (window.confirm('Are you sure you want to delete this entry? This cannot be undone.')) {
+  const handleDeleteEntry = async (id) => {
+    try {
+      await journalService.deleteEntry(id);
       setEntries(prev => prev.filter(entry => entry.id !== id));
       if (viewEntry?.id === id) {
         setViewEntry(null);
       }
       showNotification('Entry deleted', 'success');
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      showNotification('Failed to delete entry', 'error');
     }
   };
 
@@ -273,7 +292,7 @@ const JournalPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200 pt-12`}>
+    <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200 pt-16`}>
       {/* Notification */}
       {notification && (
         <Notification 
@@ -295,7 +314,7 @@ const JournalPage = () => {
       )}
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <JournalHeader 
           entryCount={filteredEntries.length} 
@@ -329,9 +348,9 @@ const JournalPage = () => {
 
       {/* Media Recorder */}
       {entryType && ['audio', 'video'].includes(entryType) && !isWriting && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={`bg-background-secondary rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl border border-background-tertiary ${colors.cardBg}`}>
-            <div className={`px-6 py-5 border-b border-background-tertiary bg-background-secondary/80 backdrop-blur-sm ${colors.textSecondary}`}>
+        <div className={`fixed inset-0 ${colors.overlay} ${colors.backdropBlur} z-50 flex items-center justify-center p-4`}>
+          <div className={`${colors.cardBg} rounded-2xl w-full max-w-2xl overflow-hidden ${colors.shadow} border ${colors.border}`}>
+            <div className={`px-6 py-5 border-b ${colors.divider} ${colors.cardBg} ${colors.backdropBlur}`}>
               <div className="flex items-center justify-between">
                 <h2 className={`text-2xl font-bold ${colors.text}`}>
                   New {entryType === 'audio' ? 'Audio' : 'Video'} Entry
@@ -388,15 +407,6 @@ const JournalPage = () => {
           theme={theme}
         />
       )}
-
-      {/* Floating Action Button (Mobile) */}
-      <button
-        onClick={() => setIsWriting(true)}
-        className="md:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary-500 hover:bg-primary-600 text-white shadow-lg flex items-center justify-center transition-colors"
-        aria-label="New entry"
-      >
-        <Plus className="-ml-1 mr-2 h-5 w-5" />
-      </button>
     </div>
   );
 };

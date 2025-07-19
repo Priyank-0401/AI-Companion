@@ -1,7 +1,11 @@
-import { Clock, Play, Mic } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, Play, Mic, Trash2, Video } from 'lucide-react';
 import { MediaAttachment } from './MediaAttachment';
+import { ConfirmationDialog } from '../common/ConfirmationDialog';
 
 export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, theme = 'light' }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const themeClasses = {
     light: {
       bg: 'bg-white',
@@ -19,6 +23,8 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, them
       timeText: 'text-gray-500',
       actionHover: 'hover:bg-gray-100',
       actionText: 'text-gray-600',
+      deleteButton: 'bg-red-500 hover:bg-red-600 text-white',
+      deleteButtonShadow: 'shadow-lg',
     },
     dark: {
       bg: 'bg-gray-800',
@@ -36,6 +42,8 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, them
       timeText: 'text-gray-400',
       actionHover: 'hover:bg-gray-700',
       actionText: 'text-gray-300',
+      deleteButton: 'bg-red-500 hover:bg-red-600 text-white',
+      deleteButtonShadow: 'shadow-lg',
     }
   };
   
@@ -58,20 +66,73 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, them
   // Get the first media item (if any)
   const firstMedia = entry.media?.[0];
 
+  // Handle delete click
+  const handleDeleteClick = (e) => {
+    e.stopPropagation(); // Prevent card click
+    setShowDeleteConfirm(true);
+  };
+
+  // Handle confirmation of delete
+  const handleConfirmDelete = async () => {
+    if (onDelete) {
+      setIsDeleting(true);
+      try {
+        await onDelete(entry.id);
+        setShowDeleteConfirm(false);
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  // Handle cancel delete
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+  };
+
   return (
+    <>
     <div 
-      className={`${colors.bg} rounded-xl overflow-hidden border ${colors.border} ${colors.hoverBorder} transition-colors cursor-pointer flex flex-col h-full`}
+      className={`${colors.bg} rounded-xl overflow-hidden border ${colors.border} ${colors.hoverBorder} transition-colors cursor-pointer flex flex-col h-full relative group`}
       onClick={onClick}
     >
+      {/* Delete Button - appears on hover */}
+      <button
+        onClick={handleDeleteClick}
+        className={`absolute bottom-2 right-2 w-8 h-8 rounded-full ${colors.deleteButton} ${colors.deleteButtonShadow} opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-10`}
+        aria-label="Delete entry"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+
       {/* Media Thumbnail */}
       {firstMedia && (
         <div className={`relative h-32 ${firstMedia.type === 'audio' ? colors.audioBg : colors.mediaBg} overflow-hidden`}>
           {firstMedia.type === 'video' ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className={`w-10 h-10 rounded-full ${colors.playButton} backdrop-blur-sm flex items-center justify-center`}>
-                <Play className="w-5 h-5" />
+            <>
+              {/* Use video URL as thumbnail for saved entries, or thumbnail for unsaved */}
+              {(firstMedia.url && !firstMedia.thumbnail) ? (
+                <video 
+                  src={firstMedia.url}
+                  className="w-full h-full object-cover"
+                  muted
+                  preload="metadata"
+                />
+              ) : firstMedia.thumbnail ? (
+                <img 
+                  src={firstMedia.thumbnail} 
+                  alt="" 
+                  className="w-full h-full object-cover"
+                />
+              ) : null}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <div className={`w-10 h-10 rounded-full ${colors.playButton} backdrop-blur-sm flex items-center justify-center`}>
+                  <Play className="w-5 h-5" />
+                </div>
               </div>
-            </div>
+            </>
           ) : firstMedia.type === 'audio' ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className={`w-10 h-10 rounded-full ${colors.audioBg} flex items-center justify-center ${colors.audioIcon}`}>
@@ -79,13 +140,6 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, them
               </div>
             </div>
           ) : null}
-          {firstMedia.thumbnail && (
-            <img 
-              src={firstMedia.thumbnail} 
-              alt="" 
-              className="w-full h-full object-cover"
-            />
-          )}
           {entry.media.length > 1 && (
             <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
               +{entry.media.length - 1} more
@@ -146,5 +200,18 @@ export const JournalEntryCard = ({ entry, moods, onClick, onEdit, onDelete, them
           </div>
         )}
     </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Delete Journal Entry"
+        message="Are you sure you want to delete this journal entry? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDeleting={isDeleting}
+      />
+    </>
   );
 };

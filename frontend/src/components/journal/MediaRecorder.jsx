@@ -1,9 +1,39 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, Video, Camera, X, Save, RotateCcw } from 'lucide-react';
+import { useTheme } from '../../contexts/useTheme';
 
-export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, onCancel }) => {
+export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, onCancel, theme }) => {
+  const { theme: contextTheme } = useTheme();
+  const currentTheme = theme || contextTheme;
+  
+  // Theme colors
+  const themeColors = {
+    light: {
+      errorBg: 'bg-red-50',
+      errorText: 'text-red-700',
+      errorBorder: 'border-red-200',
+      audioBg: 'bg-gray-100',
+      buttonPrimary: 'bg-blue-600 hover:bg-blue-700',
+      buttonSecondary: 'bg-gray-200 hover:bg-gray-300 text-gray-700',
+      buttonDanger: 'bg-red-500 hover:bg-red-600',
+      text: 'text-gray-900',
+    },
+    dark: {
+      errorBg: 'bg-red-900/20',
+      errorText: 'text-red-300',
+      errorBorder: 'border-red-800',
+      audioBg: 'bg-gray-700',
+      buttonPrimary: 'bg-blue-600 hover:bg-blue-700',
+      buttonSecondary: 'bg-gray-700 hover:bg-gray-600 text-gray-300',
+      buttonDanger: 'bg-red-500 hover:bg-red-600',
+      text: 'text-gray-100',
+    }
+  };
+  
+  const colors = themeColors[currentTheme] || themeColors.light;
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
+  const [recordedBlobUrl, setRecordedBlobUrl] = useState(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [error, setError] = useState(null);
   const mediaRecorderRef = useRef(null);
@@ -51,7 +81,17 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
         const blob = new Blob(chunks, { 
           type: type === 'video' ? 'video/webm' : 'audio/webm' 
         });
-        setRecordedBlob(URL.createObjectURL(blob));
+        console.log('MediaRecorder onstop:', {
+          type,
+          blobSize: blob.size,
+          blobType: blob.type,
+          chunksLength: chunks.length
+        });
+        
+        setRecordedBlob(blob); // Store the actual blob for upload
+        const blobUrl = URL.createObjectURL(blob);
+        console.log('Created blob URL:', blobUrl);
+        setRecordedBlobUrl(blobUrl); // Store URL for preview
       };
 
       mediaRecorder.start(100); // Collect data every 100ms
@@ -90,6 +130,7 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
 
   const resetRecording = () => {
     setRecordedBlob(null);
+    setRecordedBlobUrl(null);
     setRecordingTime(0);
     setError(null);
   };
@@ -98,7 +139,7 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
     if (recordedBlob) {
       onRecordingComplete({
         type,
-        url: recordedBlob,
+        blob: recordedBlob,  // Pass the actual blob data for upload
         duration: recordingTime,
         timestamp: new Date().toISOString()
       });
@@ -121,7 +162,7 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
 
       {type === 'video' && (
         <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
-          {!recordedBlob ? (
+          {!recordedBlobUrl ? (
             <video 
               ref={videoRef} 
               autoPlay 
@@ -130,11 +171,20 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
               className={`w-full h-full ${isRecording ? '' : 'opacity-50'}`}
             />
           ) : (
-            <video 
-              src={recordedBlob} 
-              controls 
-              className="w-full h-full"
-            />
+            <>
+              {console.log('Rendering recorded video with URL:', recordedBlobUrl)}
+              <video 
+                src={recordedBlobUrl} 
+                controls 
+                className="w-full h-full bg-gray-900"
+                style={{ minHeight: '200px', display: 'block' }}
+                onLoadedData={() => console.log('Video loaded successfully')}
+                onError={(e) => console.error('Video load error:', e)}
+                autoPlay={false}
+                preload="metadata"
+              />
+            </>
+              
           )}
           {isRecording && (
             <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
@@ -145,9 +195,9 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
         </div>
       )}
 
-      {type === 'audio' && recordedBlob && (
+      {type === 'audio' && recordedBlobUrl && (
         <div className="p-4 bg-background-tertiary rounded-xl">
-          <audio src={recordedBlob} controls className="w-full" />
+          <audio src={recordedBlobUrl} controls className="w-full" />
         </div>
       )}
 

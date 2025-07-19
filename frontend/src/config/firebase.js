@@ -5,6 +5,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager
 } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -33,6 +34,9 @@ const db = initializeFirestore(app, {
   })
 });
 
+// Initialize Firebase Storage
+const storage = getStorage(app);
+
 // Create Google Auth Provider instance
 const googleProvider = new GoogleAuthProvider();
 
@@ -42,4 +46,4 @@ googleProvider.setCustomParameters({
 });
 
 
-export { db, auth, GoogleAuthProvider, googleProvider };
+export { db, auth, storage, GoogleAuthProvider, googleProvider };
