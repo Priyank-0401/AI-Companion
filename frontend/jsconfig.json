@@ -22,11 +22,7 @@
       "@/*": ["src/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    "src/**/*.jsx", 
-    "src/**/*.js"
-  ],
+  "include": ["src"],
   "exclude": [
     "node_modules",
     "dist",

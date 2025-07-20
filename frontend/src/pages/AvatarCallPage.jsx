@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import chatApi, { api } from '../services/api';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
 import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volume lip sync hook
+import { useVisemeLipSync } from '../hooks/useVisemeLipSync'; // Import the viseme lip sync hook
 import { useEmotionDetection } from '../hooks/useEmotionDetection'; // Import the emotion detection hook
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useAuth from '../auth/hooks/useAuth';
@@ -337,7 +338,33 @@ const AvatarCallPage = () => {
   // Camera State (missing state variable for existing camera functionality)
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   
-
+  // NEW: Viseme Lip Sync Hook
+  const {
+    visemeMultiplier,
+    currentWord,
+    isActive: isVisemeActive,
+    attachToUtterance,
+    detachFromUtterance,
+    getDebugInfo
+  } = useVisemeLipSync();
+  
+  // NEW: Connect viseme system to voice service
+  useEffect(() => {
+    // Register viseme callback with voice service
+    const visemeCallback = (utterance) => {
+      console.log('🎭 Attaching viseme analysis to utterance');
+      attachToUtterance(utterance);
+    };
+    
+    // Add callback to voice service
+    voiceService.addVisemeCallback(visemeCallback);
+    
+    // Cleanup on unmount
+    return () => {
+      voiceService.removeVisemeCallback(visemeCallback);
+      detachFromUtterance();
+    };
+  }, [attachToUtterance, detachFromUtterance]);
   
   // Handle final transcript changes
   useEffect(() => {
@@ -492,12 +519,8 @@ const AvatarCallPage = () => {
       // Use the voiceService to speak the text
       await voiceService.speak(text, {
         onStart: () => {
-          console.log('🎤 Speech started, delaying talking animation for better sync');
-          // Add 1.5 second delay before starting talking animation to sync with audio
-          setTimeout(() => {
-            console.log('🎤 Starting talking animation after delay');
-            setIsSpeaking(true);
-          }, 2300); // 1.5 second delay for better audio/animation sync
+          console.log('🎤 Speech started - starting talking animation immediately');
+          setIsSpeaking(true); // Start talking animation immediately when speech begins
         },
         onEnd: () => {
           console.log('✅ Speech ended');
@@ -1211,21 +1234,26 @@ const AvatarCallPage = () => {
       setShowVolumeSlider(false);    }, 150); // 150ms delay
   }, []);
 
-  // Memoize avatar props - simplified with voice support and lip sync
+  // Memoize avatar props - simplified with voice support and hybrid lip sync
   const avatarProps = useMemo(() => ({
     lastMessage: lastMessage?.content || '',
     voiceEnabled: voiceEnabled && systemVolume > 0,
     selectedVoice: selectedVoice,
     onVoiceEnd: handleVoiceEnd,
     avatarVolume: systemVolume, // Pass volume to avatar
+    isTalking: isSpeaking, // CRITICAL: Pass talking state to trigger animation
     volumeLipSyncRef: {
       current: {
         getVolumeValue: () => currentLipSyncVolume || 0,
         isPlaying: () => isLipSyncing
       }
     },
+    // NEW: Viseme props for hybrid lip sync
+    visemeMultiplier: visemeMultiplier,
+    currentWord: currentWord,
+    isVisemeActive: isVisemeActive,
     detectedEmotion: emotion
-  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, lipSyncVolume, lipSyncActive, emotion]);
+  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, isSpeaking, currentLipSyncVolume, isLipSyncing, emotion, visemeMultiplier, currentWord, isVisemeActive]);
   
   // Handle ending the call
   const endCall = useCallback(() => {

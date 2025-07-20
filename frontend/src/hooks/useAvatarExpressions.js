@@ -26,9 +26,67 @@ const EMOTION_INTENSITY = {
 
 // Categorize emotions by their intensity
 const EMOTION_CATEGORIES = {
-  subtle: ['neutral', 'slight_smile', 'thinking'],
-  moderate: ['sad', 'happy', 'thinking', 'confused'],
-  strong: ['angry', 'surprised', 'excited', 'frustrated']
+  subtle: ['neutral', 'slight_smile', 'thinking', 'content'],
+  moderate: ['sad', 'happy', 'thinking', 'confused', 'smile_teeth', 'warm_smile'],
+  strong: ['angry', 'surprised', 'excited', 'frustrated', 'big_smile', 'laugh']
+};
+
+// Enhanced blinking patterns for realism
+const BLINK_PATTERNS = {
+  // Normal single blinks
+  single: {
+    duration: 120,
+    probability: 0.7,
+    weight: 70
+  },
+  // Quick double blinks (more natural)
+  double: {
+    duration: [100, 80], // First blink, pause, second blink
+    pause: 150,
+    probability: 0.2,
+    weight: 20
+  },
+  // Slow thoughtful blinks
+  slow: {
+    duration: 200,
+    probability: 0.1,
+    weight: 10
+  }
+};
+
+// Smile variations with teeth for realism
+const SMILE_EXPRESSIONS = {
+  slight_smile: {
+    intensity: 0.3,
+    showTeeth: false,
+    duration: 2000
+  },
+  smile: {
+    intensity: 0.6,
+    showTeeth: false,
+    duration: 2500
+  },
+  smile_teeth: {
+    intensity: 0.7,
+    showTeeth: true,
+    duration: 3000
+  },
+  warm_smile: {
+    intensity: 0.8,
+    showTeeth: true,
+    duration: 3500
+  },
+  big_smile: {
+    intensity: 0.9,
+    showTeeth: true,
+    duration: 4000
+  },
+  laugh: {
+    intensity: 1.0,
+    showTeeth: true,
+    duration: 2000,
+    animated: true // For laugh animation
+  }
 };
 
 // Helper function to get transition type between two emotions
@@ -115,12 +173,55 @@ export const useAvatarExpressions = (
     }
   }, [forceExpression]);
 
-  // Analyze message for expression
+  // Enhanced message analysis for smile/teeth expressions
   const analyzeMessage = useCallback((message) => {
     if (!enableAutoExpression || !message) return 'neutral';
 
-    return analyzeTextForExpression(message);
+    const baseExpression = analyzeTextForExpression(message);
+    const lowerMessage = message.toLowerCase(); // Define once for entire function scope
+    
+    // Enhance with smile/teeth variations based on message content
+    if (baseExpression === 'happy' || baseExpression === 'smile') {
+      
+      // Check for laughter indicators
+      if (lowerMessage.includes('haha') || lowerMessage.includes('lol') || 
+          lowerMessage.includes('😂') || lowerMessage.includes('😄')) {
+        return Math.random() > 0.5 ? 'big_smile' : 'laugh';
+      }
+      
+      // Check for warm/positive indicators
+      if (lowerMessage.includes('wonderful') || lowerMessage.includes('amazing') || 
+          lowerMessage.includes('love') || lowerMessage.includes('great')) {
+        return 'warm_smile';
+      }
+      
+      // Check for moderate happiness
+      if (lowerMessage.includes('good') || lowerMessage.includes('nice') || 
+          lowerMessage.includes('thank') || lowerMessage.includes('😊')) {
+        return 'smile_teeth';
+      }
+      
+      // Default to regular smile
+      return Math.random() > 0.3 ? 'smile_teeth' : 'smile';
+    }
+    
+    // Check for content/peaceful expressions
+    if (lowerMessage.includes('peaceful') || lowerMessage.includes('calm') || 
+        lowerMessage.includes('content')) {
+      return 'content';
+    }
+    
+    return baseExpression;
   }, [enableAutoExpression]);
+  
+  // Function to get smile configuration
+  const getSmileConfig = useCallback((expression) => {
+    return SMILE_EXPRESSIONS[expression] || {
+      intensity: 0.5,
+      showTeeth: false,
+      duration: 2500
+    };
+  }, []);
 
   // Track the current transition timeout
   const transitionTimeout = useRef(null);
@@ -176,6 +277,24 @@ export const useAvatarExpressions = (
     
   }, [currentExpression, expressionDuration, clearPendingTransition]);
 
+  // Function to trigger contextual micro-expressions
+  const triggerMicroExpression = useCallback((baseExpression) => {
+    // Add subtle micro-expressions for realism
+    const microExpressions = {
+      'neutral': ['slight_smile', 'content'],
+      'thinking': ['confused', 'content'],
+      'happy': ['warm_smile', 'big_smile']
+    };
+    
+    const options = microExpressions[baseExpression];
+    if (options && Math.random() < 0.3) { // 30% chance for micro-expression
+      const microExp = options[Math.floor(Math.random() * options.length)];
+      setTimeout(() => {
+        applyExpression(microExp);
+      }, Math.random() * 2000 + 500); // Random delay 0.5-2.5s
+    }
+  }, [applyExpression]);
+
   // Handle emotion changes from video detection
   const handleEmotionChange = useCallback((emotion) => {
     // Only update if we're not forcing an expression and auto expressions are enabled
@@ -185,7 +304,7 @@ export const useAvatarExpressions = (
     applyExpression(emotion);
   }, [forceExpression, enableAutoExpression, applyExpression]);
 
-  // Handle new messages - MODIFIED to respect forced expressions and use smooth transitions
+  // Handle new messages - ENHANCED with micro-expressions and smile variations
   useEffect(() => {
     // Don't run auto expressions if we're forcing an expression
     if (!enableAutoExpression || forceExpression) return;
@@ -194,37 +313,88 @@ export const useAvatarExpressions = (
       const detectedExpression = analyzeMessage(lastMessage);
 
       if (detectedExpression !== 'neutral') {
-        // Apply the expression with transition
+        // Apply the main expression with transition
         applyExpression(detectedExpression);
+        
+        // Trigger contextual micro-expressions for added realism
+        triggerMicroExpression(detectedExpression);
       }
     }
-  }, [lastMessage, analyzeMessage, enableAutoExpression, forceExpression, applyExpression]);
+  }, [lastMessage, analyzeMessage, enableAutoExpression, forceExpression, applyExpression, triggerMicroExpression]);
 
-  // Automatic blinking system - MODIFIED to respect forced expressions
+  // Enhanced realistic blinking system with multiple patterns
   useEffect(() => {
     // Don't blink during forced expressions (like greeting smile)
     if (!enableBlinking || forceExpression === 'smile') {
       return; // Silently disabled
     }
 
+    // Helper function to select blink pattern based on weights
+    const selectBlinkPattern = () => {
+      const rand = Math.random() * 100;
+      if (rand < BLINK_PATTERNS.single.weight) return 'single';
+      if (rand < BLINK_PATTERNS.single.weight + BLINK_PATTERNS.double.weight) return 'double';
+      return 'slow';
+    };
+
+    // Execute a blink with the selected pattern
+    const executeBlink = (pattern) => {
+      const patternConfig = BLINK_PATTERNS[pattern];
+      
+      if (pattern === 'double') {
+        // Double blink: first blink, pause, second blink
+        setIsBlinking(true);
+        setTimeout(() => {
+          setIsBlinking(false);
+          // Pause between blinks
+          setTimeout(() => {
+            setIsBlinking(true);
+            setTimeout(() => {
+              setIsBlinking(false);
+            }, patternConfig.duration[1]);
+          }, patternConfig.pause);
+        }, patternConfig.duration[0]);
+      } else {
+        // Single or slow blink
+        setIsBlinking(true);
+        setTimeout(() => {
+          setIsBlinking(false);
+        }, patternConfig.duration);
+      }
+    };
+
     const scheduleBlink = () => {
       const [minInterval, maxInterval] = blinkInterval;
-      const interval = minInterval + Math.random() * (maxInterval - minInterval);
+      // Add more natural variation to blink intervals
+      const baseInterval = minInterval + Math.random() * (maxInterval - minInterval);
+      // Add micro-variations for more realism
+      const microVariation = (Math.random() - 0.5) * 200; // ±100ms
+      const interval = Math.max(1000, baseInterval + microVariation);
 
       blinkTimer.current = setTimeout(() => {
-        // Allow blinking even with mild expressions, but not during strong emotions
-        const allowBlinking = currentExpression === 'neutral' ||
-          currentExpression === 'smile' ||
-          Math.random() < 0.3; // 30% chance to blink during other expressions
+        // Enhanced blinking conditions for more realism
+        const isNeutralOrMild = ['neutral', 'slight_smile', 'content', 'thinking'].includes(currentExpression);
+        const isSmiling = ['smile', 'smile_teeth', 'warm_smile'].includes(currentExpression);
+        const isStrongEmotion = ['angry', 'surprised', 'big_smile', 'laugh'].includes(currentExpression);
+        
+        let blinkProbability = 0.85; // Base probability
+        
+        if (isNeutralOrMild) {
+          blinkProbability = 0.9; // Higher chance during neutral states
+        } else if (isSmiling) {
+          blinkProbability = 0.7; // Moderate chance during smiles
+        } else if (isStrongEmotion) {
+          blinkProbability = 0.4; // Lower chance during strong emotions
+        }
+        
+        // Reduce blinking frequency when talking
+        if (isTalking) {
+          blinkProbability *= 0.6;
+        }
 
-        if (allowBlinking && Math.random() < 0.8) { // Increased probability to 80%
-          setIsBlinking(true);
-
-          // Brief blink without changing the main expression
-          setTimeout(() => {
-            setIsBlinking(false);
-          }, 150);
-        } else {
+        if (Math.random() < blinkProbability) {
+          const selectedPattern = selectBlinkPattern();
+          executeBlink(selectedPattern);
         }
 
         // Schedule next blink
@@ -276,7 +446,7 @@ export const useAvatarExpressions = (
     if (expressionTimer.current) {
       clearTimeout(expressionTimer.current);
     }
-  }, []);
+  }, [clearPendingTransition]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -298,7 +468,12 @@ export const useAvatarExpressions = (
     detectedEmotion, // For debugging purposes
     setExpression,
     resetExpression,
-    analyzeMessage
+    analyzeMessage,
+    // NEW: Enhanced features for realistic expressions
+    getSmileConfig, // Get smile configuration with teeth/intensity info
+    triggerMicroExpression, // Trigger contextual micro-expressions
+    smileExpressions: SMILE_EXPRESSIONS, // Available smile variations
+    blinkPatterns: BLINK_PATTERNS // Available blink patterns
   };
 };
 

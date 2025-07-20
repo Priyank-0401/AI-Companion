@@ -11,7 +11,7 @@ export const AVATAR_CONFIG = {
 
   // Camera settings - Position at eye level and look at head
   CAMERA: {
-    POSITION: [0, 2.2, 2.5],           // Y = eye level, closer for better view
+    POSITION: [0, 2.5, 2.5],           // Y = eye level, closer for better view
     FOV: 60,                           // Good framing
     NEAR: 0.1,
     FAR: 1000,

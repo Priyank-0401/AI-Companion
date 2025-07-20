@@ -24,6 +24,12 @@ export default defineConfig({
   // Copy model files to the public directory during build
   build: {
     assetsInlineLimit: 0, // Disable inlining of assets to ensure models are copied
+    terserOptions: {
+      compress: {
+        drop_console: true, // This line removes console.log
+        drop_debugger: true, // This line removes debugger statements
+      },
+    },
   },
   // Serve model files from node_modules
   optimizeDeps: {

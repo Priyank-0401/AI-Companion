@@ -73,6 +73,10 @@ class VoiceService {
       style: 'friendly'
     };
     
+    // NEW: Viseme support
+    this.currentUtterance = null;
+    this.visemeCallbacks = new Set();
+    
     // Start initialization immediately but don't wait for it
     this.initialize();
   }
@@ -243,7 +247,7 @@ class VoiceService {
 
     try {
       this._isSpeaking = true;
-      options.onStart?.();
+      // NOTE: onStart callback moved to playAudioBlob when audio actually starts
 
       // Check cache first for instant response
       const cacheKey = `${text}-${this.selectedVoice?.name}`;
@@ -320,29 +324,38 @@ class VoiceService {
       utterance.pitch = 1.1;
       utterance.volume = options.volume !== undefined ? options.volume : 0.8;
       
+      // NEW: Store current utterance for viseme access
+      this.currentUtterance = utterance;
+      
+      // NEW: Call viseme callbacks to allow viseme listeners to attach
+      this.visemeCallbacks.forEach(callback => {
+        try {
+          callback(utterance);
+        } catch (error) {
+          console.warn('⚠️ Viseme callback error:', error);
+        }
+      });
+      
       // Set a timeout to handle cases where onend doesn't fire
       const timeout = setTimeout(() => {
         this._isSpeaking = false;
         this.currentAudio = null;
+        this.currentUtterance = null;
         reject(new Error('Speech synthesis timed out'));
       }, 30000); // 30 second timeout
       
       utterance.onstart = () => {
         clearTimeout(timeout);
         this._isSpeaking = true;
-        this.currentAudio = new Audio();
-        if (options.onStart) {
-          options.onStart();
-        }
+        options.onStart?.(); // Call onStart here for perfect animation sync
       };
       
       utterance.onend = () => {
         clearTimeout(timeout);
         this._isSpeaking = false;
         this.currentAudio = null;
-        if (options.onEnd) {
-          options.onEnd();
-        }
+        this.currentUtterance = null;
+        options.onEnd?.();
         resolve();
       };
       
@@ -350,6 +363,7 @@ class VoiceService {
         clearTimeout(timeout);
         this._isSpeaking = false;
         this.currentAudio = null;
+        this.currentUtterance = null;
         console.error('❌ Web Speech synthesis error:', error);
         if (options.onError) {
           options.onError(error);
@@ -362,6 +376,7 @@ class VoiceService {
       } catch (e) {
         clearTimeout(timeout);
         this._isSpeaking = false;
+        this.currentUtterance = null;
         reject(e);
       }
     });
@@ -369,7 +384,7 @@ class VoiceService {
 
   // REVISED: Play audio blob with immediate playback
   async playAudioBlob(audioBlob, options = {}) {
-    console.log('🎵 Starting immediate audio playback');
+
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
 
@@ -387,7 +402,7 @@ class VoiceService {
         if (playbackStarted) return;
         playbackStarted = true;
 
-        console.log('🎵 Audio ready to play, starting playback...');
+
         
         // Reduced delay from 150ms to 50ms for faster response
         setTimeout(() => {
@@ -400,7 +415,7 @@ class VoiceService {
 
       // Use 'canplay' which fires much sooner than 'canplaythrough'
       const canPlayHandler = () => {
-        console.log('✅ Audio can play (event fired)');
+
         cleanupListeners();
         startPlayback();
       };
@@ -409,7 +424,7 @@ class VoiceService {
       const readyStateCheck = setInterval(() => {
         // Use readyState >= 3 (HAVE_FUTURE_DATA) which is equivalent to 'canplay'
         if (audio.readyState >= 3) {
-          console.log('✅ Audio ready (via readyState check)');
+
           cleanupListeners();
           startPlayback();
         }
@@ -440,13 +455,13 @@ class VoiceService {
       audio.addEventListener('error', errorHandler);
 
       audio.onplaying = () => {
-        console.log('▶️ Audio is now actively playing.');
+
         this._isSpeaking = true;
         options.onStart?.(); // Call onStart here for perfect animation sync
       };
 
       audio.onended = () => {
-        console.log('✅ Playback completed');
+
         this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
@@ -455,12 +470,12 @@ class VoiceService {
       };
 
       audio.onpause = () => {
-        console.log('⏸️ Audio playback paused');
+
         options.onPause?.();
       };
 
       audio.onabort = () => {
-        console.log('⏹️ Audio playback aborted');
+
         this._isSpeaking = false;
         this.currentAudio = null;
         URL.revokeObjectURL(audioUrl);
@@ -595,6 +610,44 @@ class VoiceService {
   // Get the current audio element for lip sync integration
   getAudioElement() {
     return this.currentAudio;
+  }
+
+  // NEW: Viseme support methods
+  
+  /**
+   * Register a callback to receive SpeechSynthesisUtterance objects for viseme analysis
+   * @param {Function} callback - Function that receives utterance object
+   */
+  addVisemeCallback(callback) {
+    if (typeof callback === 'function') {
+      this.visemeCallbacks.add(callback);
+
+    }
+  }
+
+  /**
+   * Remove a viseme callback
+   * @param {Function} callback - Function to remove
+   */
+  removeVisemeCallback(callback) {
+    this.visemeCallbacks.delete(callback);
+
+  }
+
+  /**
+   * Get current utterance for viseme analysis
+   * @returns {SpeechSynthesisUtterance|null}
+   */
+  getCurrentUtterance() {
+    return this.currentUtterance;
+  }
+
+  /**
+   * Check if viseme support is available (Web Speech API)
+   * @returns {boolean}
+   */
+  isVisemeSupported() {
+    return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   }
 }
 

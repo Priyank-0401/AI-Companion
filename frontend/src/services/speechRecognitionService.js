@@ -35,29 +35,29 @@ class SpeechRecognitionService {
     // Set up event handlers
     this.setupEventHandlers();
     
-    console.log('✅ Speech Recognition initialized');
+
     return true;  }
 
   // Register a component to use the service
   registerComponent(componentName) {
-    console.log(`📝 Registering component: ${componentName}`);
+
     this.registeredComponents.add(componentName);
     
     // If no active component, this becomes the active one
     if (!this.activeComponent) {
       this.activeComponent = componentName;
-      console.log(`🎯 ${componentName} is now the active speech recognition component`);
+
     }
   }
 
   // Unregister a component
   unregisterComponent(componentName) {
-    console.log(`📝 Unregistering component: ${componentName}`);
+
     this.registeredComponents.delete(componentName);
     
     // If this was the active component, stop listening and clear active status
     if (this.activeComponent === componentName) {
-      console.log(`🛑 Active component ${componentName} is unregistering - stopping recognition`);
+
       this.stopListening();
       this.activeComponent = null;
       
@@ -65,7 +65,7 @@ class SpeechRecognitionService {
       if (this.registeredComponents.size > 0) {
         const newActive = Array.from(this.registeredComponents)[0];
         this.activeComponent = newActive;
-        console.log(`🎯 ${newActive} is now the active speech recognition component`);
+
       }
     }
   }
@@ -80,7 +80,7 @@ class SpeechRecognitionService {
     this.recognition.onstart = () => {
       this.isListening = true;
       this.lastSpeechTime = Date.now();
-      console.log('🎤 Speech recognition started - listening for user input...');
+
       
       // ✅ START SILENCE TIMER when recognition actually starts
       this.startSilenceTimer();
@@ -98,9 +98,9 @@ class SpeechRecognitionService {
       this.clearSilenceTimer();
       
       if (wasListening) {
-        console.log(`🔇 Speech recognition stopped (was used by: ${previousComponent || 'unknown'})`);
+
       } else {
-        console.log('🔇 Speech recognition ended (cleanup)');
+
       }
       
       if (this.onEnd && wasListening) {
@@ -129,10 +129,10 @@ class SpeechRecognitionService {
 
       // Log interim results (what user is currently speaking)
       if (interimTranscript.trim()) {
-        console.log('🗣️ User speaking (interim):', interimTranscript.trim());
+
       }      // Log final results (complete sentences/phrases)
       if (finalTranscript.trim()) {
-        console.log('✅ User said (final):', finalTranscript.trim());
+
         
         if (this.onTranscript) {
           this.onTranscript(finalTranscript.trim(), true); // true = final
@@ -150,7 +150,7 @@ class SpeechRecognitionService {
       // Handle specific error types
       switch (event.error) {
         case 'no-speech':
-          console.log('ℹ️ No speech detected - continuing...');
+
           // Don't reset state for no-speech - let it continue
           break;
         case 'audio-capture':
@@ -166,12 +166,12 @@ class SpeechRecognitionService {
           if (this.onError) this.onError(event.error);
           break;
         case 'network':
-          console.log('ℹ️ Network error (browser limitation) - this is normal and expected');
+
           // Network errors are common browser limitations - don't treat as real errors
           // Don't reset state or call error callback
           break;
         case 'aborted':
-          console.log('ℹ️ Speech recognition aborted');
+
           this.isListening = false;
           this.clearSilenceTimer();
           // Don't call error callback for intentional aborts
@@ -186,7 +186,7 @@ class SpeechRecognitionService {
 
     // Handle no speech detected
     this.recognition.onnomatch = () => {
-      console.log('ℹ️ No speech match found');
+
     };  }  // Start listening for user input - IMPROVED VERSION WITH COMPONENT REGISTRATION
   startListening(options = {}) {
     if (!this.recognition) {
@@ -197,7 +197,7 @@ class SpeechRecognitionService {
     const componentName = options.componentName || 'unknown';
     
     // Debug current state
-    console.log(`🔍 ${componentName} wants to start listening. Current state:`, this.getServiceState());
+
 
     // ✅ Check if component is registered and can use the service
     if (!this.canComponentUseService(componentName)) {
@@ -208,15 +208,15 @@ class SpeechRecognitionService {
     // ✅ Check if already listening
     if (this.isListening) {
       if (this.activeComponent === componentName) {
-        console.log(`ℹ️ ${componentName} is already listening... skipping start`);
+
         return true;
       } else {
-        console.log(`⚠️ ${componentName} tried to start listening, but ${this.activeComponent} is already using the service`);
+
         return false;
       }
     }
 
-    console.log(`🎯 ${componentName} starting speech recognition...`);
+
 
     // Set callbacks if provided in options (for backward compatibility)
     if (options.onTranscript) this.onTranscript = options.onTranscript;
@@ -230,14 +230,14 @@ class SpeechRecognitionService {
     }    try {
       // ✅ SIMPLIFIED: Just try to start, handle errors gracefully
       this.recognition.start();
-      console.log(`🎤 ${componentName} starting to listen for user voice input...`);
+
       return true;
     } catch (error) {
       console.error('❌ Failed to start speech recognition:', error.message);
       
       // Handle the "already started" error by forcing a reset
       if (error.message.includes('already started') || error.name === 'InvalidStateError') {
-        console.log('🔄 Recognition state conflict - forcing reset...');
+
         this.forceReset();
         return false;
       }
@@ -256,13 +256,13 @@ class SpeechRecognitionService {
 
     // If a component name is provided, check if it's the active component
     if (componentName && this.activeComponent && this.activeComponent !== componentName) {
-      console.log(`⚠️ ${componentName} tried to stop listening, but ${this.activeComponent} is the active component`);
+
       return;
     }
 
     if (this.isListening) {
       try {
-        console.log(`🔇 ${this.activeComponent || 'unknown'} stopping speech recognition...`);
+
         this.recognition.stop(); // Use stop() instead of abort() for graceful shutdown
       } catch (error) {
         console.error('❌ Error stopping speech recognition:', error);
@@ -275,28 +275,28 @@ class SpeechRecognitionService {
         }
       }
     } else {
-      console.log('ℹ️ Not currently listening');
+
     }
   }
   // Start silence timer - auto-stop after 3 seconds of no speech
   startSilenceTimer() {
     this.clearSilenceTimer();
     
-    console.log(`⏰ Starting silence timer (${this.silenceTimeout}ms)...`);
+
     
     this.silenceTimer = setTimeout(() => {
       if (this.isListening) {
-        console.log('⏰ No speech detected for 3 seconds - auto-stopping microphone');
+
         this.stopListening();
       } else {
-        console.log('⏰ Silence timer expired but not listening');
+
       }
     }, this.silenceTimeout);
   }
 
   // Reset silence timer when speech is detected
   resetSilenceTimer() {
-    console.log('🔄 Speech detected - resetting silence timer');
+
     this.clearSilenceTimer();
     this.startSilenceTimer();
   }
@@ -304,7 +304,7 @@ class SpeechRecognitionService {
   // Clear silence timer
   clearSilenceTimer() {
     if (this.silenceTimer) {
-      console.log('🛑 Clearing silence timer');
+
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
     }
@@ -333,7 +333,7 @@ class SpeechRecognitionService {
   // Set silence timeout (in milliseconds)
   setSilenceTimeout(timeout) {
     this.silenceTimeout = timeout;
-    console.log(`🔧 Silence timeout set to ${timeout}ms`);
+
   }
 
   // Get current silence timeout
@@ -342,7 +342,7 @@ class SpeechRecognitionService {
   }
   // Force reset the recognition state
   forceReset() {
-    console.log('🔄 Force resetting speech recognition state...');
+
     this.isListening = false;
     this.activeComponent = null;
     this.clearSilenceTimer();
@@ -366,7 +366,7 @@ class SpeechRecognitionService {
     this.onEnd = callbacks.onEnd || null;
     this.onError = callbacks.onError || null;
     
-    console.log('🔧 Speech recognition callbacks updated');
+
   }
 
   // Get current service state for debugging
@@ -382,7 +382,7 @@ class SpeechRecognitionService {
   // Debug method to log current state
   logCurrentState() {
     const state = this.getServiceState();
-    console.log('🔍 Speech Recognition Service State:', state);
+
   }
   // Cleanup resources
   cleanup() {
@@ -398,7 +398,7 @@ class SpeechRecognitionService {
       this.recognition.onnomatch = null;
     }
     
-    console.log('🧹 Speech recognition service cleaned up');
+
   }
 
   // Helper method to safely check if recognition is actually active
@@ -414,7 +414,7 @@ class SpeechRecognitionService {
       const lang = this.recognition.lang;
       return true;
     } catch (error) {
-      console.log('ℹ️ Recognition appears to be in invalid state');
+
       return false;
     }
   }

@@ -22,17 +22,17 @@ class CameraService {
    */
   async requestCamera(ownerId, constraints = { audio: true, video: true }, options = {}) {
     try {
-      console.log(`Camera requested by: ${ownerId}`);
+
       
       // If another component is using the camera, release it first
       if (this.isActive && this.currentOwner !== ownerId) {
-        console.log(`Releasing camera from ${this.currentOwner} for ${ownerId}`);
+
         await this.releaseCamera(this.currentOwner);
       }
 
       // If we already have a stream for this owner with same constraints, return it
       if (this.isActive && this.currentOwner === ownerId && this.constraintsMatch(constraints)) {
-        console.log(`Reusing existing camera stream for: ${ownerId}`);
+
         return this.currentStream;
       }
 
@@ -42,7 +42,7 @@ class CameraService {
       }
 
       // Request new camera access
-      console.log('Requesting camera access with constraints:', constraints);
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       // Store the stream and owner info
@@ -51,7 +51,7 @@ class CameraService {
       this.isActive = true;
       this.constraints = { ...constraints };
 
-      console.log(`Camera successfully allocated to: ${ownerId}`);
+
       
       // Add event listeners to track when tracks end
       stream.getTracks().forEach(track => {

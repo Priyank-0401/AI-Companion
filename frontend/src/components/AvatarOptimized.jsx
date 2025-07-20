@@ -46,6 +46,10 @@ const AvatarModel = React.memo(({
   onError,
   avatarVolume = 0.8,
   volumeLipSyncRef = null,
+  // NEW: Viseme props
+  visemeMultiplier = 1.0,
+  currentWord = '',
+  isVisemeActive = false,
   // NEW: Greeting props
   enableGreeting = true,
   onGreetingComplete = null,
@@ -332,21 +336,21 @@ const AvatarModel = React.memo(({
     });
   }, [isBlinking, currentExpression, greetingState.shouldSmile]);
 
-  // Auto-speak new messages (unchanged)
+  // Voice integration with immediate synchronization
   useEffect(() => {
     if (voiceEnabled && lastMessage && lastMessage.trim() && !isTalking) {
-      const speakTimeout = setTimeout(() => {
-        speak(lastMessage, {
-          onStart: () => {},
-          onEnd: () => {
-            if (!lastMessage.includes('Seriva') || !lastMessage.includes('companion')) {
-              onVoiceEnd?.();
-            }
+      // Start speech immediately without delay for perfect sync
+      speak(lastMessage, {
+        onStart: () => {
+          // Animation will be triggered by the isTalking state change
+          console.log('🎵 Speech started - animation should sync now');
+        },
+        onEnd: () => {
+          if (!lastMessage.includes('Seriva') || !lastMessage.includes('companion')) {
+            onVoiceEnd?.();
           }
-        });
-      }, 500);
-
-      return () => clearTimeout(speakTimeout);
+        }
+      });
     }
   }, [lastMessage, voiceEnabled, speak, isTalking, onVoiceEnd]);
 
