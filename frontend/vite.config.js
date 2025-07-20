@@ -23,7 +23,8 @@ export default defineConfig({
   },
   // Copy model files to the public directory during build
   build: {
-    assetsInlineLimit: 0, // Disable inlining of assets to ensure models are copied
+    assetsInlineLimit: 0,
+    minify: 'terser',
     terserOptions: {
       compress: {
         drop_console: true, // This line removes console.log
