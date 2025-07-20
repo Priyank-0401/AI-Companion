@@ -138,6 +138,30 @@ const JournalPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [mediaBlob, setMediaBlob] = useState(null);
 
+  // Cleanup function to ensure all media resources are released
+  useEffect(() => {
+    // This will run when the component unmounts
+    return () => {
+      console.log('JournalPage unmounting - cleaning up resources');
+      
+      // If there's an active media recording, stop it and clean up
+      if (mediaBlob) {
+        console.log('Cleaning up media blob');
+        if (mediaBlob.blob && typeof mediaBlob.blob === 'object' && 'type' in mediaBlob.blob) {
+          // If it's a blob with type, revoke its URL if it exists
+          if (mediaBlob.blobUrl) {
+            URL.revokeObjectURL(mediaBlob.blobUrl);
+          }
+        }
+        setMediaBlob(null);
+      }
+      
+      // Reset any media-related states
+      setEntryType(null);
+      setShowEntrySelector(false);
+    };
+  }, [mediaBlob]);
+
   // Load entries from Firebase when component mounts or auth state changes
   useEffect(() => {
     const loadEntries = async () => {
@@ -163,7 +187,11 @@ const JournalPage = () => {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      // Clean up auth subscription
+      unsubscribe();
+      console.log('Auth subscription cleaned up');
+    };
   }, []);
 
   // Filter entries based on search term and mood filter

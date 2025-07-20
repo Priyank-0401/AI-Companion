@@ -334,6 +334,11 @@ const AvatarCallPage = () => {
   const [isGreeting, setIsGreeting] = useState(true); // Start with greeting active
   const [greetingComplete, setGreetingComplete] = useState(false);
   
+  // Camera State (missing state variable for existing camera functionality)
+  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
+  
+
+  
   // Handle final transcript changes
   useEffect(() => {
     if (finalTranscript) {
@@ -587,7 +592,7 @@ const AvatarCallPage = () => {
   // Emotion state for avatar expressions
   
   // Camera state for emotion detection
-  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
+  // const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
 
@@ -1657,18 +1662,27 @@ const AvatarCallPage = () => {
             {/* Camera Toggle Button */}
             <div className="relative group">
               <button 
-                onClick={() => setIsCameraEnabled(!isCameraEnabled)}
+                onClick={handleToggleCamera}
+                disabled={isGreeting}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isCameraEnabled 
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                    : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
+                  isGreeting
+                    ? 'bg-gray-500/70 cursor-not-allowed text-white/70'
+                    : isCameraEnabled 
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                      : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
-                title={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
+                title={
+                  isGreeting 
+                    ? 'Camera disabled during greeting'
+                    : isCameraEnabled 
+                      ? 'Turn off camera' 
+                      : 'Turn on camera'
+                }
               >
                 {isCameraEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
               </button>
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
-                {isCameraEnabled ? 'Turn off' : 'Turn on'}
+                {isGreeting ? 'Greeting...' : isCameraEnabled ? 'Turn off' : 'Turn on'}
               </div>
             </div>
 

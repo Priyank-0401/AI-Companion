@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as faceapi from '@vladmandic/face-api';
+import cameraService from '../services/cameraService';
 
 const EMOTION_MAPPING = {
   'happy': 'happy',
@@ -39,6 +40,8 @@ export const useEmotionDetection = (options = {}) => {
   const neutralDetectionCount = useRef(0); // Count consecutive neutral detections
   const lastNonNeutralEmotion = useRef('neutral');
   const lastEmotionChangeTime = useRef(0);
+  const componentId = useRef(`emotion-detection-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const streamRef = useRef(null);
   
   const EMOTION_CHECK_INTERVAL = 500; // Check for emotion changes (every 500ms)
   const EMOTION_COOLDOWN = 5000; // 5-second cooldown between any emotion change
@@ -126,10 +129,7 @@ export const useEmotionDetection = (options = {}) => {
     }
   }, []);
 
-  // Track the current stream
-  const streamRef = useRef(null);
-  
-  // Start video stream
+  // Start video stream using camera service
   const startVideo = useCallback(async () => {
     if (!modelsLoaded.current) {
       console.log('Models not loaded, cannot start video');
@@ -147,20 +147,20 @@ export const useEmotionDetection = (options = {}) => {
     }
 
     try {
-      // Stop any existing stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-
-      // Get new stream
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: 640, 
-          height: 480,
-          facingMode: 'user'
-        },
-        audio: false
-      });
+      console.log('Requesting camera access for emotion detection');
+      
+      // Request camera access through the service
+      const stream = await cameraService.requestCamera(
+        componentId.current,
+        {
+          video: { 
+            width: 640, 
+            height: 480,
+            facingMode: 'user'
+          },
+          audio: false
+        }
+      );
       
       // Store the stream reference
       streamRef.current = stream;
@@ -183,23 +183,31 @@ export const useEmotionDetection = (options = {}) => {
       setHasCameraAccess(true);
       return true;
     } catch (err) {
-      console.error('Error accessing camera:', err);
-      setError(new Error('Could not access camera. Please check permissions.'));
+      console.error('Error accessing camera for emotion detection:', err);
+      let errorMessage = 'Could not access camera. Please check permissions.';
+      
+      if (err.message.includes('Failed to access camera')) {
+        errorMessage = err.message; // Use camera service error message
+      } else if (err.message.includes('Permission denied')) {
+        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+      }
+      
+      setError(new Error(errorMessage));
       setHasCameraAccess(false);
       return false;
     }
   }, []);
 
-  // Stop video stream
+  // Stop video stream using camera service
   const stopVideo = useCallback(() => {
+    console.log('Stopping emotion detection video stream');
+    
     let wasStreaming = false;
     
     if (streamRef.current) {
-      const tracks = streamRef.current.getTracks();
-      tracks.forEach(track => {
-        track.stop();
-        wasStreaming = true;
-      });
+      wasStreaming = true;
+      // Release camera through service
+      cameraService.releaseCamera(componentId.current);
       streamRef.current = null;
       
       if (videoRef.current) {

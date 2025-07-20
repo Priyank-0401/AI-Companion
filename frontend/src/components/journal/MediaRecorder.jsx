@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, Video, Camera, X, Save, RotateCcw } from 'lucide-react';
 import { useTheme } from '../../contexts/useTheme';
+import cameraService from '../../services/cameraService';
 
 export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, onCancel, theme }) => {
   const { theme: contextTheme } = useTheme();
@@ -40,25 +41,55 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
   const streamRef = useRef(null);
   const videoRef = useRef(null);
   const timerRef = useRef(null);
+  const componentId = useRef(`media-recorder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const [cameraError, setCameraError] = useState(null);
 
-  // Cleanup function
+  // Cleanup function - enhanced to ensure all resources are properly released
   useEffect(() => {
+    const id = componentId.current;
+    
     return () => {
-      stopMediaTracks();
+      console.log('MediaRecorder component unmounting');
+      
+      // Stop any active recordings
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (e) {
+          console.warn('Error stopping media recorder on unmount:', e);
+        }
+      }
+      
+      // Release camera through service
+      cameraService.releaseCamera(id);
+      
+      // Clear any active timers
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
+      
+      // Clean up any blob URLs to prevent memory leaks
+      if (recordedBlobUrl) {
+        URL.revokeObjectURL(recordedBlobUrl);
+      }
+      
+      // Clear media recorder reference
+      mediaRecorderRef.current = null;
+      streamRef.current = null;
     };
-  }, []);
+  }, [recordedBlobUrl]);
 
   const startRecording = async () => {
     try {
       setError(null);
+      setCameraError(null);
       const constraints = type === 'video' 
         ? { audio: true, video: true } 
         : { audio: true };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Request camera access through the service
+      const stream = await cameraService.requestCamera(componentId.current, constraints);
       streamRef.current = stream;
 
       if (type === 'video' && videoRef.current) {
@@ -106,33 +137,59 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
 
     } catch (err) {
       console.error('Error accessing media devices:', err);
-      setError('Could not access your camera/microphone. Please check permissions.');
+      let errorMessage = 'Could not access your camera/microphone.';
+      
+      if (err.message.includes('Permission denied')) {
+        errorMessage = 'Camera/microphone permission denied. Please allow access and try again.';
+      } else if (err.message.includes('Could not start video source')) {
+        errorMessage = 'Camera is being used by another application. Please close other applications and try again.';
+      } else if (err.message.includes('Failed to access camera')) {
+        errorMessage = err.message; // Use the camera service error message
+      }
+      
+      setError(errorMessage);
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      stopMediaTracks();
-      setIsRecording(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+    }
+    
+    // Release camera through service
+    cameraService.releaseCamera(componentId.current);
+    streamRef.current = null;
+    
+    setIsRecording(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
   };
 
   const stopMediaTracks = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
+    // This is now handled by the camera service
+    // Just clear our reference
+    streamRef.current = null;
   };
 
   const resetRecording = () => {
+    // Clean up any existing blob URL before resetting
+    if (recordedBlobUrl) {
+      URL.revokeObjectURL(recordedBlobUrl);
+    }
+    
     setRecordedBlob(null);
     setRecordedBlobUrl(null);
     setRecordingTime(0);
     setError(null);
+    setCameraError(null);
+    
+    // Release camera through service if we have one
+    if (streamRef.current) {
+      cameraService.releaseCamera(componentId.current);
+      streamRef.current = null;
+    }
   };
 
   const handleSave = () => {
@@ -154,9 +211,9 @@ export const MediaRecorderComponent = ({ type = 'audio', onRecordingComplete, on
 
   return (
     <div className="space-y-4">
-      {error && (
+      {(error || cameraError) && (
         <div className="p-3 bg-red-500/20 text-red-200 text-sm rounded-lg">
-          {error}
+          {error || cameraError}
         </div>
       )}
 
