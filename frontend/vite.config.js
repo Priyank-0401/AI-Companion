@@ -24,6 +24,11 @@ export default defineConfig({
   // Copy model files to the public directory during build
   build: {
     assetsInlineLimit: 0, // Disable inlining of assets to ensure models are copied
+    
+    // ADD THIS LINE: This tells Vite to use the Terser minifier
+    minify: 'terser', 
+
+    // Your existing Terser options will now be used
     terserOptions: {
       compress: {
         drop_console: true, // This line removes console.log
