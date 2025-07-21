@@ -13,7 +13,8 @@ import {
   limit as firestoreLimit,
   onSnapshot,
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  Timestamp
 } from 'firebase/firestore';
 import { auth } from '../config/firebase';
 
@@ -196,8 +197,36 @@ export const messageService = {
   }
 };
 
+// Feedback operations
+const submitFeedback = async (feedbackData) => {
+  try {
+    const feedbackWithTimestamp = {
+      ...feedbackData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      userId: auth.currentUser?.uid || 'anonymous',
+      status: 'new',
+      // Convert rating to number if it's a string
+      rating: typeof feedbackData.rating === 'string' 
+        ? parseInt(feedbackData.rating, 10) 
+        : feedbackData.rating
+    };
+
+    const docRef = await addDoc(collection(db, 'feedback'), feedbackWithTimestamp);
+    return { id: docRef.id, ...feedbackWithTimestamp };
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    throw new Error('Failed to submit feedback. Please try again later.');
+  }
+};
+
+export const feedbackService = {
+  submitFeedback
+};
+
 // Combined service for backward compatibility
 export const firestoreService = {
   ...conversationService,
-  ...messageService
+  ...messageService,
+  ...feedbackService
 };

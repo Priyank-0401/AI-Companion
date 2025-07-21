@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/common/ScrollToTop';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -18,6 +19,11 @@ import SettingsPage from './pages/SettingsPage';
 import AvatarCallPage from './pages/AvatarCallPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import AboutPage from './pages/AboutPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import CookiePolicyPage from './pages/CookiePolicyPage';
+import FeedbackPage from './pages/FeedbackPage';
 
 // Contexts
 import { AuthProvider } from './auth/context/AuthContext';
@@ -38,12 +44,15 @@ function AppContent() {
   // Prevent body scrolling on specific pages - must be called unconditionally
   useEffect(() => {
     const isChatRoute = location.pathname.startsWith('/chat');
-    if (!isHomePage && !isDashboardPage && !isChatRoute) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.height = '100vh';
-    } else {
+    const isInformationalPage = ['/about', '/privacy', '/terms', '/cookies', '/feedback'].some(path => location.pathname.startsWith(path));
+    
+    // Allow scrolling on home, dashboard, chat, and informational pages
+    if (isHomePage || isDashboardPage || isChatRoute || isInformationalPage) {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
+    } else {
+      document.body.style.overflow = 'hidden';
+      document.body.style.height = '100vh';
     }
 
     // Cleanup on unmount
@@ -61,6 +70,7 @@ function AppContent() {
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
       <Toaster position="top-right" />
+      <ScrollToTop />
       {!hideNavbar && <Navbar />}
       <motion.main
         initial={{ opacity: 0 }}
@@ -120,6 +130,13 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+          
+          {/* Public Information Pages */}
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
+          <Route path="/cookies" element={<CookiePolicyPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
         </Routes>
       </motion.main>
       {!['/login', '/signup', '/chat', '/dashboard', '/journal', '/avatar-call', '/settings'].some(path => location.pathname.startsWith(path)) && <Footer />}

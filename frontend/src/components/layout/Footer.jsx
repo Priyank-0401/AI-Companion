@@ -7,7 +7,7 @@ const Footer = () => {
 
   const socialLinks = [
     { icon: <FaLinkedin />, href: 'https://linkedin.com/in/priyankpahwa41', 'aria-label': 'LinkedIn' },
-    { icon: <FaGithub />, href: 'https://github.com/priyank-0401', 'aria-label': 'GitHub' },
+    { icon: <FaGithub />, href: 'https://github.com/Priyank-0401', 'aria-label': 'GitHub' },
     { icon: <FaInstagram />, href: 'https://instagram.com/priyank.0401', 'aria-label': 'Instagram' },
   ];
 
@@ -19,10 +19,9 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">About Seriva</h3>
             <ul className="space-y-3">
-              <li><Link to="/about" className="hover:text-violet-400 transition-colors">What is Seriva?</Link></li>
-              <li><Link to="/about#companion" className="hover:text-violet-400 transition-colors">Meet the AI Companion</Link></li>
-              <li><Link to="/how-it-works" className="hover:text-violet-400 transition-colors">How It Works</Link></li>
-              <li><Link to="/philosophy" className="hover:text-violet-400 transition-colors">Wellness Philosophy</Link></li>
+              <li><Link to="/about" className="hover:text-violet-400 transition-colors">About Seriva</Link></li>
+              <li><Link to="/feedback" className="hover:text-violet-400 transition-colors">Feedback & Suggestions</Link></li>
+              <li><a href="mailto:priyankpahwa41@gmail.com" className="hover:text-violet-400 transition-colors">Support</a></li>
             </ul>
           </div>
 
@@ -31,8 +30,9 @@ const Footer = () => {
             <h3 className="text-lg font-semibold text-white mb-4">Quick Links</h3>
             <ul className="space-y-3">
               <li><Link to="/" className="hover:text-violet-400 transition-colors">Home</Link></li>
+              <li><Link to="/avatar-call" className="hover:text-violet-400 transition-colors">Avatar Call</Link></li>
               <li><Link to="/journal" className="hover:text-violet-400 transition-colors">Journal</Link></li>
-              <li><Link to="/chat" className="hover:text-violet-400 transition-colors">Avatar Chat</Link></li>
+              <li><Link to="/chat" className="hover:text-violet-400 transition-colors">Chat</Link></li>
             </ul>
           </div>
 
@@ -51,7 +51,6 @@ const Footer = () => {
             <h3 className="text-lg font-semibold text-white mb-4">Connect</h3>
             <ul className="space-y-3">
               <li><a href="mailto:priyankpahwa41@gmail.com" className="hover:text-violet-400 transition-colors">Contact: priyankpahwa41@gmail.com</a></li>
-              <li><Link to="/feedback" className="hover:text-violet-400 transition-colors">Feedback & Suggestions</Link></li>
             </ul>
             <div className="flex space-x-4 mt-6">
               {socialLinks.map((link, index) => (
