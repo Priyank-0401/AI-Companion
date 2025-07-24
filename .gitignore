@@ -5,14 +5,16 @@ node_modules
 /backend/logs
 /backend/logs/
 
-# Environment files
+# Environment files - all variations
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-frontend/.env
-backend/.env
+.env.*
+*.env
+frontend/.env*
+backend/.env*
+frontend/.env.development
+frontend/.env.production
+backend/.env.development
+backend/.env.production
 
 # Log files
 backend/logs/error.log
