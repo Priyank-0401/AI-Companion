@@ -5,8 +5,17 @@ import { useTheme } from '../../contexts/useTheme';
 import EmojiPicker from 'emoji-picker-react';
 import PropTypes from 'prop-types';
 
-const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAudio }) => {
+const MAX_CHAR_LIMIT = 2000;
+
+const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAudio, externalValue, onExternalValueChange }) => {
   const [message, setMessage] = useState('');
+
+  // Handle external value changes
+  useEffect(() => {
+    if (externalValue !== undefined && externalValue !== '') {
+      setMessage(externalValue);
+    }
+  }, [externalValue]);
   const [isTyping, setIsTyping] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -92,7 +101,13 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
   };
 
   const handleInput = (e) => {
-    setMessage(e.target.value);
+    const newValue = e.target.value;
+    setMessage(newValue);
+    
+    // Propagate change to parent if external control is used
+    if (onExternalValueChange) {
+      onExternalValueChange(newValue);
+    }
     
     // Auto-resize textarea
     if (textareaRef.current) {
@@ -101,9 +116,9 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
     }
     
     // Show typing indicator
-    if (!isTyping && e.target.value.length > 0) {
+    if (!isTyping && newValue.length > 0) {
       setIsTyping(true);
-    } else if (isTyping && e.target.value.length === 0) {
+    } else if (isTyping && newValue.length === 0) {
       setIsTyping(false);
     }
   };
@@ -134,6 +149,9 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
       setIsTyping(false);
     }
   };
+
+  const charCount = message.length;
+  const isOverLimit = charCount > MAX_CHAR_LIMIT;
 
   return (
     <div ref={containerRef} className="px-4 py-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
@@ -190,6 +208,9 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
           <div className="relative">
             {/* Input Area */}
             <div className={`flex items-center bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border ${
+              isOverLimit
+                ? 'border-red-500 dark:border-red-400 ring-2 ring-red-100 dark:ring-red-900/30'
+                :
               isTyping || isActive
                 ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-100 dark:ring-blue-900/30' 
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -244,7 +265,7 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   type="submit"
-                  disabled={!message.trim() || isSending}
+                  disabled={!message.trim() || isSending || isOverLimit}
                   className={`p-2 mx-1 rounded-full transition-all duration-200 ${
                     message.trim()
                       ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md hover:shadow-lg'
@@ -261,6 +282,12 @@ const ChatInput = ({ onSendMessage, isSending = false, onAttachFile, onRecordAud
               </div>
             </div>
             
+            <div className="text-right text-xs mt-1 pr-2">
+              <span className={`${isOverLimit ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                {charCount} / {MAX_CHAR_LIMIT}
+              </span>
+            </div>
+
             {/* Helper Text */}
             {!message.trim() && !isActive && (
               <div className="mt-2 text-center">

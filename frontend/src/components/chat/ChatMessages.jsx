@@ -1,12 +1,32 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiMessageSquare, FiCheck, FiCheckCircle } from 'react-icons/fi';
+import { FiUser, FiMessageSquare } from 'react-icons/fi';
+import { useEffect, useRef } from 'react';
 import useAuth from '../../auth/hooks/useAuth';
+
+const SerivaAvatar = () => (
+  <div className="flex-shrink-0 mr-3 self-end mb-1">
+    <div className="h-12 w-12 rounded-full flex items-center justify-center shadow-md">
+      <img 
+        src="/logo.svg" 
+        alt="Seriva" 
+        className="h-12 w-12"
+      />
+    </div>
+  </div>
+);
+
+const UserAvatar = () => (
+  <div className="flex-shrink-0 ml-3 self-end mb-1">
+    <div className="h-12 w-12 rounded-full flex items-center justify-center text-white shadow-md">
+      <FiUser className="w-6 h-6" />
+    </div>
+  </div>
+);
 
 const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
   const { user } = useAuth();
   const displayName = user?.displayName || 'You';
   
-  // Safely handle message and its properties
   const safeMessage = message || {};
   const safeContent = safeMessage.content || '';
   const safeTimestamp = safeMessage.timestamp || new Date().toISOString();
@@ -20,130 +40,77 @@ const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} px-2 sm:px-4 py-1.5`}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} px-2 sm:px-4 py-1`}
     >
-      <div className="flex w-full">
-        {/* Left side for assistant's avatar */}
-        {!isUser ? (
-          <div className="flex-shrink-0 mr-3 self-end mb-1">
-            <img 
-              src="/logo.png" 
-              alt="Seriva" 
-              className="h-10 w-10 object-contain"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/logo.svg';
-              }}
-            />
-          </div>
-        ) : (
-          <div className="flex-grow" />
-        )}
-        
-        {/* Message content */}
-        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`} style={{ maxWidth: 'calc(100% - 6rem)' }}>
-          {/* Sender Name */}
+      <div className={`flex items-end ${isUser ? 'flex-row-reverse' : 'flex-row'}`} style={{ maxWidth: '80%' }}>
+        {isLastInGroup && (isUser ? <UserAvatar /> : <SerivaAvatar />)}
+        {!isLastInGroup && <div className="w-11" />}
+
+        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
           {isFirstInGroup && (
-            <div className={`mb-1 ${isUser ? 'text-right' : 'text-left'}`}>
-              <span className={`text-sm font-medium ${
-                isUser 
-                  ? 'text-blue-600 dark:text-blue-400' 
-                  : 'text-purple-600 dark:text-purple-400'
-              }`}>
-                {isUser ? displayName : 'Seriva'}
-              </span>
-            </div>
+            <span className={`text-xs font-medium mb-1 px-3 ${isUser ? 'text-blue-600 dark:text-blue-400' : 'text-purple-600 dark:text-purple-400'}`}>
+              {isUser ? displayName : 'Seriva'}
+            </span>
           )}
           
-          <motion.div 
-            whileHover={{ scale: 1.01 }}
-            className={`px-5 py-3 rounded-2xl shadow-sm transition-all duration-200 ${
-              isUser 
-                ? 'bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-br-sm' 
-                : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 rounded-bl-sm'
-            }`} style={{ maxWidth: '48rem' }}
+          <div 
+            className={`px-4 py-3 rounded-2xl shadow-md transition-all duration-200 ${isUser 
+                ? 'bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-br-lg'
+                : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-lg'
+            }`}
           >
             <div className="whitespace-pre-wrap text-sm leading-relaxed">
               {safeContent}
             </div>
-            
-            {/* Message Metadata */}
-            <div className={`flex items-center mt-1.5 space-x-2 text-xs ${isUser ? 'justify-end' : 'justify-start'}`}>
-              <span className={isUser ? 'text-indigo-100/90' : 'text-gray-500 dark:text-gray-400'}>
-                {timeString}
-              </span>
-              
-              {isUser && (
-                <span className="flex items-center" style={{ color: 'rgba(255,255,255,0.8)' }}>
-                  {safeMessage.status === 'sending' && (
-                    <motion.span 
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <FiCheck className="w-3 h-3" />
-                    </motion.span>
-                  )}
-                  {safeMessage.status === 'sent' && <FiCheck className="w-3 h-3" />}
-                  {safeMessage.status === 'delivered' && (
-                    <span className="flex">
-                      <FiCheck className="w-3 h-3 -mr-1" />
-                      <FiCheck className="w-3 h-3" />
-                    </span>
-                  )}
-                  {safeMessage.status === 'read' && (
-                    <span className="flex text-blue-200">
-                      <FiCheckCircle className="w-3 h-3 -mr-1" />
-                      <FiCheckCircle className="w-3 h-3" />
-                    </span>
-                  )}
-                </span>
-              )}
-            </div>
-          </motion.div>
-        </div>
-        
-        {/* Right side for user's avatar */}
-        {isUser ? (
-          <div className="flex-shrink-0 ml-3 self-end mb-1">
-            <div className="h-9 w-9 rounded-full overflow-hidden bg-gradient-to-br from-indigo-500 to-blue-400 flex items-center justify-center text-white shadow-sm">
-              <FiUser className="w-4 h-4" />
-            </div>
           </div>
-        ) : (
-          <div className="flex-grow" />
-        )}
+          <div className="px-3 mt-1">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {timeString}
+            </span>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
 };
 
 export const ChatMessages = ({ messages = [], isLoading = false }) => {
-  // Group consecutive messages from the same sender
   const groupedMessages = [];
-  let currentGroup = [];
+  const messagesEndRef = useRef(null);
   
-  messages.forEach((message, index) => {
-    const isUser = message.role === 'user';
-    const prevMessage = messages[index - 1];
-    const nextMessage = messages[index + 1];
-    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role;
-    const isLastInGroup = !nextMessage || nextMessage.role !== message.role;
-    
-    groupedMessages.push({
-      ...message,
-      isFirstInGroup,
-      isLastInGroup
+  if (messages) {
+    messages.forEach((message, index) => {
+      const prevMessage = messages[index - 1];
+      const nextMessage = messages[index + 1];
+      groupedMessages.push({
+        ...message,
+        isFirstInGroup: !prevMessage || prevMessage.role !== message.role,
+        isLastInGroup: !nextMessage || nextMessage.role !== message.role,
+      });
     });
-  });
+  }
+
+  // Auto-scroll to bottom when messages change
+  const scrollContainerRef = useRef(null);
+  
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const scrollContainer = scrollContainerRef.current;
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [messages, isLoading]);
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pt-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 pt-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
       <div className="max-w-6xl mx-auto w-full px-4">
         <AnimatePresence initial={false}>
-          {groupedMessages.map((message, index) => (
+          {groupedMessages.map((message) => (
             <Message
-              key={message.id || index}
+              key={message.id}
               message={message}
               isUser={message.role === 'user'}
               isFirstInGroup={message.isFirstInGroup}
@@ -152,31 +119,28 @@ export const ChatMessages = ({ messages = [], isLoading = false }) => {
           ))}
           
           {isLoading && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-start mb-4"
+              className="flex items-start mb-4 px-2 sm:px-4 py-1"
             >
-              <div className="flex-shrink-0 mr-2">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-500 dark:text-indigo-300">
-                  <FiMessageSquare className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 px-1">
-                  AI Assistant is typing
+              <SerivaAvatar />
+              <div className="flex flex-col items-start">
+                <span className="text-xs font-medium mb-1 px-3 text-purple-600 dark:text-purple-400">
+                  Seriva is typing...
                 </span>
-                <div className="px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700/50 rounded-tl-none shadow-sm border border-gray-100 dark:border-gray-700/50">
+                <div className="px-4 py-3 rounded-2xl bg-white dark:bg-gray-700 shadow-md">
                   <div className="flex space-x-1.5">
-                    <div className="w-2 h-2 rounded-full bg-indigo-400 dark:bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 rounded-full bg-indigo-400 dark:bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 rounded-full bg-indigo-400 dark:bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-purple-400 dark:bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-purple-400 dark:bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-purple-400 dark:bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+        <div ref={messagesEndRef} />
       </div>
     </div>
   );

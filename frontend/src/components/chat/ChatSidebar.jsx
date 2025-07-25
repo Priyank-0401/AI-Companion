@@ -1,4 +1,4 @@
-import { FiPlus, FiSearch, FiCheck, FiX, FiMenu, FiMessageSquare, FiSun, FiMoon, FiChevronDown, FiHeart, FiZap, FiSmile, FiCompass } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiCheck, FiTrash2, FiMenu, FiMessageSquare, FiSun, FiMoon, FiChevronDown, FiHeart, FiZap, FiSmile, FiCompass, FiX } from 'react-icons/fi';
 import { FaBrain, FaLaughSquint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
@@ -23,61 +23,109 @@ const ConversationItem = ({
     ? selectedConversation === conversationId
     : selectedConversation?.id === conversationId;
 
+  // Get style-based colors
+  const getStyleColors = (style) => {
+    switch(style) {
+      case 'empathetic': return { bg: 'from-purple-500 to-pink-500', text: 'text-purple-600 dark:text-purple-400' };
+      case 'coach': return { bg: 'from-green-500 to-emerald-500', text: 'text-green-600 dark:text-green-400' };
+      case 'playful': return { bg: 'from-yellow-500 to-orange-500', text: 'text-yellow-600 dark:text-yellow-400' };
+      case 'mindful': return { bg: 'from-blue-500 to-cyan-500', text: 'text-blue-600 dark:text-blue-400' };
+      default: return { bg: 'from-purple-500 to-pink-500', text: 'text-purple-600 dark:text-purple-400' };
+    }
+  };
+
+  const styleColors = getStyleColors(conversationStyle);
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -10 }}
-      className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className={`group relative flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all duration-300 ${
         isSelected
-          ? 'bg-white dark:bg-gray-800 shadow-md border-l-4 border-blue-500 pl-2.5'
-          : 'hover:bg-white/80 dark:hover:bg-gray-700/50 border-l-4 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+          ? 'bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-700 shadow-lg border border-gray-200 dark:border-gray-600'
+          : 'hover:bg-gradient-to-r hover:from-white/60 hover:to-gray-50/60 dark:hover:from-gray-800/60 dark:hover:to-gray-700/60 hover:shadow-md'
       }`}
       onClick={() => onSelect(conversationId, conversationStyle)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center min-w-0">
-        <div className={`p-2 rounded-lg mr-3 ${
+      {/* Selection indicator */}
+      {isSelected && (
+        <motion.div 
+          initial={{ scaleY: 0 }}
+          animate={{ scaleY: 1 }}
+          className={`absolute left-0 top-2 bottom-2 w-1 bg-gradient-to-b ${styleColors.bg} rounded-r-full`}
+        />
+      )}
+      
+      <div className="flex items-center min-w-0 flex-1">
+        <div className={`relative p-3 rounded-xl mr-4 transition-all duration-300 ${
           isSelected
-            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300' 
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+            ? `bg-gradient-to-br ${styleColors.bg} text-white shadow-md` 
+            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-gray-200 dark:group-hover:bg-gray-600'
         }`}>
-          <FiMessageSquare className="w-4 h-4" />
+          <FiMessageSquare className="w-5 h-5" />
+          {isSelected && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"
+            />
+          )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className={`text-sm font-medium truncate ${
+          <h3 className={`text-sm font-semibold truncate transition-colors ${
             isSelected
               ? 'text-gray-900 dark:text-white' 
-              : 'text-gray-700 dark:text-gray-300'
+              : 'text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'
           }`}>
             {safeConversation.title || 'New Chat'}
           </h3>
-          <p className={`text-xs truncate ${
+          <p className={`text-xs truncate mt-1 transition-colors ${
             isSelected
-              ? 'text-gray-500 dark:text-gray-400' 
-              : 'text-gray-400 dark:text-gray-500'
+              ? 'text-gray-600 dark:text-gray-400' 
+              : 'text-gray-500 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400'
           }`}>
             {safeConversation.lastMessage || 'No messages yet'}
           </p>
         </div>
       </div>
-      <button
+      
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(null);
+        }}
+        className={`p-2 rounded-full transition-all duration-200 ${
+          isHovered || isSelected
+            ? 'opacity-100 bg-gray-50 dark:bg-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600'
+            : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+        }`}
+        aria-label="Close chat"
+      >
+        <FiX className="w-4 h-4" />
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={(e) => {
           e.stopPropagation();
           onDelete(conversationId);
         }}
-        className={`p-1 rounded-full ${
+        className={`p-2 rounded-full transition-all duration-200 ${
           isHovered || isSelected
-            ? 'opacity-100 text-gray-400 hover:text-red-500'
-            : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500'
-        } transition-opacity`}
+            ? 'opacity-100 bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40'
+            : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+        }`}
         aria-label="Delete conversation"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+        <FiTrash2 className="w-4 h-4" />
+      </motion.button>
     </motion.div>
   );
 };
@@ -116,26 +164,28 @@ export const ChatSidebar = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    if (isOpen && searchInputRef.current && isMobile) {
-      searchInputRef.current.focus();
-    }
-  }, [isOpen, isMobile]);
-  if (!isOpen) return null;
-
-  // Define valid styles for safety check
+  // Define valid styles for safety check (moved before early return)
   const validStyles = ['empathetic', 'coach', 'playful', 'mindful'];
   const defaultStyle = 'empathetic';
   
-  // Use the validated style for the dropdown
+  // Use the validated style for the dropdown (moved before early return)
   const [selectedStyle, setSelectedStyle] = useState(validatedStyle);
   
-  // Update selected style when validatedStyle changes
+  // Update selected style when validatedStyle changes (moved before early return)
   useEffect(() => {
     if (validatedStyle && validatedStyle !== selectedStyle) {
       setSelectedStyle(validatedStyle);
     }
   }, [validatedStyle, selectedStyle]);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current && isMobile) {
+      searchInputRef.current.focus();
+    }
+  }, [isOpen, isMobile]);
+  
+  // Early return after all hooks are called
+  if (!isOpen) return null;
   
   const handleStyleChange = (styleId) => {
     if (!styleId) return; // Don't allow setting to null/undefined
@@ -182,18 +232,24 @@ export const ChatSidebar = ({
   ];
 
   return (
-    <div className="h-full w-72 flex-shrink-0 flex flex-col bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+    <div className="h-full w-72 flex-shrink-0 flex flex-col bg-gradient-to-b from-white via-gray-50 to-gray-100 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 border-r border-gray-200/60 dark:border-gray-700/60">
       {/* Header */}
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-        <button
+      <div className="p-6 bg-gradient-to-br from-white via-gray-50 to-white dark:from-gray-800 dark:via-gray-750 dark:to-gray-800 border-b border-gray-200/50 dark:border-gray-700/50">
+        <div className="mb-4">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+            Conversations
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your chat history with Seriva</p>
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={onNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 shadow-sm"
+          className="w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <FiPlus className="w-5 h-5" />
           New Chat
-        </button>
+        </motion.button>
       </div>
 
       {/* Conversation Style Dropdown */}
@@ -282,78 +338,55 @@ export const ChatSidebar = ({
       </div>
       
       {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-2">
         <AnimatePresence>
           {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full py-8 px-4 text-center">
-              <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 mb-3">
-                <FiMessageSquare className="w-5 h-5" />
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center h-full py-12 px-4 text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-gray-400 mb-4 shadow-inner">
+                <FiMessageSquare className="w-7 h-7" />
               </div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">No conversations</h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {searchQuery ? 'No matches found' : 'Start a new chat to begin'}
+              <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">No conversations yet</h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs">
+                {searchQuery ? 'No matches found for your search' : 'Start your first conversation with Seriva'}
               </p>
               {!searchQuery && (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={onNewChat}
-                  className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
-                  New Chat
-                </button>
+                  Start Chatting
+                </motion.button>
               )}
-            </div>
+            </motion.div>
           ) : (
-            <div className="space-y-1">
-              {conversations.map((conversation) => (
-                <ConversationItem
+            <div className="space-y-2">
+              {conversations.map((conversation, index) => (
+                <motion.div
                   key={conversation.id}
-                  conversation={conversation}
-                  isActive={selectedConversation?.id === conversation.id}
-                  onSelect={onSelectConversation}
-                  onDelete={onDeleteConversation}
-                  selectedConversation={selectedConversation}
-                />
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <ConversationItem
+                    conversation={conversation}
+                    isActive={selectedConversation?.id === conversation.id}
+                    onSelect={onSelectConversation}
+                    onDelete={onDeleteConversation}
+                    selectedConversation={selectedConversation}
+                  />
+                </motion.div>
               ))}
             </div>
           )}
         </AnimatePresence>
       </div>
-      
-      {/* User Profile and Theme Toggle */}
-      <div className="mt-auto p-4 border-t border-gray-100 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-medium shadow-inner">
-              U
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">User</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Free Plan</p>
-            </div>
-          </div>
-          <ThemeToggleButton />
-        </div>
-      </div>
     </div>
-  );
-};
-
-// Theme Toggle Button Component
-const ThemeToggleButton = () => {
-  const { theme, toggleTheme } = useTheme();
-  
-  return (
-    <button
-      onClick={toggleTheme}
-      className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {theme === 'dark' ? (
-        <FiSun className="w-5 h-5" />
-      ) : (
-        <FiMoon className="w-5 h-5" />
-      )}
-    </button>
   );
 };
 

@@ -48,10 +48,13 @@ class LLMService {
     // Ensure options is always an object
     const safeOptions = typeof options === 'object' && options !== null ? options : {};
     
+    // Extract context from options
+    const context = safeOptions.context || {};
+    
     // Inject Seriva's system prompt unless explicitly disabled
     let processedMessages = [...messages];
     if (!safeOptions.skipSystemPrompt) {
-      processedMessages = this.injectSerivaSystemPrompt(messages);
+      processedMessages = this.injectSerivaSystemPrompt(messages, context);
     }
     
     const { 
@@ -390,11 +393,12 @@ class LLMService {
   }
   
   /**
-   * Inject Seriva's system prompt into the messages array
+   * Inject Seriva's system prompt into the messages array with dynamic context
    * @param {Array} messages - Original messages array
-   * @returns {Array} Messages array with system prompt injected
+   * @param {Object} context - Context object containing emotion and other metadata
+   * @returns {Array} Messages array with enhanced system prompt injected
    */
-  injectSerivaSystemPrompt(messages) {
+  injectSerivaSystemPrompt(messages, context = {}) {
     // Check if there's already a system message
     const hasSystemMessage = messages.some(msg => msg.role === 'system');
     
@@ -404,15 +408,25 @@ class LLMService {
       return messages;
     }
     
-    // Create the system message with Seriva's prompt
+    // Build enhanced system prompt with emotion context
+    let enhancedSystemPrompt = SERIVA_CONFIG.systemPrompt;
+    
+    // Add emotion context if provided
+    if (context && context.emotion) {
+      const emotionContext = `\n\nCurrent emotional context: The user appears to be feeling ${context.emotion}. Please respond with heightened empathy and emotional awareness, acknowledging their emotional state naturally within your response.`;
+      enhancedSystemPrompt += emotionContext;
+      logger.debug(`[LLM] Enhanced system prompt with emotion: ${context.emotion}`);
+    }
+    
+    // Create the enhanced system message
     const systemMessage = {
       role: 'system',
-      content: SERIVA_CONFIG.systemPrompt
+      content: enhancedSystemPrompt
     };
     
-    logger.debug('[LLM] Injecting Seriva system prompt');
+    logger.debug('[LLM] Injecting enhanced Seriva system prompt with context');
     
-    // Return messages with system prompt at the beginning
+    // Return messages with enhanced system prompt at the beginning
     return [systemMessage, ...messages];
   }
 

@@ -12,18 +12,67 @@ const steps = [
     iconColor: 'text-blue-500',
     illustration: (
       <div className="relative w-full h-full flex items-center justify-center">
-        <div className="absolute w-32 h-32 rounded-full bg-blue-500/10 blur-xl"></div>
-        <div className="relative z-10 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-          <div className="relative w-full aspect-square bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl overflow-hidden">
+        {/* Ambient glow effects */}
+        <div className="absolute w-32 h-32 rounded-full bg-blue-500/20 blur-2xl animate-pulse"></div>
+        
+        {/* Main avatar container */}
+        <div className="relative z-10 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
+          {/* 3D Avatar Display */}
+          <div className="relative w-full aspect-square bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl overflow-hidden">
+            
+            {/* 3D Avatar */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <User className="w-16 h-16 text-blue-400 dark:text-blue-500" />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
-              <div className="text-white text-sm font-medium">Your AI Companion</div>
-              <div className="flex items-center mt-1">
-                <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
-                <span className="text-xs text-gray-200">Active now</span>
+              <div className="relative">
+                {/* Avatar head with 3D styling */}
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 via-indigo-500 to-blue-600 flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
+                  {/* Face */}
+                  <div className="relative">
+                    {/* Eyes */}
+                    <div className="flex space-x-2 mb-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                    </div>
+                    {/* Smile */}
+                    <div className="w-3 h-1.5 border-b-2 border-white rounded-full"></div>
+                  </div>
+                </div>
+                
+                {/* Body */}
+                <div className="absolute top-12 left-1/2 transform -translate-x-1/2">
+                  <div className="w-10 h-8 rounded-t-xl bg-gradient-to-b from-blue-300 to-blue-500 shadow-md"></div>
+                </div>
               </div>
+            </div>
+            
+            {/* Status indicators */}
+            <div className="absolute top-2 right-2">
+              <div className="bg-green-500 w-3 h-3 rounded-full animate-pulse shadow-lg"></div>
+            </div>
+            
+            <div className="absolute top-2 left-2">
+              <Heart className="w-4 h-4 text-pink-500 animate-pulse" />
+            </div>
+          </div>
+          
+          {/* Info panel below avatar */}
+          <div className="mt-3 text-center">
+            <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">Seriva AI</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center mt-1">
+              <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
+              Active & Ready
+            </div>
+          </div>
+          
+          {/* Control buttons */}
+          <div className="flex justify-center space-x-2 mt-3">
+            <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+              <MessageSquare className="w-3 h-3" />
+            </div>
+            <div className="p-1.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400">
+              <Activity className="w-3 h-3" />
+            </div>
+            <div className="p-1.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400">
+              <Sparkle className="w-3 h-3" />
             </div>
           </div>
         </div>

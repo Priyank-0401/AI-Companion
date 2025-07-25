@@ -1044,13 +1044,14 @@ const AvatarCallPage = () => {
       setConversationHistory,
       setEmotion,
       voiceService.speak.bind(voiceService)
-    ).catch(error => {
-      console.error('❌ Error processing message:', error);
-      setError('Failed to process your message. Please try again.');
-    });
-  }, 500), [speakText, setError, setIsProcessing, emotion, setConversationHistory, setEmotion, currentRequestId]);
+    );
 
-
+    // Automatically turn off the microphone after sending the message
+    if (isListening) {
+      console.log('🎤 Transcript sent, automatically turning off microphone.');
+      stopListening();
+    }
+  }, 500), [isListening, isProcessing, speakText, setError, setIsProcessing, emotion, setConversationHistory, setEmotion, currentRequestId, stopListening]);
 
   // Speech recognition is handled by the useSpeechRecognition hook
   // The hook manages initialization, event handling, and cleanup

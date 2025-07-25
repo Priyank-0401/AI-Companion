@@ -320,7 +320,7 @@ const JournalPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200 pt-16`}>
+    <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200`}>
       {/* Notification */}
       {notification && (
         <Notification 

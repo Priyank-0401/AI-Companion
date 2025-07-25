@@ -21,7 +21,7 @@ class LLMController {
         });
       }
 
-      const { messages, model, provider, temperature, maxTokens } = req.body;
+      const { messages, model, provider, temperature, maxTokens, context } = req.body;
       
       // Validate required fields
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -31,13 +31,14 @@ class LLMController {
         });
       }
 
-      // Call the LLM service
+      // Call the LLM service with context
       const response = await LLMService.chatCompletion(messages, {
         provider,
         model,
         temperature: temperature || 0.7,
         maxTokens: maxTokens || 2000,
-        stream: false
+        stream: false,
+        context: context || {}
       });
 
       // Return the response
@@ -68,7 +69,7 @@ class LLMController {
         });
       }
 
-      const { messages, model, provider, temperature, maxTokens } = req.body;
+      const { messages, model, provider, temperature, maxTokens, context } = req.body;
       
       // Validate required fields
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -90,8 +91,8 @@ class LLMController {
         res.end();
       });
 
-      // Inject Seriva's system prompt into messages
-      const processedMessages = LLMService.injectSerivaSystemPrompt(messages);
+      // Inject Seriva's system prompt into messages with context
+      const processedMessages = LLMService.injectSerivaSystemPrompt(messages, context || {});
 
       // Choose the appropriate streaming method based on provider
       const stream = provider === 'groq' 

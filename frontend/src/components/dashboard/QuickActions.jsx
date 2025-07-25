@@ -1,5 +1,8 @@
-import { MessageSquare, PenSquare, Wind, Activity } from 'lucide-react';
+import { MessageSquare, PenSquare, Wind, Video } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import BreathingExercise from './BreathingExercise';
 
 const QuickAction = ({ icon: Icon, title, description, color, onClick }) => {
   const colors = {
@@ -42,6 +45,9 @@ const QuickAction = ({ icon: Icon, title, description, color, onClick }) => {
 };
 
 const QuickActions = ({ onAction }) => {
+  const navigate = useNavigate();
+  const [showBreathingExercise, setShowBreathingExercise] = useState(false);
+
   const actions = [
     {
       icon: MessageSquare,
@@ -49,6 +55,7 @@ const QuickActions = ({ onAction }) => {
       description: 'Have a conversation with your AI wellness companion',
       color: 'indigo',
       action: 'chat',
+      link: '/chat'
     },
     {
       icon: PenSquare,
@@ -56,6 +63,7 @@ const QuickActions = ({ onAction }) => {
       description: 'Write about your thoughts and feelings',
       color: 'purple',
       action: 'journal',
+      link: '/journal'
     },
     {
       icon: Wind,
@@ -63,38 +71,52 @@ const QuickActions = ({ onAction }) => {
       description: 'Practice mindful breathing to reduce stress',
       color: 'teal',
       action: 'breathe',
+      popup: true
     },
     {
-      icon: Activity,
-      title: 'Mood Analysis',
-      description: 'View your mood trends and insights',
+      icon: Video,
+      title: 'Avatar Call',
+      description: 'Have a face-to-face conversation with your 3D AI companion',
       color: 'pink',
-      action: 'mood',
+      action: 'avatar-call',
+      link: '/avatar-call'
     },
   ];
 
   const handleAction = (action) => {
-    if (onAction) {
-      onAction(action);
+    if (action.popup && action.action === 'breathe') {
+      setShowBreathingExercise(true);
+    } else if (action.link) {
+      navigate(action.link);
+    } else if (onAction) {
+      onAction(action.action);
     }
   };
 
   return (
-    <div className="mb-8">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-5">Quick Actions</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {actions.map((action, index) => (
-          <QuickAction
-            key={index}
-            icon={action.icon}
-            title={action.title}
-            description={action.description}
-            color={action.color}
-            onClick={() => handleAction(action.action)}
-          />
-        ))}
+    <>
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-5">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {actions.map((action, index) => (
+            <QuickAction
+              key={index}
+              icon={action.icon}
+              title={action.title}
+              description={action.description}
+              color={action.color}
+              onClick={() => handleAction(action)}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+      
+      {/* Breathing Exercise Popup */}
+      <BreathingExercise 
+        isOpen={showBreathingExercise}
+        onClose={() => setShowBreathingExercise(false)}
+      />
+    </>
   );
 };
 

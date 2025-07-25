@@ -8,9 +8,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { useTheme } from '../contexts/useTheme';
+import EmptyChat from '../components/chat/EmptyChat';
+import { ChatBackground } from '../components/chat/ChatBackground';
+import Sentiment from 'sentiment';
 
 // Components
-import { ChatHeader } from '../components/chat/ChatHeader';
 import { ChatMessages } from '../components/chat/ChatMessages';
 import ChatInput from '../components/chat/ChatInput';
 import { ChatSidebar } from '../components/chat/ChatSidebar';
@@ -134,12 +136,12 @@ const ChatPage = () => {
   const [conversationStyle, setConversationStyle] = useState(defaultStyle);
   const [activeConversation, setActiveConversation] = useState(null);
   const [isNewChat, setIsNewChat] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [sentimentScore, setSentimentScore] = useState(0);
   
   // Debug effect for tracking component mounts/unmounts
   useEffect(() => {
@@ -239,11 +241,6 @@ const ChatPage = () => {
     const handleResize = () => {
       const isMobileView = window.innerWidth < 768;
       setIsMobile(isMobileView);
-      if (!isMobileView) {
-        setIsSidebarOpen(true);
-      } else if (isMobileView && isSidebarOpen) {
-        setIsSidebarOpen(false);
-      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -264,29 +261,24 @@ const ChatPage = () => {
     isRefetching: isRefreshingConversations,
   } = useQuery({
     queryKey: ['conversations', currentUser?.uid],
+    enabled: !!currentUser && !authLoading,
     refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes before data is considered stale
-    refetchInterval: 30000, // Only refetch every 30 seconds at most
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-    retry: 2, // Only retry failed requests twice
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-    cacheTime: 30 * 60 * 1000, // 30 minutes before cache is garbage collected
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: false, // Prevent mount refetch
+    refetchOnReconnect: false,
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    cacheTime: 30 * 60 * 1000,
     queryFn: async () => {
       try {
-        // Wait for auth to initialize
-        if (authLoading) return [];
-        
         if (!currentUser) {
-          console.log('No current user in conversations query');
-          return [];
+          throw new Error('No authenticated user');
         }
         
         // Get fresh token before making the request
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) {
-          console.log('No Firebase user found');
-          return [];
+          throw new Error('No Firebase user found');
         }
         
         // Only force token refresh if it's about to expire (last 5 minutes)
@@ -301,19 +293,14 @@ const ChatPage = () => {
         const response = await chatApi.getConversations();
         
         // Handle different response formats
-        if (Array.isArray(response)) {
-          return response;
-        } else if (response?.data && Array.isArray(response.data)) {
+        if (response.data) {
           return response.data;
-        } else if (typeof response === 'object' && response !== null) {
-          // Handle case where response is an object with conversation IDs as keys
-          return Object.entries(response).map(([id, data]) => ({
-            id,
-            ...data,
-          }));
+        } else if (Array.isArray(response)) {
+          return response;
+        } else {
+          console.warn('Unexpected response format:', response);
+          return [];
         }
-        
-        return [];
       } catch (error) {
         console.error('Error in conversations query:', error);
         
@@ -325,9 +312,6 @@ const ChatPage = () => {
           // Return cached data if available, or empty array
           return queryClient.getQueryData(['conversations', currentUser?.uid]) || [];
         }
-        
-        // Re-throw other errors to be handled by React Query's retry mechanism
-        throw error;
         
         // Handle authentication errors
         if (error.isAuthError || 
@@ -348,20 +332,13 @@ const ChatPage = () => {
           return [];
         }
         
+        // Re-throw other errors to be handled by React Query's retry mechanism
         throw new Error('Failed to load conversations. Please try again later.');
       }
     },
-    enabled: !!currentUser,
     onError: (error) => {
       console.error('Conversations query error:', error);
-      
-      // Handle rate limiting
-      if (error?.response?.status === 429) {
-        // Already handled in queryFn, just log it
-        return;
-      }
-      
-      // Handle auth errors in the onError callback as well
+      setFetchError(error.message || 'Failed to load conversations');
       if (error.isAuthError || 
           error?.response?.status === 401 || 
           error?.message?.includes('auth') ||
@@ -423,11 +400,12 @@ const ChatPage = () => {
     refetchOnReconnect: false,
   });
 
-  // Fetch active conversation
+  // Fetch active conversation with proper state management
   const {
     data: activeConversationData,
     isLoading: isLoadingActiveConversation,
     error: activeConversationError,
+    refetch: refetchActiveConversation
   } = useQuery({
     queryKey: ['conversation', activeConversation],
     queryFn: async () => {
@@ -443,6 +421,11 @@ const ChatPage = () => {
       }
     },
     enabled: !!activeConversation && !isNewChat,
+    staleTime: 0, // Always fetch fresh data to prevent stale state
+    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: false, // Prevent race conditions
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     onSuccess: (data) => {
       // Always ensure we have a valid style
       const defaultStyle = 'empathetic';
@@ -467,30 +450,18 @@ const ChatPage = () => {
           throw new Error('No authenticated user');
         }
         
-        // Default title for new conversations
+        // Use provided title or generate from messages only if no title provided
         let title = conversationData.title || 'New Chat';
         
-        // If there are messages, use the first one to generate a title
-        if (conversationData.messages?.length > 0 && conversationData.messages[0]?.content) {
+        // Only generate title from messages if no custom title provided
+        if (!conversationData.title && conversationData.messages?.length > 0 && conversationData.messages[0]?.content) {
           const firstMessage = conversationData.messages[0].content;
-          title = firstMessage.substring(0, 30) + (firstMessage.length > 30 ? '...' : '');
+          title = getTitleFromFirstMessage(firstMessage);
         }
-        
-        const now = new Date().toISOString();
-        
-        // Use provided values or fall back to defaults
-        const currentStyle = conversationData.style || conversationStyle;
-        const currentModel = conversationData.model || 'llama3-8b';
-        
-        // Generate title from first message if available
-        const firstMessage = conversationData.messages?.[0]?.content || '';
-        const conversationTitle = firstMessage 
-          ? getTitleFromFirstMessage(firstMessage)
-          : 'New Chat';
           
         // Prepare the conversation data with conversation settings or defaults
         const newConversationData = {
-          title: conversationTitle,
+          title: title,
           model: currentModel,
           style: currentStyle,
           lastMessage: firstMessage,
@@ -562,7 +533,8 @@ const ChatPage = () => {
       }
       
       // Ensure content is a non-empty string after trimming
-      const messageContent = typeof content === 'string' ? content.trim() : String(content).trim();
+      const messageContent = typeof content === 'string' ? content.trim() : String(content || message || '').trim();
+      
       if (!messageContent) {
         throw new Error('Message content cannot be empty');
       }
@@ -580,12 +552,13 @@ const ChatPage = () => {
       const tempMessageId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const tempAIMessageId = `temp-ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      // Generate title if this is the first message in a new conversation
+      // Use existing title, only generate for new conversations without custom title
       const isFirstMessage = activeConversationData?.isNew || 
                            (!activeConversationData?.messages?.length);
       
       let title = activeConversationData?.title || 'New Chat';
-      if (isFirstMessage) {
+      if (isFirstMessage && title === 'New Chat') {
+        // Only generate title if it's still the default and this is first message
         title = getTitleFromFirstMessage(messageContent);
       }
 
@@ -622,7 +595,7 @@ const ChatPage = () => {
       // Create optimistic update
       const optimisticUpdate = {
         ...previousData,
-        title: title, // Use generated title
+        title: previousData.title || title, // Preserve existing title
         lastMessage: messageContent,
         updatedAt: now,
         messages: [
@@ -884,12 +857,6 @@ const ChatPage = () => {
         },
         staleTime: 5 * 60 * 1000, // 5 minutes
       });
-      
-      // Close sidebar on mobile
-      if (isMobile) {
-        debugLog('Closing mobile sidebar');
-        setIsSidebarOpen(false);
-      }
     } catch (error) {
       console.error('Error in handleSelectConversation:', error);
       // Optionally show error to user
@@ -967,6 +934,8 @@ const ChatPage = () => {
       queryClient.invalidateQueries(['conversations', currentUser?.uid]);
     }
   });
+
+
   
   // Delete conversation handlers
   const promptDelete = (conversationId) => {
@@ -1006,8 +975,14 @@ const ChatPage = () => {
     const defaultModel = 'llama3-8b-8192'; // Updated to valid Groq model name
     const defaultStyle = 'empathetic';
 
+
+
     // Function to send a message with retry logic
     const sendMessageWithRetry = async (messageData, isNewConversation = false) => {
+      const sentiment = new Sentiment();
+      const result = sentiment.analyze(messageData.content);
+      setSentimentScore(prevScore => prevScore * 0.7 + result.comparative * 0.3); // Weighted average to smooth changes
+
       try {
         // If it's a new conversation, create it first
         if (isNewConversation) {
@@ -1228,13 +1203,26 @@ const ChatPage = () => {
     );
   }
 
+  const handleStartConversationFromPrompt = (prompt) => {
+    // This function can be expanded to create a new conversation with the given prompt
+    handleNewChat(); // For now, it just starts a new chat
+    // TODO: Send the prompt as the first message
+    console.log(`Starting conversation with prompt: ${prompt}`);
+  };
+
+  const handlePopulateInput = (prompt) => {
+    // This function will populate the chat input with the selected prompt
+    setInputValue(prompt);
+  };
+
+
+
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
         {/* Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-20 w-72 flex flex-col border-r border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 transition-transform duration-300 ease-in-out transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
+        <div className="fixed inset-y-0 left-0 z-20 w-72 flex flex-col border-r border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 md:relative">
           <ChatSidebar
-            isOpen={isSidebarOpen}
             conversations={conversations}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -1247,59 +1235,79 @@ const ChatPage = () => {
           />
         </div>
 
-        {/* Mobile sidebar backdrop */}
-        {isSidebarOpen && (
-          <div 
-            className="fixed inset-0 z-10 bg-black/50 md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
+
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          {/* Mobile header */}
-          <div className="md:hidden p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-              </svg>
-            </button>
-            <h1 className="ml-4 text-lg font-semibold text-gray-900 dark:text-white">
-              {activeConversationData?.title || 'New Chat'}
-            </h1>
-          </div>
+        <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+            <ChatBackground sentimentScore={sentimentScore} />
+            {activeConversation ? (
+              <>
+                {/* Mobile header */}
+                <div className="md:hidden p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between">
+                  <div className="flex items-center flex-1 min-w-0">
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white dark:bg-gray-900">
-            {isLoadingActiveConversation ? (
-              <div className="h-full flex items-center justify-center">
-                <LoadingSpinner />
-              </div>
-            ) : activeConversationError ? (
-              <ErrorMessage message="Failed to load conversation" />
+                    <div className="ml-4 flex-1 min-w-0">
+                      <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        {activeConversationData?.title || 'New Chat'}
+                      </h1>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setActiveConversation(null)}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
+                    aria-label="Close chat"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </div>
+
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white dark:bg-gray-900">
+                  {isLoadingActiveConversation ? (
+                    <div className="h-full flex items-center justify-center">
+                      <LoadingSpinner />
+                    </div>
+                  ) : activeConversationError ? (
+                    <ErrorMessage message="Failed to load conversation" />
+                  ) : (
+                    messages.length > 0 ? (
+                      <ChatMessages messages={messages} isLoading={sendMessageMutation.isLoading} />
+                    ) : (
+                      <EmptyChat 
+                        onStartConversation={handleStartConversationFromPrompt} 
+                        onPopulateInput={handlePopulateInput}
+                      />
+                    )
+                  )}
+                </div>
+                
+                {/* Input Area */}
+                <div className="bg-white dark:bg-gray-900 p-4 pb-16">
+                  <div className="max-w-3xl mx-auto w-full">
+                    <ChatInput 
+                      onSendMessage={handleSendMessage} 
+                      isSending={sendMessageMutation.isLoading}
+                      externalValue={inputValue}
+                      onExternalValueChange={setInputValue}
+                    />
+                    <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                      Press Shift+Enter for new line. Press Enter to send.
+                    </p>
+                  </div>
+                </div>
+              </>
             ) : (
-              <ChatMessages 
-                messages={messages} 
-                isLoading={sendMessageMutation.isLoading} 
-              />
+              <div className="hidden md:flex flex-1 flex-col items-center justify-center p-6 bg-white dark:bg-gray-900">
+                <EmptyChat 
+                  onStartConversation={handleStartConversationFromPrompt} 
+                  onPopulateInput={handlePopulateInput}
+                />
+              </div>
             )}
-          </div>
-          
-          {/* Input Area */}
-          <div className="bg-white dark:bg-gray-900 p-4 pb-16">
-            <div className="max-w-3xl mx-auto w-full">
-              <ChatInput 
-                onSendMessage={handleSendMessage} 
-                isSending={sendMessageMutation.isLoading} 
-              />
-              <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-                Press Shift+Enter for new line. Press Enter to send.
-              </p>
-            </div>
-          </div>
         </div>
       </div>
       

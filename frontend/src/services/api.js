@@ -950,6 +950,27 @@ const chatApi = {
   },
 
   /**
+   * Update a conversation
+   * @param {string} conversationId - The ID of the conversation to update
+   * @param {Object} updates - The updates to apply to the conversation
+   * @param {string} [updates.title] - New title for the conversation
+   * @param {string} [updates.model] - New model for the conversation
+   * @param {string} [updates.style] - New style for the conversation
+   * @returns {Promise<Object>} The updated conversation
+   */
+  async updateConversation(conversationId, updates) {
+    if (!conversationId) {
+      throw new Error('conversationId is required');
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('updates object is required');
+    }
+    
+    return apiClient.put(`chat/conversations/${conversationId}`, updates);
+  },
+
+  /**
    * Delete a conversation
    * @param {string} conversationId - The ID of the conversation to delete
    * @returns {Promise<boolean>} True if the conversation was deleted
