@@ -454,16 +454,18 @@ const ChatPage = () => {
         let title = conversationData.title || 'New Chat';
         
         // Only generate title from messages if no custom title provided
+        let firstMessage = '';
         if (!conversationData.title && conversationData.messages?.length > 0 && conversationData.messages[0]?.content) {
-          const firstMessage = conversationData.messages[0].content;
+          firstMessage = conversationData.messages[0].content;
           title = getTitleFromFirstMessage(firstMessage);
         }
           
         // Prepare the conversation data with conversation settings or defaults
+        const now = new Date();
         const newConversationData = {
           title: title,
-          model: currentModel,
-          style: currentStyle,
+          model: 'llama3-8b-8192', // Default model
+          style: conversationStyle, // Use conversationStyle state
           lastMessage: firstMessage,
           createdAt: now,
           updatedAt: now,

@@ -137,9 +137,10 @@ class ChatController {
         });
       }
 
-      // Get messages
-      const { messages, lastVisible } = await FirestoreService.getMessages(
+      // Get and decrypt messages for display
+      const { messages, lastVisible } = await FirestoreService.getMessagesForDisplay(
         conversationId,
+        userId,
         parseInt(limit, 10),
         startAfter
       );
@@ -360,19 +361,15 @@ class ChatController {
         conversationId,
         content,
         role: 'user',
+        userId, // Pass userId for encryption
         metadata: {
           tokens: content.length / 4, // Rough estimate
         },
       });
 
-      // Get recent messages for conversation history
+      // Get recent messages for conversation history (with decryption for LLM)
       console.log('Getting messages for conversation:', conversationId);
-      const messagesResponse = await FirestoreService.getMessages(conversationId, 10);
-      console.log('Messages response type:', typeof messagesResponse);
-      console.log('Messages response keys:', messagesResponse ? Object.keys(messagesResponse) : []);
-
-      // Extract messages from the response
-      const messages = messagesResponse && messagesResponse.messages ? messagesResponse.messages : [];
+      const messages = await FirestoreService.getMessagesForLLM(conversationId, userId, 10);
       console.log('Number of messages found:', messages.length);
 
       // Prepare conversation history for the AI
@@ -685,13 +682,14 @@ class ChatController {
         conversationId,
         content,
         role: 'user',
+        userId, // Pass userId for encryption
         metadata: {
           tokens: content.length / 4, // Rough estimate
         },
       });
 
-      // Prepare conversation history
-      const messages = await FirestoreService.getMessages(conversationId, 10);
+      // Prepare conversation history (with decryption for LLM)
+      const messages = await FirestoreService.getMessagesForLLM(conversationId, userId, 10);
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content,
@@ -881,9 +879,10 @@ class ChatController {
         });
       }
 
-      // Get messages
-      const { messages, lastVisible } = await FirestoreService.getMessages(
+      // Get and decrypt messages for display
+      const { messages, lastVisible } = await FirestoreService.getMessagesForDisplay(
         conversationId,
+        userId,
         parseInt(limit, 10),
         startAfter
       );

@@ -103,6 +103,11 @@ const config = {
     rateLimiting: process.env.FEATURE_RATE_LIMITING !== 'false'
   },
 
+  // Google Cloud Configuration
+  googleCloud: {
+    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
+  },
+
   // LLM Configuration
   // Configuration for LLM providers is now in llm.config.js
 };

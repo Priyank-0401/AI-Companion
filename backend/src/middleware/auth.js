@@ -4,6 +4,7 @@ import AppError from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import config from '../config/index.js';
 import User from '../models/user.model.js';
+import UserEncryptionService from '../services/UserEncryptionService.js';
 
 // This will be initialized when first used
 let authInstance = null;
@@ -72,6 +73,18 @@ const protect = async (req, res, next) => {
         updatedAt: new Date().toISOString()
       };
       await usersRef.doc(firebaseUser.uid).set(userData);
+      
+      // Initialize user encryption (generate and store encryption key)
+      // This ensures all users have encryption, even if created through middleware
+      try {
+        logger.debug(`Attempting to initialize encryption for user in middleware: ${firebaseUser.uid}`);
+        await UserEncryptionService.initializeUserEncryption(firebaseUser.uid);
+        logger.info(`Encryption initialized for user created in middleware: ${firebaseUser.uid}`);
+      } catch (encryptionError) {
+        logger.error(`Failed to initialize encryption for user ${firebaseUser.uid}:`, encryptionError);
+        // Note: We don't fail authentication if encryption setup fails
+        // The user can still use the app, but messages won't be encrypted
+      }
     } else {
       userData = userDoc.data();
     }

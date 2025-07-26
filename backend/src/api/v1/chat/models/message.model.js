@@ -26,6 +26,8 @@ class Message {
       model: metadata.model || null,
       tokens: metadata.tokens || 0,
       isEdited: metadata.isEdited || false,
+      encrypted: metadata.encrypted || false,
+      encryptionVersion: metadata.encryptionVersion || null,
       ...metadata
     };
   }
@@ -53,6 +55,32 @@ class Message {
     this.content = newContent;
     this.metadata.isEdited = true;
     return this;
+  }
+
+  /**
+   * Mark message as encrypted
+   * @param {string} version - Encryption version
+   */
+  markAsEncrypted(version = '1.0') {
+    this.metadata.encrypted = true;
+    this.metadata.encryptionVersion = version;
+    return this;
+  }
+
+  /**
+   * Check if message is encrypted
+   * @returns {boolean} True if message is encrypted
+   */
+  isEncrypted() {
+    return this.metadata.encrypted === true;
+  }
+
+  /**
+   * Get encryption version
+   * @returns {string|null} Encryption version or null if not encrypted
+   */
+  getEncryptionVersion() {
+    return this.metadata.encrypted ? this.metadata.encryptionVersion : null;
   }
 }
 

@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
+import { apiClient } from '../../services/api';
 
 const provider = new GoogleAuthProvider();
 provider.addScope('profile');
@@ -107,23 +108,53 @@ export const signInWithGoogle = async () => {
     const result = await signInWithPopup(auth, provider);
     console.log('Google sign in successful, user:', result.user);
     
-    console.log('Ensuring user profile...');
-    const userData = await ensureUserProfile(result.user);
-    console.log('User profile ensured:', userData);
+    // Get the Firebase ID token
+    console.log('Getting Firebase ID token...');
+    const idToken = await result.user.getIdToken();
+    console.log('Firebase ID token retrieved');
     
-    console.log('Getting auth token...');
-    const token = await getAuthToken();
-    console.log('Auth token retrieved:', token ? 'Token exists' : 'No token');
-    
-    console.log('Storing auth data...');
-    storeAuthData(token, userData);
-    
-    // Verify storage after setting
-    console.log('Verifying storage after sign in:');
-    console.log('localStorage token:', localStorage.getItem(TOKEN_KEY) ? 'Exists' : 'Missing');
-    console.log('localStorage user:', localStorage.getItem(USER_KEY) ? 'Exists' : 'Missing');
-    
-    return userData;
+    // Call backend login endpoint to trigger user creation and encryption setup
+    console.log('Calling backend login endpoint...');
+    try {
+      const backendResponse = await apiClient.post('/api/auth/login', { idToken });
+      console.log('Backend login successful:', backendResponse);
+      
+      // Use the user data from backend response
+      const userData = backendResponse.user;
+      const token = backendResponse.token;
+      
+      console.log('Storing auth data from backend response...');
+      storeAuthData(token, userData);
+      
+      // Verify storage after setting
+      console.log('Verifying storage after sign in:');
+      console.log('localStorage token:', localStorage.getItem(TOKEN_KEY) ? 'Exists' : 'Missing');
+      console.log('localStorage user:', localStorage.getItem(USER_KEY) ? 'Exists' : 'Missing');
+      
+      return userData;
+    } catch (backendError) {
+      console.error('Backend login error:', backendError);
+      // Fallback to previous approach if backend login fails
+      console.log('Falling back to Firebase-only authentication...');
+      
+      console.log('Ensuring user profile...');
+      const userData = await ensureUserProfile(result.user);
+      console.log('User profile ensured:', userData);
+      
+      console.log('Getting auth token...');
+      const token = await getAuthToken();
+      console.log('Auth token retrieved:', token ? 'Token exists' : 'No token');
+      
+      console.log('Storing auth data...');
+      storeAuthData(token, userData);
+      
+      // Verify storage after setting
+      console.log('Verifying storage after sign in:');
+      console.log('localStorage token:', localStorage.getItem(TOKEN_KEY) ? 'Exists' : 'Missing');
+      console.log('localStorage user:', localStorage.getItem(USER_KEY) ? 'Exists' : 'Missing');
+      
+      return userData;
+    }
   } catch (error) {
     console.error('Google sign in error:', error);
     clearAuthData();

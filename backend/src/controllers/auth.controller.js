@@ -5,6 +5,7 @@ import { success, error as errorResponse } from '../utils/apiResponse.js';
 import AppError from '../utils/AppError.js';
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
+import UserEncryptionService from '../services/UserEncryptionService.js';
 
 // This will be initialized when first used
 let authInstance = null;
@@ -127,7 +128,18 @@ const register = async (req, res, next) => {
       const user = await User.create(userData);
       logger.info(`Firestore user record created with ID: ${user.id}`);
 
-      // 4) Generate JWT token
+      // 4) Initialize user encryption (generate and store encryption key)
+      try {
+        logger.debug(`Attempting to initialize encryption for user: ${firebaseUser.uid}`);
+        await UserEncryptionService.initializeUserEncryption(firebaseUser.uid);
+        logger.info(`Encryption initialized for user: ${firebaseUser.uid}`);
+      } catch (encryptionError) {
+        logger.error(`Failed to initialize encryption for user ${firebaseUser.uid}:`, encryptionError);
+        // Note: We don't fail registration if encryption setup fails
+        // The user can still use the app, but messages won't be encrypted
+      }
+
+      // 5) Generate JWT token
       createSendToken(user, 201, res);
       logger.info(`Registration successful for email: ${email}`);
       
@@ -195,6 +207,7 @@ const login = async (req, res, next) => {
     let user = await User.findByFirebaseUid(firebaseUser.uid);
     
     // If user doesn't exist in Firestore but exists in Firebase Auth (edge case)
+    // This happens with Google login for first-time users
     if (!user) {
       const userData = {
         firebaseUid: firebaseUser.uid,
@@ -209,6 +222,17 @@ const login = async (req, res, next) => {
         role: 'user',
       };
       user = await User.create(userData);
+      
+      // Initialize user encryption (generate and store encryption key)
+      // This ensures all users, including those logging in with Google for the first time, have encryption
+      try {
+        await UserEncryptionService.initializeUserEncryption(firebaseUser.uid);
+        logger.info(`Encryption initialized for new user: ${firebaseUser.uid}`);
+      } catch (encryptionError) {
+        logger.error(`Failed to initialize encryption for user ${firebaseUser.uid}:`, encryptionError);
+        // Note: We don't fail login if encryption setup fails
+        // The user can still use the app, but messages won't be encrypted
+      }
     }
 
     // 4) Update last login time

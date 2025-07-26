@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import Conversation from '../models/conversation.model.js';
 import Message from '../models/message.model.js';
+import UserEncryptionService from '../../../../services/UserEncryptionService.js';
+import { logger } from '../../../../utils/logger.js';
 
 const CONVERSATIONS_COLLECTION = 'conversations';
 const MESSAGES_COLLECTION = 'messages';
@@ -267,6 +269,33 @@ class FirestoreService {
         timestamp: new Date() // Set a default timestamp that will be overridden by serverTimestamp
       });
       
+      // If we have a userId and plain text content, encrypt it
+      if (messageData.userId && messageData.content && typeof messageData.content === 'string') {
+        try {
+          // Check if user has encryption enabled
+          const encryptionStatus = await UserEncryptionService.getUserEncryptionStatus(messageData.userId);
+          
+          if (encryptionStatus.encryptionEnabled) {
+            // Encrypt the message content
+            const encryptedContent = await UserEncryptionService.encryptUserMessage(
+              messageData.userId, 
+              messageData.content
+            );
+            
+            // Update message with encrypted content
+            message.content = encryptedContent;
+            message.markAsEncrypted('1.0');
+            
+            logger.debug(`Message content encrypted for user: ${messageData.userId}`);
+          } else {
+            logger.debug(`User ${messageData.userId} does not have encryption enabled`);
+          }
+        } catch (encryptionError) {
+          logger.error(`Failed to encrypt message for user ${messageData.userId}:`, encryptionError);
+          // Continue with unencrypted message if encryption fails
+        }
+      }
+      
       // Convert to plain object and add server timestamp
       const messageDataWithTimestamp = {
         ...message.toJSON(),
@@ -331,6 +360,109 @@ class FirestoreService {
     } catch (error) {
       console.error('Error getting messages:', error);
       throw new Error('Failed to get messages');
+    }
+  }
+
+  /**
+   * Get and decrypt messages for display purposes
+   * @param {string} conversationId - Conversation ID
+   * @param {string} userId - User ID
+   * @param {number} limit - Number of messages to return
+   * @returns {Promise<{messages: Array<Message>, lastVisible: any}>} List of decrypted messages and pagination info
+   */
+  static async getMessagesForDisplay(conversationId, userId, limitCount = 50, startAfterId = null) {
+    try {
+      // Get messages from Firestore
+      const { messages, lastVisible } = await this.getMessages(conversationId, limitCount, startAfterId);
+      
+      // Decrypt messages if they are encrypted
+      const decryptedMessages = [];
+      
+      for (const message of messages) {
+        try {
+          // Check if message is encrypted
+          if (message.isEncrypted()) {
+            // Decrypt the message content
+            const decryptedContent = await UserEncryptionService.processMessageContent(
+              userId,
+              message.content
+            );
+            
+            // Create a new message with decrypted content
+            const decryptedMessage = new Message({
+              ...message,
+              content: decryptedContent
+            });
+            
+            decryptedMessages.push(decryptedMessage);
+          } else {
+            // Message is not encrypted, use as-is
+            decryptedMessages.push(message);
+          }
+        } catch (decryptionError) {
+          logger.error(`Failed to decrypt message ${message.id} for user ${userId}:`, decryptionError);
+          // Keep original message if decryption fails
+          decryptedMessages.push(message);
+        }
+      }
+      
+      return {
+        messages: decryptedMessages,
+        lastVisible
+      };
+    } catch (error) {
+      logger.error(`Error getting messages for display for conversation ${conversationId}:`, error);
+      throw new Error(`Failed to get messages for display: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get and decrypt messages for LLM context (used when preparing conversation history)
+   * @param {string} conversationId - Conversation ID
+   * @param {string} userId - User ID
+   * @param {number} limit - Number of messages to return
+   * @returns {Promise<Array<Message>>} List of decrypted messages
+   */
+  static async getMessagesForLLM(conversationId, userId, limitCount = 20) {
+    try {
+      // Get messages from Firestore
+      const { messages } = await this.getMessages(conversationId, limitCount);
+      
+      // Decrypt messages if they are encrypted
+      const decryptedMessages = [];
+      
+      for (const message of messages) {
+        try {
+          // Check if message is encrypted
+          if (message.isEncrypted()) {
+            // Decrypt the message content
+            const decryptedContent = await UserEncryptionService.processMessageContent(
+              userId,
+              message.content
+            );
+            
+            // Create a new message with decrypted content
+            const decryptedMessage = new Message({
+              ...message,
+              content: decryptedContent
+            });
+            
+            decryptedMessages.push(decryptedMessage);
+          } else {
+            // Message is not encrypted, use as-is
+            decryptedMessages.push(message);
+          }
+        } catch (decryptionError) {
+          logger.error(`Failed to decrypt message ${message.id} for user ${userId}:`, decryptionError);
+          // Keep original message if decryption fails
+          decryptedMessages.push(message);
+        }
+      }
+      
+      return decryptedMessages;
+    } catch (error) {
+      logger.error(`Error getting messages for LLM for conversation ${conversationId}:`, error);
+      throw new Error(`Failed to get messages for LLM: ${error.message}`);
     }
   }
 
