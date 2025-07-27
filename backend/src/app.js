@@ -16,6 +16,7 @@ import { chatRoutes, llmRoutes } from './api/v1/chat/index.js';
 import { router as avatarCallRoutes } from './api/v1/avatar-call/index.js';
 import { router as dashboardRoutes } from './api/v1/dashboard/index.js';
 import { moodRoutes } from './api/v1/mood/index.js';
+import journalRoutes from './api/v1/journal/routes/journal.routes.js';
 
 // Get the directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -87,17 +88,17 @@ const apiPrefix = config.app.apiPrefix;
 
 // Mount health routes
 const healthPath = apiPrefix + '/health';
-logger.info(`Mounting health routes at ${healthPath}`);
+// logger.info(`Mounting health routes at ${healthPath}`);
 app.use(healthPath, healthRouter);
 
 // Mount auth routes
 const authPath = apiPrefix + '/auth';
-logger.info(`Mounting auth routes at ${authPath}`);
+// logger.info(`Mounting auth routes at ${authPath}`);
 app.use(authPath, authRouter);
 
 // Mount chat routes
 const chatPath = apiPrefix + '/chat';
-logger.info(`Mounting chat routes at ${chatPath}`);
+// logger.info(`Mounting chat routes at ${chatPath}`);
 // Mount chat routes at /api/chat
 app.use(chatPath, chatRoutes);
 // Also mount at /chat for backward compatibility
@@ -105,7 +106,7 @@ app.use('/chat', chatRoutes);
 
 // Mount LLM routes
 const llmPath = apiPrefix + '/llm';
-logger.info(`Mounting LLM routes at ${llmPath}`);
+// logger.info(`Mounting LLM routes at ${llmPath}`);
 app.use(llmPath, llmRoutes);
 
 // Mount API v1 routes
@@ -114,6 +115,7 @@ apiV1Router.use('/chat', chatRoutes);
 apiV1Router.use('/avatar-call', avatarCallRoutes);
 apiV1Router.use('/dashboard', dashboardRoutes);
 apiV1Router.use('/mood', moodRoutes);
+apiV1Router.use('/journal', journalRoutes);
 
 // Mount avatar-call routes at /api/avatar-call for backward compatibility
 app.use('/api/avatar-call', avatarCallRoutes);
@@ -123,7 +125,7 @@ app.use(apiPrefix + '/v1', apiV1Router);
 
 // Mount Avatar Call routes at /api/avatar-call for backward compatibility
 const avatarCallPath = apiPrefix + '/avatar-call';
-logger.info(`Mounting Avatar Call routes at ${avatarCallPath}`);
+// logger.info(`Mounting Avatar Call routes at ${avatarCallPath}`);
 app.use(avatarCallPath, avatarCallRoutes);
 
 // Enhanced route debugging
@@ -136,7 +138,7 @@ const logRoutes = (router, prefix = '') => {
       const methods = Object.keys(middleware.route.methods).join(',').toUpperCase();
       // Clean up the path to remove double slashes
       const cleanPath = `${prefix}${middleware.route.path}`.replace(/\/+/g, '/');
-      logger.info(`Route: ${methods.padEnd(6)} ${cleanPath}`);
+      // logger.info(`Route: ${methods.padEnd(6)} ${cleanPath}`);
     } else if (middleware.name === 'router' && middleware.handle && middleware.handle.stack) {
       // For mounted routers, use the path they were mounted at
       let mountPath = '';
@@ -163,8 +165,8 @@ const logRoutes = (router, prefix = '') => {
 };
 
 // Log all routes
-logger.info('Registered Routes:');
-logRoutes(app._router);
+// logger.info('Registered Routes:');
+// logRoutes(app._router);
 
 // More API routes will be mounted here
 // app.use(`${config.app.apiPrefix}/users`, require('./routes/user.routes'));
@@ -186,6 +188,9 @@ const v1Router = express.Router();
 
 // Mount chat routes
 v1Router.use('/chat', chatRoutes);
+
+// Mount journal routes
+v1Router.use('/journal', journalRoutes);
 
 // Mount v1 router
 apiRouter.use('/v1', v1Router);

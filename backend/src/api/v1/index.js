@@ -3,6 +3,7 @@ import { router as chatRoutes } from './chat';
 import { router as avatarCallRoutes } from './avatar-call';
 import { router as dashboardRoutes } from './dashboard';
 import { moodRoutes } from './mood';
+import journalRoutes from './journal/routes/journal.routes.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/chat', chatRoutes);
 router.use('/avatar-call', avatarCallRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/mood', moodRoutes);
+router.use('/journal', journalRoutes);
 
 export default router;

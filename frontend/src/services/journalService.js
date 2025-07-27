@@ -1,28 +1,11 @@
-import { db, storage, auth } from '../config/firebase';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit as firestoreLimit,
-  onSnapshot,
-  serverTimestamp
-} from 'firebase/firestore';
+import { storage, auth } from '../config/firebase';
 import { 
   ref, 
   uploadBytes, 
   getDownloadURL, 
   deleteObject 
 } from 'firebase/storage';
-
-// Collection name
-const JOURNAL_ENTRIES_COLLECTION = 'journalEntries';
+import chatApi from './api';
 
 // Helper to get current user ID
 const getCurrentUserId = () => {
@@ -111,8 +94,8 @@ export const journalService = {
         mood: entryData.mood || 'neutral',
         tags: entryData.tags || [],
         type: entryData.type || 'text',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
       
       // Add media metadata only if present and with defined values
@@ -123,61 +106,21 @@ export const journalService = {
         if (mediaMetadata.type) journalEntryDoc.mediaType = mediaMetadata.type;
       }
       
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, JOURNAL_ENTRIES_COLLECTION), journalEntryDoc);
-      
-      return { 
-        id: docRef.id, 
-        ...journalEntryDoc,
-        // Convert serverTimestamp to actual date for immediate UI use
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+      const response = await chatApi.createJournalEntry(journalEntryDoc);
+      return response.data;
     } catch (error) {
       console.error('Error creating journal entry:', error);
       throw error;
     }
   },
 
-  // Get all journal entries for current user
-  async getEntries(limitCount = 50) {
+  // Get all journal entries for the current user
+  async getEntries(limitCount = 50, startAfter = null) {
     try {
-      const userId = getCurrentUserId();
-      const q = query(
-        collection(db, JOURNAL_ENTRIES_COLLECTION),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        firestoreLimit(limitCount)
-      );
-
-      const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      const entry = {
-        id: doc.id,
-        ...data,
-        // Convert Firestore timestamps to ISO strings
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt
-      };
-      
-      // Reconstruct media array from individual fields for viewer compatibility
-      if (data.mediaUrl) {
-        // Extract base media type (audio/video) from MIME type
-        const baseType = data.mediaType?.startsWith('audio/') ? 'audio' : 
-                        data.mediaType?.startsWith('video/') ? 'video' : 'audio';
-        
-        entry.media = [{
-          url: data.mediaUrl,
-          type: baseType,
-          mimeType: data.mediaType || 'audio/webm', // Keep full MIME type for reference
-          size: data.mediaSize || 0,
-          path: data.mediaPath
-        }];
-      }
-      
-      return entry;
-    });
+      const params = { limit: limitCount };
+      if (startAfter) params.startAfter = startAfter;
+      const response = await chatApi.getJournalEntries(params);
+      return response.data.entries;
     } catch (error) {
       console.error('Error getting journal entries:', error);
       throw error;
@@ -187,20 +130,8 @@ export const journalService = {
   // Get a single journal entry
   async getEntry(entryId) {
     try {
-      const docRef = doc(db, JOURNAL_ENTRIES_COLLECTION, entryId);
-      const docSnap = await getDoc(docRef);
-      
-      if (!docSnap.exists()) {
-        throw new Error('Journal entry not found');
-      }
-      
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        ...data,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt
-      };
+      const response = await chatApi.getJournalEntry(entryId);
+      return response.data;
     } catch (error) {
       console.error('Error getting journal entry:', error);
       throw error;
@@ -238,7 +169,7 @@ export const journalService = {
         ...(updates.content !== undefined && { content: updates.content }),
         ...(updates.mood !== undefined && { mood: updates.mood }),
         ...(updates.tags !== undefined && { tags: updates.tags }),
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
         ...(mediaMetadata && {
           mediaUrl: mediaMetadata.url,
           mediaPath: mediaMetadata.path,
@@ -247,11 +178,8 @@ export const journalService = {
         })
       };
       
-      // Update in Firestore
-      const docRef = doc(db, JOURNAL_ENTRIES_COLLECTION, entryId);
-      await updateDoc(docRef, updateData);
-      
-      return await this.getEntry(entryId);
+      const response = await chatApi.updateJournalEntry(entryId, updateData);
+      return response.data;
     } catch (error) {
       console.error('Error updating journal entry:', error);
       throw error;
@@ -274,48 +202,26 @@ export const journalService = {
         await deleteMediaFile(entry.mediaPath);
       }
       
-      // Delete from Firestore
-      const docRef = doc(db, JOURNAL_ENTRIES_COLLECTION, entryId);
-      await deleteDoc(docRef);
-      
-      return true;
+      const response = await chatApi.deleteJournalEntry(entryId);
+      return response.data;
     } catch (error) {
       console.error('Error deleting journal entry:', error);
       throw error;
     }
   },
 
-  // Subscribe to real-time updates of journal entries
-  subscribeToEntries(callback, limitCount = 50) {
+  // Subscribe to journal entries updates (returns initial data only)
+  async subscribeToEntries(callback, limitCount = 50) {
     try {
-      const userId = getCurrentUserId();
+      const params = { limit: limitCount };
+      const response = await chatApi.getJournalEntries(params);
+      const entries = response.data.entries;
       
-      const q = query(
-        collection(db, JOURNAL_ENTRIES_COLLECTION),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        firestoreLimit(limitCount)
-      );
-
-      return onSnapshot(
-        q,
-        (querySnapshot) => {
-          try {
-            const entries = querySnapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-              updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
-            }));
-            callback(entries);
-          } catch (error) {
-            console.error('Error processing journal entries:', error);
-          }
-        },
-        (error) => {
-          console.error('Error in journal entries subscription:', error);
-        }
-      );
+      // Call callback with initial entries
+      callback(entries);
+      
+      // Return a no-op function for consistent API
+      return () => {};
     } catch (error) {
       console.error('Error setting up journal entries subscription:', error);
       // Return a no-op function for consistent API
@@ -326,22 +232,9 @@ export const journalService = {
   // Get entries filtered by mood
   async getEntriesByMood(mood, limitCount = 20) {
     try {
-      const userId = getCurrentUserId();
-      const q = query(
-        collection(db, JOURNAL_ENTRIES_COLLECTION),
-        where('userId', '==', userId),
-        where('mood', '==', mood),
-        orderBy('createdAt', 'desc'),
-        firestoreLimit(limitCount)
-      );
-
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
-      }));
+      const params = { limit: limitCount };
+      const response = await chatApi.getJournalEntriesByMood(mood, params);
+      return response.data.entries;
     } catch (error) {
       console.error('Error getting entries by mood:', error);
       throw error;
@@ -351,32 +244,9 @@ export const journalService = {
   // Search entries by text content
   async searchEntries(searchTerm, limitCount = 20) {
     try {
-      const userId = getCurrentUserId();
-      // Note: This is a basic implementation. For advanced full-text search,
-      // consider using Algolia or implementing client-side filtering
-      const q = query(
-        collection(db, JOURNAL_ENTRIES_COLLECTION),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        firestoreLimit(limitCount * 2) // Get more to filter client-side
-      );
-
-      const querySnapshot = await getDocs(q);
-      const allEntries = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt
-      }));
-
-      // Filter client-side for text search
-      const filteredEntries = allEntries.filter(entry => 
-        entry.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-
-      return filteredEntries.slice(0, limitCount);
+      const params = { limit: limitCount };
+      const response = await chatApi.searchJournalEntries(searchTerm, params);
+      return response.data.entries;
     } catch (error) {
       console.error('Error searching entries:', error);
       throw error;

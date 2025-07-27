@@ -1012,6 +1012,86 @@ const chatApi = {
   },
   
   /**
+   * Create a new journal entry
+   * @param {Object} entryData - Journal entry data
+   * @returns {Promise<Object>} Created journal entry
+   */
+  createJournalEntry(entryData) {
+    return apiClient.post('/api/v1/journal', entryData);
+  },
+
+  /**
+   * Get all journal entries for the current user
+   * @param {Object} params - Query parameters
+   * @param {number} [params.limit=50] - Number of entries to return
+   * @param {string} [params.startAfter] - ID of the last entry for pagination
+   * @returns {Promise<Object>} List of journal entries
+   */
+  getJournalEntries(params = {}) {
+    const { limit = 50, startAfter } = params;
+    const queryParams = {};
+    if (limit) queryParams.limit = limit;
+    if (startAfter) queryParams.startAfter = startAfter;
+    return apiClient.get('/api/v1/journal', queryParams);
+  },
+
+  /**
+   * Get a specific journal entry by ID
+   * @param {string} entryId - Journal entry ID
+   * @returns {Promise<Object>} Journal entry
+   */
+  getJournalEntry(entryId) {
+    return apiClient.get(`/api/v1/journal/${entryId}`);
+  },
+
+  /**
+   * Update a journal entry
+   * @param {string} entryId - Journal entry ID
+   * @param {Object} updates - Update data
+   * @returns {Promise<Object>} Updated journal entry
+   */
+  updateJournalEntry(entryId, updates) {
+    return apiClient.put(`/api/v1/journal/${entryId}`, updates);
+  },
+
+  /**
+   * Delete a journal entry
+   * @param {string} entryId - Journal entry ID
+   * @returns {Promise<Object>} Deletion result
+   */
+  deleteJournalEntry(entryId) {
+    return apiClient.delete(`/api/v1/journal/${entryId}`);
+  },
+
+  /**
+   * Get journal entries by mood
+   * @param {string} mood - Mood to filter by
+   * @param {Object} params - Query parameters
+   * @param {number} [params.limit=20] - Number of entries to return
+   * @returns {Promise<Object>} List of journal entries
+   */
+  getJournalEntriesByMood(mood, params = {}) {
+    const { limit = 20 } = params;
+    const queryParams = {};
+    if (limit) queryParams.limit = limit;
+    return apiClient.get(`/api/v1/journal/mood/${mood}`, queryParams);
+  },
+
+  /**
+   * Search journal entries
+   * @param {string} searchTerm - Text to search for
+   * @param {Object} params - Query parameters
+   * @param {number} [params.limit=20] - Number of entries to return
+   * @returns {Promise<Object>} List of journal entries
+   */
+  searchJournalEntries(searchTerm, params = {}) {
+    const { limit = 20 } = params;
+    const queryParams = { searchTerm };
+    if (limit) queryParams.limit = limit;
+    return apiClient.get('/api/v1/journal/search', queryParams);
+  },
+
+  /**
    * Callback for handling streaming chunks
    * @callback StreamChunkCallback
    * @param {Object} chunk - The chunk of data
