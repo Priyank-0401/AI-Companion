@@ -74,6 +74,26 @@
 
 </td>
 </tr>
+<tr>
+<td width="50%">
+
+### 🖐️ **Gesture & Pose Recognition**
+> **Seriva sees your body language.** Real-time detection of hand gestures and body poses to understand your non-verbal communication and respond appropriately.
+
+![MediaPipe](https://img.shields.io/badge/Google-MediaPipe-4285F4?style=flat-square&logo=google)
+![Pose Detection](https://img.shields.io/badge/AI-Pose_Detection-34A853?style=flat-square&logo=google)
+
+</td>
+<td width="50%">
+
+### 😊 **Emotion & Expression Analysis**
+> **Seriva reads your emotions.** Advanced facial expression analysis combined with gesture interpretation to create a truly empathetic interaction.
+
+![Emotion AI](https://img.shields.io/badge/AI-Emotion_Detection-EA4335?style=flat-square&logo=google)
+![Context Awareness](https://img.shields.io/badge/Context-Awareness-FBBC04?style=flat-square&logo=google)
+
+</td>
+</tr>
 </table>
 
 ### 📔 **Smart Journaling & Mood Tracking**
