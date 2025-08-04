@@ -63,8 +63,10 @@ class FirestoreService {
   static async createEntry(entryData) {
     try {
       // Create journal entry without timestamp first
+      // Remove id from entryData to ensure Firestore document ID is used
+      const { id: entryIdToRemove, ...entryDataWithoutId } = entryData;
       const entry = new JournalEntry({
-        ...entryData,
+        ...entryDataWithoutId,
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -97,14 +99,26 @@ class FirestoreService {
       }
       
       // Convert to plain object and add server timestamp
+      const entryObject = entry.toJSON();
+      // Remove the generated id from the entry object to ensure Firestore document ID is used
+      const { id: generatedId, ...entryObjectWithoutId } = entryObject;
       const entryDataWithTimestamps = {
-        ...entry.toJSON(),
+        ...entryObjectWithoutId,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       };
       
       // Add to Firestore
       const docRef = await getFirestoreDb().collection(JOURNAL_ENTRIES_COLLECTION).add(entryDataWithTimestamps);
+      
+      // Update the entry with the Firestore document ID
+      const entryDataWithFirestoreId = {
+        ...entryDataWithTimestamps,
+        id: docRef.id
+      };
+      
+      // Update the document with the Firestore document ID
+      await docRef.update({ id: docRef.id });
       
       // Get the newly created document
       const docSnap = await docRef.get();
@@ -360,8 +374,10 @@ class FirestoreService {
       }
       
       // Prepare the update data
+      // Remove id from updateData to prevent conflicts
+      const { id: updateId, ...updateDataWithoutId } = updateData;
       const updateDataWithTimestamps = {
-        ...updateData,
+        ...updateDataWithoutId,
         updatedAt: FieldValue.serverTimestamp(),
       };
       

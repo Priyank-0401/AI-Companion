@@ -21,11 +21,13 @@ export default defineConfig({
       allow: ['..'],
     },
   },
-  // Copy model files to the public directory during build
+  worker: {
+    format: 'es', // Use ES module format for MediaPipe ES module compatibility
+  },
   build: {
     assetsInlineLimit: 0, // Disable inlining of assets to ensure models are copied
-    
-    // ADD THIS LINE: This tells Vite to use the Terser minifier
+      
+    // This tells Vite to use the Terser minifier
     minify: 'terser', 
 
     // Your existing Terser options will now be used
@@ -35,9 +37,19 @@ export default defineConfig({
         drop_debugger: true, // This line removes debugger statements
       },
     },
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name.endsWith('.task')) {
+            return 'assets/[name][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        },
+      },
+    },
   },
   // Serve model files from node_modules
   optimizeDeps: {
-    include: ['@vladmandic/face-api'],
+    include: ['@vladmandic/face-api', '@mediapipe/tasks-vision'],
   },
 })

@@ -6,6 +6,8 @@ import { useVolumeLipSync } from '../hooks/useVolumeLipSync'; // Import the volu
 import { useVisemeLipSync } from '../hooks/useVisemeLipSync'; // Import the viseme lip sync hook
 import { useEmotionDetection } from '../hooks/useEmotionDetection'; // Import the emotion detection hook
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import useGestureDetectionMainThread from '../hooks/useGestureDetectionMainThread'; // Import the gesture detection hook
+import { createGestureContext } from '../utils/gestureAndPoseMapping'; // Import gesture context utility
 import useAuth from '../auth/hooks/useAuth';
 import avatarConversationService from '../services/avatarConversationService';
 import { auth } from '../config/firebase';
@@ -48,7 +50,7 @@ const debounce = (func, wait) => {
 };
 
 // Process user message and get response from the backend
-const processUserMessage = async (message, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', setMessages, setEmotion, conversationHistory = []) => {
+const processUserMessage = async (message, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', gestureContext = null, setMessages, setEmotion, conversationHistory = []) => {
   if (!message || !message.trim()) {
     console.warn('⚠️ Empty message provided to processUserMessage');
     return null;
@@ -95,6 +97,7 @@ const processUserMessage = async (message, setError, setIsProcessing, lastProces
       maxTokens: 2000,
       context: { 
         emotion: currentEmotion,
+        gestureContext: gestureContext,
         timestamp: new Date().toISOString(),
         requestId,
         isAvatarCall: true,
@@ -338,6 +341,10 @@ const AvatarCallPage = () => {
   // Camera State (missing state variable for existing camera functionality)
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   
+  // Gesture Detection State
+  const [gestureContext, setGestureContext] = useState(null);
+  const [isGestureDetectionActive, setIsGestureDetectionActive] = useState(false);
+  
   // NEW: Viseme Lip Sync Hook
   const {
     visemeMultiplier,
@@ -347,6 +354,19 @@ const AvatarCallPage = () => {
     detachFromUtterance,
     getDebugInfo
   } = useVisemeLipSync();
+  
+  // NEW: Gesture Detection Hook
+  const {
+    isInitialized: isGestureInitialized,
+    error: gestureError,
+    poseResults,
+    gestureResults,
+    isProcessing: isGestureProcessing,
+    videoRef: gestureVideoRef,
+    canvasRef: gestureCanvasRef,
+    startProcessing: startGestureDetection,
+    stopProcessing: stopGestureDetection
+  } = useGestureDetectionMainThread();
   
   // NEW: Connect viseme system to voice service
   useEffect(() => {
@@ -365,6 +385,33 @@ const AvatarCallPage = () => {
       detachFromUtterance();
     };
   }, [attachToUtterance, detachFromUtterance]);
+  
+  // Process gesture and pose results to generate context for LLM
+  useEffect(() => {
+    if (poseResults || gestureResults) {
+      const context = createGestureContext(gestureResults, poseResults);
+      
+      // Only update and log if there are actual changes
+      setGestureContext(prevContext => {
+        // Simple deep equality check for gestures and poses
+        const gesturesChanged = JSON.stringify(prevContext?.gestures || []) !== JSON.stringify(context.gestures);
+        const posesChanged = JSON.stringify(prevContext?.poses || []) !== JSON.stringify(context.poses);
+        
+        if (gesturesChanged || posesChanged) {
+          // Log gesture context for debugging only when there are changes
+          if (context.gestures.length > 0 || context.poses.length > 0) {
+            console.log('🎯 Gesture/pose context updated:', context);
+          } else if (prevContext?.gestures?.length > 0 || prevContext?.poses?.length > 0) {
+            // Log when gestures/poses disappear
+            console.log('🎯 Gesture/pose context cleared');
+          }
+          return context;
+        }
+        
+        return prevContext;
+      });
+    }
+  }, [poseResults, gestureResults]);
   
   // Handle final transcript changes
   useEffect(() => {
@@ -386,6 +433,47 @@ const AvatarCallPage = () => {
       setError(`Speech recognition error: ${speechError}`);
     }
   }, [speechError]);
+  
+  // Start/stop gesture detection based on camera state and manual toggle
+  useEffect(() => {
+    let isCancelled = false;
+    
+    const startGestureDetectionSafely = async () => {
+      if (isCancelled) return;
+      
+      // Only attempt to start if not already processing
+      if (!isGestureProcessing) {
+        console.log('🚀 Starting gesture detection');
+        try {
+          await startGestureDetection();
+        } catch (error) {
+          console.error('❌ Error starting gesture detection:', error);
+          if (!isCancelled) {
+            setIsGestureDetectionActive(false);
+          }
+        }
+      }
+    };
+    
+    if (isCameraEnabled && isGestureInitialized && isGestureDetectionActive) {
+      startGestureDetectionSafely();
+    } else if (isGestureInitialized) {
+      console.log('🛑 Stopping gesture detection');
+      stopGestureDetection();
+    }
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [isCameraEnabled, isGestureInitialized, isGestureDetectionActive, isGestureProcessing, startGestureDetection, stopGestureDetection]);
+  
+  // Automatically enable gesture detection when camera is turned on
+  useEffect(() => {
+    if (isCameraEnabled && isGestureInitialized && !isGestureDetectionActive) {
+      console.log('🔄 Auto-enabling gesture detection with camera');
+      setIsGestureDetectionActive(true);
+    }
+  }, [isCameraEnabled, isGestureInitialized, isGestureDetectionActive]);
 
   // Load conversation history when user is available
   useEffect(() => {
@@ -568,6 +656,7 @@ const AvatarCallPage = () => {
         lastProcessedText,
         currentRequestId,
         emotion,
+        gestureContext,
         setConversationHistory,
         setEmotion,
         conversationHistory
@@ -598,7 +687,7 @@ const AvatarCallPage = () => {
       console.error('❌ Error processing text:', error);
       setError('Failed to process your message. Please try again.');
     }
-  }, [isProcessing, emotion, currentUser, conversationHistory, voiceEnabled, speakText, setError, setIsProcessing, setConversationHistory, setEmotion, setLastMessage]);
+  }, [isProcessing, emotion, gestureContext, currentUser, conversationHistory, voiceEnabled, speakText, setError, setIsProcessing, setConversationHistory, setEmotion, setLastMessage]);
 
   // Handle when voice playback ends
   const handleVoiceEnd = useCallback(() => {
@@ -1567,6 +1656,29 @@ const AvatarCallPage = () => {
                 onLoadedData={() => console.log('Preview video data loaded')}
                 onError={(e) => console.error('Preview video error:', e)}
               />
+              {/* Gesture Detection Video */}
+              <video
+                ref={gestureVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute top-0 left-0 w-1/3 h-1/3 object-cover border-2 border-blue-500 rounded"
+                style={{
+                  transform: 'scaleX(-1)', // Mirror the video
+                  zIndex: 10
+                }}
+                onPlay={() => console.log('Gesture detection video is playing')}
+                onLoadedData={() => console.log('Gesture detection video data loaded')}
+                onError={(e) => console.error('Gesture detection video error:', e)}
+              />
+              {/* Gesture Detection Canvas */}
+              <canvas
+                ref={gestureCanvasRef}
+                className="absolute top-0 left-0 w-1/3 h-1/3 border-2 border-green-500 rounded"
+                style={{
+                  zIndex: 11
+                }}
+              />
               <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-xs">
                 <div className="flex justify-between items-center">
                   <span>You</span>
@@ -1712,6 +1824,47 @@ const AvatarCallPage = () => {
               </button>
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 {isGreeting ? 'Greeting...' : isCameraEnabled ? 'Turn off' : 'Turn on'}
+              </div>
+            </div>
+
+            {/* Gesture Detection Toggle Button */}
+            <div className="relative group">
+              <button 
+                onClick={() => setIsGestureDetectionActive(!isGestureDetectionActive)}
+                disabled={!isCameraEnabled || !isGestureInitialized || isGreeting}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isGreeting
+                    ? 'bg-gray-500/70 cursor-not-allowed text-white/70'
+                    : !isCameraEnabled || !isGestureInitialized
+                      ? 'bg-gray-500/70 cursor-not-allowed text-white/70'
+                      : isGestureDetectionActive 
+                        ? 'bg-purple-500 hover:bg-purple-600 text-white' 
+                        : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
+                }`}
+                title={
+                  isGreeting 
+                    ? 'Gesture detection disabled during greeting'
+                    : !isCameraEnabled
+                      ? 'Enable camera first'
+                      : !isGestureInitialized
+                        ? 'Gesture detection initializing...'
+                        : isGestureDetectionActive 
+                          ? 'Turn off gesture detection' 
+                          : 'Turn on gesture detection'
+                }
+              >
+                {isGestureDetectionActive ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7a1 1 0 01-1-1V5a1 1 0 011-1h4zM9 3v1h6V3H9zm-2 5v10h10V8H7z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7a1 1 0 01-1-1V5a1 1 0 011-1h4zM9 3v1h6V3H9zm-2 5v10h10V8H7z" />
+                  </svg>
+                )}
+              </button>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
+                {isGreeting ? 'Greeting...' : !isCameraEnabled ? 'Camera off' : !isGestureInitialized ? 'Initializing...' : isGestureDetectionActive ? 'Turn off' : 'Turn on'}
               </div>
             </div>
 
