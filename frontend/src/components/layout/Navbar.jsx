@@ -52,8 +52,8 @@ const Navbar = () => {
   // Navigation items for authenticated users
   const authNavItems = [
     { path: '/', label: 'Home', icon: Home },
-    { path: '/avatar-call', label: 'Avatar Call', icon: User },
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+    { path: '/avatar-call', label: 'Avatar Call', icon: User },
     { path: '/chat', label: 'Chat', icon: MessageCircle },
     { path: '/journal', label: 'Journal', icon: BookOpen },
     { path: '/settings', label: 'Settings', icon: Settings },

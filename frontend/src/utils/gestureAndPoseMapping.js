@@ -139,6 +139,36 @@ export const POSE_CLASSIFICATIONS = {
     description: 'Poor posture, shoulders dropped',
     context: 'tired, casual, disengaged, relaxed',
     emotion: 'tired, casual, disengaged'
+  },
+  'right_hand_raised': {
+    name: 'Right Hand Raised',
+    description: 'Right hand raised above shoulder level',
+    context: 'waving, greeting, asking question, pointing',
+    emotion: 'engaged, curious, friendly'
+  },
+  'left_hand_raised': {
+    name: 'Left Hand Raised',
+    description: 'Left hand raised above shoulder level',
+    context: 'waving, greeting, asking question, pointing',
+    emotion: 'engaged, curious, friendly'
+  },
+  'hands_together': {
+    name: 'Hands Together',
+    description: 'Hands placed close together or touching',
+    context: 'praying, thinking, emphasis, sincerity',
+    emotion: 'thoughtful, sincere, focused'
+  },
+  'arms_raised': {
+    name: 'Arms Raised',
+    description: 'Both arms raised above shoulder level',
+    context: 'celebration, surrender, emphasis, stretching',
+    emotion: 'excited, surrendered, emphatic'
+  },
+  'shrugging': {
+    name: 'Shrugging',
+    description: 'Shoulders raised towards ears',
+    context: 'uncertainty, indifference, confusion, questioning',
+    emotion: 'uncertain, indifferent, confused'
   }
 };
 
@@ -237,6 +267,63 @@ export const analyzePose = (landmarks) => {
     
     if (leftHandToFace < 0.15 || rightHandToFace < 0.15) {
       poses.push('hands_on_face');
+    }
+  }
+  
+  // Wave detection - right hand raised and moving horizontally
+  if (rightWrist && rightShoulder && nose) {
+    // Check if hand is raised above shoulder
+    if (rightWrist.y < rightShoulder.y - 0.1) {
+      // Additional check for waving motion could be added here
+      // For now, we'll detect the raised hand position
+      poses.push('right_hand_raised');
+    }
+  }
+  
+  // Wave detection - left hand raised and moving horizontally
+  if (leftWrist && leftShoulder && nose) {
+    // Check if hand is raised above shoulder
+    if (leftWrist.y < leftShoulder.y - 0.1) {
+      // Additional check for waving motion could be added here
+      // For now, we'll detect the raised hand position
+      poses.push('left_hand_raised');
+    }
+  }
+  
+  // Hands together (praying position)
+  if (leftWrist && rightWrist) {
+    const handsDistance = Math.sqrt(
+      Math.pow(leftWrist.x - rightWrist.x, 2) + 
+      Math.pow(leftWrist.y - rightWrist.y, 2)
+    );
+    
+    // Check if hands are close together
+    if (handsDistance < 0.05) {
+      poses.push('hands_together');
+    }
+  }
+  
+  // Arms raised (both hands above shoulders)
+  if (leftWrist && rightWrist && leftShoulder && rightShoulder) {
+    if (leftWrist.y < leftShoulder.y - 0.1 && rightWrist.y < rightShoulder.y - 0.1) {
+      poses.push('arms_raised');
+    }
+  }
+  
+  // Pointing (index finger extended, others closed)
+  // This would require more detailed hand landmark analysis
+  
+  // Shrugging (shoulders raised towards ears)
+  const leftEar = keypoints[POSE_LANDMARKS.LEFT_EAR];
+  const rightEar = keypoints[POSE_LANDMARKS.RIGHT_EAR];
+  
+  if (leftShoulder && rightShoulder && leftEar && rightEar) {
+    const leftShoulderToEar = Math.abs(leftShoulder.y - leftEar.y);
+    const rightShoulderToEar = Math.abs(rightShoulder.y - rightEar.y);
+    
+    // If shoulders are close to ears, person is shrugging
+    if (leftShoulderToEar < 0.1 && rightShoulderToEar < 0.1) {
+      poses.push('shrugging');
     }
   }
   
