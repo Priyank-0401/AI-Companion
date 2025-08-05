@@ -345,3 +345,5 @@ export const updateUserProfile = async (updates) => {
     throw error;
   }
 };
+
+export { ensureUserProfile };

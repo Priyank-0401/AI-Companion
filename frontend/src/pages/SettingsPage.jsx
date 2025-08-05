@@ -39,6 +39,7 @@ const SettingsPage = () => {
   const user = authUser ? JSON.parse(authUser) : currentUser;
   
   const userProfile = {
+    ...user,
     photoURL: user?.photoURL || user?.photoUrl || '',
     displayName: user?.displayName || user?.name || 'User',
     email: user?.email || 'user@example.com'

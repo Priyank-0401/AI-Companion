@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   User,
-  AlertTriangle,
+  AlertTriangle,  
   Mail,
   Edit,
   Check,
@@ -14,6 +14,7 @@ import {
   MapPin,
   Smartphone,
 } from 'lucide-react';
+import { updateUserProfile, ensureUserProfile } from '../../auth/services/authService';
 
 const ProfileSettings = ({ user, colors }) => {
   // A helper function to build input classes
@@ -80,11 +81,43 @@ const ProfileSettings = ({ user, colors }) => {
     setError('');
 
     try {
-      // TODO: Implement actual save logic
+      // Ensure user profile exists before updating
+      if (user && user.uid) {
+        await ensureUserProfile(user);
+      }
+      
+      // Prepare data for saving - only include fields that should be updated
+      const profileUpdates = {
+        displayName: formData.displayName,
+        age: formData.age,
+        gender: formData.gender,
+        location: formData.location,
+        photoURL: formData.photoURL
+      };
+
+      // Remove empty fields
+      Object.keys(profileUpdates).forEach(key => {
+        if (profileUpdates[key] === '' || profileUpdates[key] === null || profileUpdates[key] === undefined) {
+          delete profileUpdates[key];
+        }
+      });
+
+      // Update profile in database
+      await updateUserProfile(profileUpdates);
+      
+      // Update localStorage with new data
+      const storedUserData = localStorage.getItem('user');
+      if (storedUserData) {
+        const userData = JSON.parse(storedUserData);
+        const updatedData = { ...userData, ...profileUpdates };
+        localStorage.setItem('user', JSON.stringify(updatedData));
+      }
+      
       setIsSaved(true);
       setIsEditing(false);
     } catch (err) {
-      setError(err.message);
+      console.error('Error saving profile:', err);
+      setError(err.message || 'Failed to save profile. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +130,21 @@ const ProfileSettings = ({ user, colors }) => {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  const getAvatarColor = () => 'bg-background-tertiary border border-border/50';
+  const getAvatarColor = (isDarkMode = false) => {
+    const name = getUserName();
+    if (!name) return isDarkMode ? '#374151' : '#e5e7eb'; // gray-700 for dark, gray-200 for light
+    
+    // Generate a color based on the user's name
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Convert hash to HSL color for better visual variety
+    const hue = Math.abs(hash) % 360;
+    // Return appropriate color for light or dark mode
+    return isDarkMode ? `hsl(${hue}, 60%, 35%)` : `hsl(${hue}, 70%, 85%)`;
+  };
 
   const getUserName = () => formData.displayName || '';
   const getUserEmail = () => formData.email || '';
@@ -169,8 +216,8 @@ const ProfileSettings = ({ user, colors }) => {
             </form>
           ) : (
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className={`w-16 h-16 rounded-full ${getAvatarColor()} flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md border-2 border-white dark:border-gray-700`}>
-                {getUserPhoto() ? <img src={getUserPhoto()} alt={getUserName()} className="w-full h-full object-cover" /> : <span className={`text-2xl font-bold`}>{getUserInitials(getUserName())}</span>}
+              <div className={`w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md border-2 border-white dark:border-gray-700`} style={{ backgroundColor: getAvatarColor(colors.background === 'gray-900') }}>
+                {getUserPhoto() ? <img src={getUserPhoto()} alt={getUserName()} className="w-full h-full object-cover" /> : <span className={`text-2xl font-bold text-gray-700 dark:text-gray-200`}>{getUserInitials(getUserName())}</span>}
               </div>
               <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="flex items-start gap-3">
