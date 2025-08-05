@@ -1656,29 +1656,29 @@ const AvatarCallPage = () => {
                 onLoadedData={() => console.log('Preview video data loaded')}
                 onError={(e) => console.error('Preview video error:', e)}
               />
-              {/* Gesture Detection Video */}
+              {/* Hidden video element for gesture detection */}
               <video
                 ref={gestureVideoRef}
                 autoPlay
                 playsInline
                 muted
-                className="absolute top-0 left-0 w-1/3 h-1/3 object-cover border-2 border-blue-500 rounded"
                 style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '320px',
+                  height: '240px',
+                  opacity: 0,  // Completely hidden
+                  zIndex: -1,  // Move behind other content
                   transform: 'scaleX(-1)', // Mirror the video
-                  zIndex: 10
+                  pointerEvents: 'none',
+                  visibility: 'hidden'
                 }}
                 onPlay={() => console.log('Gesture detection video is playing')}
                 onLoadedData={() => console.log('Gesture detection video data loaded')}
                 onError={(e) => console.error('Gesture detection video error:', e)}
               />
-              {/* Gesture Detection Canvas */}
-              <canvas
-                ref={gestureCanvasRef}
-                className="absolute top-0 left-0 w-1/3 h-1/3 border-2 border-green-500 rounded"
-                style={{
-                  zIndex: 11
-                }}
-              />
+              
               <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-xs">
                 <div className="flex justify-between items-center">
                   <span>You</span>
