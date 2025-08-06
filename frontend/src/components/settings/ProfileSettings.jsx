@@ -148,7 +148,7 @@ const ProfileSettings = ({ user, colors }) => {
 
   const getUserName = () => formData.displayName || '';
   const getUserEmail = () => formData.email || '';
-  const getUserPhoto = () => formData.photoURL || '';
+  const getUserPhoto = () => formData.photoURL || formData.photoUrl || '';
   const isUserVerified = () => user?.emailVerified || false;
 
   if (isLoading) {
@@ -217,7 +217,7 @@ const ProfileSettings = ({ user, colors }) => {
           ) : (
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className={`w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md border-2 border-white dark:border-gray-700`} style={{ backgroundColor: getAvatarColor(colors.background === 'gray-900') }}>
-                {getUserPhoto() ? <img src={getUserPhoto()} alt={getUserName()} className="w-full h-full object-cover" /> : <span className={`text-2xl font-bold text-gray-700 dark:text-gray-200`}>{getUserInitials(getUserName())}</span>}
+                {getUserPhoto() ? <img src={getUserPhoto()} alt={getUserName()} className="w-full h-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-white shadow-md font-bold text-2xl" style={{ backgroundColor: getAvatarColor() }}>{getUserInitials(getUserName())}</div>}
               </div>
               <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="flex items-start gap-3">

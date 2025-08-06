@@ -1287,20 +1287,7 @@ const ChatPage = () => {
                   )}
                 </div>
                 
-                {/* Input Area */}
-                <div className="bg-white dark:bg-gray-900 p-4 pb-16">
-                  <div className="max-w-3xl mx-auto w-full">
-                    <ChatInput 
-                      onSendMessage={handleSendMessage} 
-                      isSending={sendMessageMutation.isLoading}
-                      externalValue={inputValue}
-                      onExternalValueChange={setInputValue}
-                    />
-                    <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-                      Press Shift+Enter for new line. Press Enter to send.
-                    </p>
-                  </div>
-                </div>
+
               </>
             ) : (
               <div className="hidden md:flex flex-1 flex-col items-center justify-center p-6 bg-white dark:bg-gray-900">
@@ -1310,6 +1297,21 @@ const ChatPage = () => {
                 />
               </div>
             )}
+            
+            {/* Input Area - Always render ChatInput */}
+            <div className="bg-white dark:bg-gray-900 p-4 pb-16">
+              <div className="max-w-3xl mx-auto w-full">
+                <ChatInput 
+                  onSendMessage={handleSendMessage} 
+                  isSending={sendMessageMutation.isLoading}
+                  externalValue={inputValue}
+                  onExternalValueChange={setInputValue}
+                />
+                <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                  Press Shift+Enter for new line. Press Enter to send.
+                </p>
+              </div>
+            </div>
         </div>
       </div>
       

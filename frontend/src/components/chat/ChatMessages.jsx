@@ -15,13 +15,37 @@ const SerivaAvatar = () => (
   </div>
 );
 
-const UserAvatar = () => (
-  <div className="flex-shrink-0 ml-3 self-end mb-1">
-    <div className="h-12 w-12 rounded-full flex items-center justify-center text-white shadow-md">
-      <FiUser className="w-6 h-6" />
+const UserAvatar = () => {
+  const { user } = useAuth();
+  const displayName = user?.displayName || user?.name || 'User';
+  
+  // Get user initials
+  const getUserInitials = (name) => {
+    if (!name || name.trim() === '') return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+  
+  // Always use blue color for user avatar
+  const getAvatarColor = () => {
+    return '#3b82f6'; // blue-500
+  };
+  
+  const initials = getUserInitials(displayName);
+  const backgroundColor = getAvatarColor();
+  
+  return (
+    <div className="flex-shrink-0 ml-3 self-end mb-1">
+      <div 
+        className="h-12 w-12 rounded-full flex items-center justify-center text-white shadow-md font-bold"
+        style={{ backgroundColor }}
+      >
+        {initials}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const Message = ({ message, isUser, isFirstInGroup, isLastInGroup }) => {
   const { user } = useAuth();
