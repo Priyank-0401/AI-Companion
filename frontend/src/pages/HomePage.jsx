@@ -5,7 +5,6 @@ import useAuth from '../auth/hooks/useAuth';
 import Hero from '../components/home/Hero';
 import Features from '../components/home/Features';
 import HowItWorks from '../components/home/HowItWorks';
-import Testimonials from '../components/home/Testimonials';
 import FAQ from '../components/home/FAQ';
 import CTA from '../components/home/CTA';
 import WellnessPhilosophy from '../components/home/WellnessPhilosophy';
@@ -35,10 +34,7 @@ const HomePage = () => {
       </div>
       <div className="bg-white dark:bg-gray-900 transition-colors duration-200">
         <WellnessPhilosophy />
-      </div>
-      <div className="bg-white dark:bg-gray-900 transition-colors duration-200">
-        <Testimonials />
-      </div>
+      </div>  
       <div className="bg-white dark:bg-gray-900 transition-colors duration-200">
         <PrivacyFirst />
       </div>
