@@ -324,17 +324,46 @@ class FirestoreService {
           // Check if entry content is encrypted
           if (entry.isEncrypted()) {
             // Decrypt the entry content
-            const decryptedContent = await UserEncryptionService.processMessageContent(
+            let decryptedContent = await UserEncryptionService.processMessageContent(
               userId,
               entry.content
             );
-            
+
+            // Detect if still looks like encrypted (iv:authTag:ciphertext) and decrypt again
+            const looksEncrypted = typeof decryptedContent === 'string' && decryptedContent.includes(':') && decryptedContent.split(':').length === 3;
+            if (looksEncrypted) {
+              decryptedContent = await UserEncryptionService.processMessageContent(
+                userId,
+                decryptedContent
+              );
+            }
+
+            // Strip encryption flags from metadata for display
+            const metadataWithoutEncryption = {};
+            for (const [key, value] of Object.entries(entry.metadata || {})) {
+              if (key !== 'encrypted' && key !== 'encryptionVersion') {
+                metadataWithoutEncryption[key] = value;
+              }
+            }
+
             // Create a new entry with decrypted content
             const decryptedEntry = new JournalEntry({
-              ...entry,
-              content: decryptedContent
+              id: entry.id,
+              userId: entry.userId,
+              title: entry.title,
+              content: decryptedContent,
+              mood: entry.mood,
+              tags: entry.tags,
+              type: entry.type,
+              mediaUrl: entry.mediaUrl,
+              mediaPath: entry.mediaPath,
+              mediaSize: entry.mediaSize,
+              mediaType: entry.mediaType,
+              createdAt: entry.createdAt,
+              updatedAt: entry.updatedAt,
+              metadata: metadataWithoutEncryption
             });
-            
+
             decryptedEntries.push(decryptedEntry);
           } else {
             // Entry is not encrypted, use as-is
