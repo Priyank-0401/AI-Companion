@@ -19,7 +19,7 @@ const generateMediaPath = (userId, entryId, fileExtension) => {
   return `journals/${userId}/${entryId}.${fileExtension}`;
 };
 
-// Get file extension from blob type
+// Get file extension from mime type
 const getFileExtension = (mimeType) => {
   const extensions = {
     'audio/webm': 'webm',
@@ -34,14 +34,22 @@ const getFileExtension = (mimeType) => {
 };
 
 // Upload media file to Firebase Storage
+// Accepts either a Blob/File or a wrapper object { blob: Blob, type: 'audio'|'video', ... }
 const uploadMediaFile = async (file, userId, entryId) => {
   try {
-    const fileExtension = getFileExtension(file.type);
+    // Unwrap if the caller passed a media wrapper object
+    const actualFile = file && file.blob instanceof Blob ? file.blob : file;
+    if (!(actualFile instanceof Blob)) {
+      throw new Error('Invalid media file provided for upload');
+    }
+
+    const mimeType = actualFile.type || (file && typeof file.type === 'string' ? file.type : 'application/octet-stream');
+    const fileExtension = getFileExtension(mimeType);
     const filePath = generateMediaPath(userId, entryId, fileExtension);
     const storageRef = ref(storage, filePath);
     
-    // Upload file
-    const snapshot = await uploadBytes(storageRef, file);
+    // Upload file with content type metadata to ensure correct playback handling
+    const snapshot = await uploadBytes(storageRef, actualFile, { contentType: mimeType });
     
     // Get download URL
     const downloadURL = await getDownloadURL(snapshot.ref);
@@ -49,8 +57,8 @@ const uploadMediaFile = async (file, userId, entryId) => {
     return {
       url: downloadURL,
       path: filePath,
-      size: file.size,
-      type: file.type
+      size: actualFile.size,
+      type: mimeType
     };
   } catch (error) {
     console.error('Error uploading media file:', error);
@@ -81,7 +89,7 @@ export const journalService = {
       
       // Handle media upload if present
       if (entryData.media && entryData.media.length > 0) {
-        const mediaFile = entryData.media[0]; // Assuming single file for now
+        const mediaFile = entryData.media[0]; // wrapper or Blob/File
         mediaMetadata = await uploadMediaFile(mediaFile, userId, entryId);
       }
       
@@ -159,7 +167,7 @@ export const journalService = {
         }
         
         // Upload new media file
-        const mediaFile = updates.media[0];
+        const mediaFile = updates.media[0]; // wrapper or Blob/File
         mediaMetadata = await uploadMediaFile(mediaFile, userId, existingEntry.entryId || entryId);
       }
       

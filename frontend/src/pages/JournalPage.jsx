@@ -57,6 +57,20 @@ const MOODS = {
   }
 };
 
+// Normalize an entry to the UI shape (derive media array from mediaUrl/mediaType)
+const normalizeEntry = (entry) => {
+  if (!entry) return entry;
+  const media = [];
+  if (entry.mediaUrl && entry.mediaType) {
+    const type = entry.mediaType.startsWith('video') ? 'video' : 'audio';
+    media.push({ type, url: entry.mediaUrl });
+  }
+  return {
+    ...entry,
+    ...(media.length > 0 ? { media } : {})
+  };
+};
+
 // Load entries from Firebase
 const loadEntriesFromFirebase = async () => {
   try {
@@ -67,11 +81,14 @@ const loadEntriesFromFirebase = async () => {
     }
     
     const entries = await journalService.getEntries();
-    return entries.map(entry => ({
-      ...entry,
-      // Ensure date field exists for backward compatibility
-      date: entry.createdAt
-    }));
+    return entries.map(entry => {
+      const normalized = normalizeEntry(entry);
+      return {
+        ...normalized,
+        // Ensure date field exists for backward compatibility
+        date: normalized.createdAt
+      };
+    });
   } catch (error) {
     console.error('Error loading entries from Firebase:', error);
     return [];
@@ -224,17 +241,18 @@ const JournalPage = () => {
         const updatedEntry = await journalService.updateEntry(entryData.id, entryToSave);
         setEntries(prev => prev.map(entry => 
           entry.id === entryData.id ? { 
-            ...updatedEntry,
-            date: updatedEntry.createdAt // For compatibility
+            ...normalizeEntry(updatedEntry),
+            date: (updatedEntry && updatedEntry.createdAt)
           } : entry
         ));
         showNotification('Entry updated successfully', 'success');
       } else {
         // Create new entry
         const newEntry = await journalService.createEntry(entryToSave);
+        const normalizedNew = normalizeEntry(newEntry);
         setEntries(prev => [{
-          ...newEntry,
-          date: newEntry.createdAt // For compatibility
+          ...normalizedNew,
+          date: normalizedNew.createdAt // For compatibility
         }, ...prev]);
         showNotification('New entry created', 'success');
       }
