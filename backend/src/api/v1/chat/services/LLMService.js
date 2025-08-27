@@ -164,15 +164,6 @@ class LLMService {
           lastSuccessResponse = responseWithProvider;
         }
         
-        // If we're not on the last provider and the response is incomplete, continue to next provider
-        if (response.choices?.[0]?.finish_reason === 'length' && !isLastProvider) {
-          logger.warn(`[LLM] Response was truncated due to length, trying next provider`);
-          continue;
-        }
-        
-        // Otherwise, return the response
-        return responseWithProvider;
-        
         // Log the raw response for debugging
         try {
           // Handle case where response might be a string
@@ -287,6 +278,25 @@ class LLMService {
               provider: provider,
               model: response.model || model || modelToUse
             };
+            
+            // Track successful response
+            lastSuccessResponse = responseData;
+            
+            // Track usage
+            this._trackUsage(provider, modelToUse, {
+              promptTokens: responseData.usage?.prompt_tokens,
+              completionTokens: responseData.usage?.completion_tokens,
+              totalTokens: responseData.usage?.total_tokens
+            });
+            
+            // Check if we should continue to next provider or return this response
+            if (responseData.choices?.[0]?.finish_reason === 'length' && !isLastProvider) {
+              logger.warn(`[LLM] Response was truncated due to length, trying next provider`);
+              continue;
+            }
+            
+            // Return the successful response
+            return responseData;
           } 
           // Handle different response formats
           else {
@@ -339,6 +349,12 @@ class LLMService {
             // Add provider info to response
             responseData.provider = provider;
             
+            // Check if we should continue to next provider or return this response
+            if (responseData.choices?.[0]?.finish_reason === 'length' && !isLastProvider) {
+              logger.warn(`[LLM] Response was truncated due to length, trying next provider`);
+              continue;
+            }
+            
             // Return the successful response
             return responseData;
           }
@@ -363,7 +379,6 @@ class LLMService {
         
       } catch (error) {
         // Log the error but continue to next provider
-        logger.error(`[LLM] Error with ${provider}${modelToUse ? ` (${modelToUse})` : ''}:`, error.message);
         lastError = error;
         
         // If this was a rate limit error, add a delay before trying the next provider
@@ -373,7 +388,6 @@ class LLMService {
         
         // If we have a successful response, return it immediately
         if (lastSuccessResponse) {
-          logger.warn(`[LLM] Returning successful response from earlier provider due to error with ${provider}`);
           return lastSuccessResponse;
         }
         

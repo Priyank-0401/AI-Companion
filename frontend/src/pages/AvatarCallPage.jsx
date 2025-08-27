@@ -141,11 +141,16 @@ const processUserMessage = async (message, setError, setIsProcessing, lastProces
       throw new Error('No response data received from server');
     }
     
-    // Extract data from the success wrapper if it exists
+    // Extract data and TTS style from the success wrapper if it exists
     let resultData = responseData;
+    let ttsStyle = 'Assistant'; // Default style
+    
     if (responseData.success && responseData.data) {
       console.log('Extracting data from success wrapper');
       resultData = responseData.data;
+      ttsStyle = responseData.ttsStyle || 'Assistant';
+    } else if (responseData.ttsStyle) {
+      ttsStyle = responseData.ttsStyle;
     }
     
     // Log the full response for debugging
@@ -181,7 +186,8 @@ const processUserMessage = async (message, setError, setIsProcessing, lastProces
         model: resultData.model || 'llama3-8b-8192',
         provider: resultData.provider || 'groq',
         usage: resultData.usage
-      }
+      },
+      ttsStyle: ttsStyle // Include TTS style in the message
     };
 
     // Get the current user directly from Firebase auth
@@ -416,7 +422,7 @@ const AvatarCallPage = () => {
   
   // Handle final transcript changes - automatically stop mic and process
   useEffect(() => {
-    if (finalTranscript && finalTranscript.trim()) {
+    if (finalTranscript && finalTranscript.trim() && finalTranscript !== lastProcessedText.current) {
       console.log('Final transcript received:', finalTranscript);
       setRecognizedText(finalTranscript);
       
@@ -433,8 +439,11 @@ const AvatarCallPage = () => {
       } else {
         console.log('⏳ Already processing, skipping transcript:', finalTranscript);
       }
+      
+      // Clear the transcript to prevent reprocessing
+      resetTranscript();
     }
-  }, [finalTranscript, isProcessing, isListening, stopListening]);
+  }, [finalTranscript, isProcessing, isListening, stopListening, resetTranscript]);
 
   // Handle speech recognition errors
   useEffect(() => {
@@ -595,7 +604,7 @@ const AvatarCallPage = () => {
   }, [conversationHistory]);
 
   // Handle text-to-speech functionality
-  const speakText = useCallback(async (text) => {
+  const speakText = useCallback(async (text, ttsStyle = 'Assistant') => {
     if (!text) {
       console.error('Cannot speak: no text provided');
       return false;
@@ -606,7 +615,7 @@ const AvatarCallPage = () => {
       setVoiceEnabled(true);
     }
 
-    console.log('🔊 Starting to speak text:', text);
+    console.log('🔊 Starting to speak text with style:', { text: text.substring(0, 50) + '...', ttsStyle });
     
     // Ensure the voice service is initialized with the selected voice
     if (selectedVoice) {
@@ -614,8 +623,9 @@ const AvatarCallPage = () => {
     }
 
     try {
-      // Use the voiceService to speak the text
+      // Use the voiceService to speak the text with the specified style
       await voiceService.speak(text, {
+        style: ttsStyle, // Pass the TTS style to the voice service
         onStart: () => {
           console.log('🎤 Speech started - starting talking animation immediately');
           setIsSpeaking(true); // Start talking animation immediately when speech begins
@@ -697,8 +707,11 @@ const AvatarCallPage = () => {
         }
         
         if (voiceEnabled || isSpeechAvailable) {
-          console.log('🎤 Speaking response:', response.content.substring(0, 50) + '...');
-          await speakText(response.content);
+          console.log('🎤 Speaking response with style:', { 
+            content: response.content.substring(0, 50) + '...', 
+            ttsStyle: response.ttsStyle 
+          });
+          await speakText(response.content, response.ttsStyle);
         } else {
           console.log('🔇 Voice is disabled, not speaking response');
         }

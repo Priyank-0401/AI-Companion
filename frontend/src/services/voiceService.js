@@ -156,14 +156,18 @@ class VoiceService {
     // Get voice and style settings
     const voice = options.voice || this.selectedVoice;
     const voiceName = voice.name || 'en-US-JennyNeural';
-    const style = options.style || this.voiceSettings.style;
+    const style = this.mapTTSStyle(options.style || this.voiceSettings.style);
     const rate = options.rate || this.voiceSettings.rate;
     const pitch = options.pitch || this.voiceSettings.pitch;    
 
-    // Create simple SSML without complex features for debugging
-    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+    // Create SSML with style support
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
         <voice name="${voiceName}">
-          ${this.escapeXML(text)}
+          <mstts:express-as style="${style}" styledegree="1.0">
+            <prosody rate="${rate}" pitch="${pitch}">
+              ${this.escapeXML(text)}
+            </prosody>
+          </mstts:express-as>
         </voice>
       </speak>`;
 
@@ -233,6 +237,37 @@ class VoiceService {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
+  }
+
+  // Map LLM-suggested TTS styles to Azure Neural Voice styles
+  mapTTSStyle(llmStyle) {
+    if (!llmStyle) return 'assistant';
+    
+    const styleMap = {
+      'Default': 'default',
+      'Assistant': 'assistant',
+      'Chat': 'chat',
+      'Customer Service': 'customerservice',
+      'Newscast': 'newscast',
+      'Angry': 'angry',
+      'Cheerful': 'cheerful',
+      'Sad': 'sad',
+      'Excited': 'excited',
+      'Friendly': 'friendly',
+      'Terrified': 'terrified',
+      'Shouting': 'shouting',
+      'Unfriendly': 'unfriendly',
+      'Whispering': 'whispering',
+      'Hopeful': 'hopeful'
+    };
+    
+    // Convert to lowercase for case-insensitive matching
+    const normalizedStyle = llmStyle.toLowerCase();
+    const mappedStyle = Object.entries(styleMap).find(([key]) => 
+      key.toLowerCase() === normalizedStyle
+    );
+    
+    return mappedStyle ? mappedStyle[1] : 'assistant';
   }  async speak(text, options = {}) {
     if (!text) {
       return Promise.reject('Cannot speak: empty text');

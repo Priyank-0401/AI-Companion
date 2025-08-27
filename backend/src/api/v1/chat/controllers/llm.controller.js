@@ -41,10 +41,31 @@ class LLMController {
         context: context || {}
       });
 
-      // Return the response
+      // Extract the text content from the response
+      let responseText = '';
+      if (response.choices && response.choices[0] && response.choices[0].message) {
+        responseText = response.choices[0].message.content;
+      } else if (response.content) {
+        responseText = response.content;
+      } else {
+        responseText = response;
+      }
+
+      // Parse TTS style from response text if present
+      const { cleanedResponse, ttsStyle } = LLMController.parseTTSStyle(responseText);
+      
+      // Update the response with cleaned content
+      if (response.choices && response.choices[0] && response.choices[0].message) {
+        response.choices[0].message.content = cleanedResponse;
+      } else if (response.content) {
+        response.content = cleanedResponse;
+      }
+      
+      // Return the response with TTS style
       res.json({
         success: true,
-        data: response
+        data: response,
+        ttsStyle: ttsStyle
       });
 
     } catch (error) {
@@ -320,6 +341,26 @@ class LLMController {
       logger.error('Error getting provider status:', error);
       next(error);
     }
+  }
+
+  /**
+   * Parse TTS style from LLM response
+   * @param {string} response - The LLM response text
+   * @returns {Object} - Object with cleanedResponse and ttsStyle
+   */
+  static parseTTSStyle(response) {
+    // Look for TTS style pattern: [TTS_STYLE: StyleName]
+    const ttsStyleRegex = /\[TTS_STYLE:\s*([^\]]+)\]/i;
+    const match = response.match(ttsStyleRegex);
+    
+    if (match) {
+      const ttsStyle = match[1].trim();
+      const cleanedResponse = response.replace(ttsStyleRegex, '').trim();
+      return { cleanedResponse, ttsStyle };
+    }
+    
+    // Default to Assistant style if no style specified
+    return { cleanedResponse: response, ttsStyle: 'Assistant' };
   }
 }
 
