@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -36,6 +36,8 @@ const NavLink = ({ to, icon: Icon, label, isActive, onClick, className = '' }) =
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const themeButtonRef = useRef(null);
+  const mobileThemeButtonRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();  const { user, signOut, loading } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -124,7 +126,8 @@ const Navbar = () => {
 
             {/* Theme Toggle */}
             <button
-              onClick={toggleTheme}
+              ref={themeButtonRef}
+              onClick={() => toggleTheme(themeButtonRef.current)}
               className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
@@ -180,7 +183,8 @@ const Navbar = () => {
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center space-x-2">
             <button
-              onClick={toggleTheme}
+              ref={mobileThemeButtonRef}
+              onClick={() => toggleTheme(mobileThemeButtonRef.current)}
               className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >

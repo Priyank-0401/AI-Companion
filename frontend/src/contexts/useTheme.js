@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useContext, createContext, useMemo } from 'react';
+import { gsap } from 'gsap';
 
 const ThemeContext = createContext();
 
@@ -58,9 +59,98 @@ const ThemeProvider = ({ children }) => {
     localStorage.setItem('theme', theme);
   }, [theme, isMounted, isDark]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  }, []);
+  const toggleTheme = useCallback((buttonElement) => {
+    try {
+      if (typeof window === 'undefined' || !document?.documentElement) {
+        setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+        return;
+      }
+
+      const root = document.documentElement;
+      const body = document.body;
+
+      // Get button coordinates for circular expansion
+      let x = window.innerWidth / 2; // fallback to center
+      let y = window.innerHeight / 2;
+      
+      if (buttonElement) {
+        const rect = buttonElement.getBoundingClientRect();
+        x = rect.left + rect.width / 2;
+        y = rect.top + rect.height / 2;
+      }
+
+      // Calculate the maximum distance from button to any corner
+      const maxDistance = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+      );
+
+      // Create or get the expanding circle element
+      let circle = document.getElementById('theme-transition-circle');
+      if (!circle) {
+        circle = document.createElement('div');
+        circle.id = 'theme-transition-circle';
+        circle.style.cssText = `
+          position: fixed;
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 2147483647;
+          transform-origin: center;
+        `;
+        body.appendChild(circle);
+      }
+
+      // Set initial position and size
+      const circleSize = maxDistance * 2.5; // Extra size to ensure full coverage
+      circle.style.width = `${circleSize}px`;
+      circle.style.height = `${circleSize}px`;
+      circle.style.left = `${x - circleSize / 2}px`;
+      circle.style.top = `${y - circleSize / 2}px`;
+      
+      // Set the circle color to the new theme's background
+      const newTheme = theme === 'light' ? 'dark' : 'light';
+      const newBg = newTheme === 'dark' ? '#0f172a' : '#ffffff';
+      circle.style.backgroundColor = newBg;
+
+      // Disable all transitions during the switch
+      root.classList.add('theme-switching');
+
+      // Start with invisible circle
+      gsap.set(circle, { scale: 0, opacity: 1 });
+
+      // Create GSAP timeline for smooth animation
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // Clean up
+          root.classList.remove('theme-switching');
+          if (circle.parentNode) {
+            circle.parentNode.removeChild(circle);
+          }
+        }
+      });
+
+      // Animate circle expansion
+      tl.to(circle, {
+        scale: 1,
+        duration: 0.6,
+        ease: "power2.out"
+      })
+      // Change theme halfway through animation
+      .call(() => {
+        setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+      }, [], 0.3)
+      // Fade out circle to reveal new theme
+      .to(circle, {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.inOut"
+      }, 0.4);
+
+    } catch (e) {
+      // Fallback if anything goes wrong
+      setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+    }
+  }, [theme]);
 
   const value = useMemo(() => ({
     theme,

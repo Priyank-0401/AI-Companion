@@ -16,3 +16,32 @@ body {
 #root.theme-loaded {
   opacity: 1;
 }
+
+/*
+  Circular expanding theme transition
+  - GSAP creates and animates a circular element from button position
+  - Disable all element transitions during the switch for smooth effect
+*/
+
+/* Disable all transitions/animations during the circular expansion */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Ensure the transition circle renders above everything */
+#theme-transition-circle {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  border-radius: 50% !important;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  html.theme-switching {
+    /* Still disable transitions but GSAP will handle reduced motion internally */
+  }
+}
