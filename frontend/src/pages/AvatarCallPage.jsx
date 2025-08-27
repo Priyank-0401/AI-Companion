@@ -280,6 +280,7 @@ const AvatarCallPage = () => {
   const conversationLoadedRef = useRef(false);
   const audioElement = useRef(null);
   const volumeLipSyncRef = useRef(null);
+  const debounceTimer = useRef(null);
   const REQUEST_COOLDOWN = 2000; // 2 seconds cooldown between requests
 
   // Speech recognition hook
@@ -413,18 +414,27 @@ const AvatarCallPage = () => {
     }
   }, [poseResults, gestureResults]);
   
-  // Handle final transcript changes
+  // Handle final transcript changes - automatically stop mic and process
   useEffect(() => {
-    if (finalTranscript) {
+    if (finalTranscript && finalTranscript.trim()) {
       console.log('Final transcript received:', finalTranscript);
       setRecognizedText(finalTranscript);
       
-      // Process the final transcript if we're in a call and not already processing
-      if (isCallActive && !isProcessing) {
+      // Automatically stop listening when we get a final transcript
+      if (isListening) {
+        console.log('🎤 Final transcript ready, automatically stopping microphone');
+        stopListening();
+      }
+      
+      // Process the final transcript if not already processing
+      if (!isProcessing) {
+        console.log('🎯 Processing final transcript:', finalTranscript);
         handleProcessText(finalTranscript);
+      } else {
+        console.log('⏳ Already processing, skipping transcript:', finalTranscript);
       }
     }
-  }, [finalTranscript, isCallActive, isProcessing]);
+  }, [finalTranscript, isProcessing, isListening, stopListening]);
 
   // Handle speech recognition errors
   useEffect(() => {
@@ -609,10 +619,15 @@ const AvatarCallPage = () => {
         onStart: () => {
           console.log('🎤 Speech started - starting talking animation immediately');
           setIsSpeaking(true); // Start talking animation immediately when speech begins
+          setCurrentCaption(text); // Set caption text when speech starts
         },
         onEnd: () => {
           console.log('✅ Speech ended');
           setIsSpeaking(false);
+          // Reset lip-sync animation
+          if (volumeLipSyncRef.current) {
+            volumeLipSyncRef.current.reset();
+          }
           // Clear captions after a delay when speech ends
           setTimeout(() => {
             setCurrentCaption('');
@@ -674,12 +689,35 @@ const AvatarCallPage = () => {
           id: `user-${Date.now()}`
         }, response]);
         
-        // Speak the response if voice is enabled
-        if (voiceEnabled) {
-          await speakText(response.content);
+        // Speak the response - auto-enable voice if user is using speech recognition
+        console.log('🔊 Voice enabled status:', voiceEnabled);
+        if (!voiceEnabled && isSpeechAvailable) {
+          console.log('🔊 Auto-enabling voice since user is using speech recognition');
+          setVoiceEnabled(true);
         }
         
-        setLastProcessedText(text); // Update last processed text
+        if (voiceEnabled || isSpeechAvailable) {
+          console.log('🎤 Speaking response:', response.content.substring(0, 50) + '...');
+          await speakText(response.content);
+        } else {
+          console.log('🔇 Voice is disabled, not speaking response');
+        }
+        
+        lastProcessedText.current = text; // Update last processed text
+        
+        // Clear the recognized text and reset transcript for next input
+        setRecognizedText('');
+        resetTranscript();
+        
+        // After processing is complete and avatar has responded, 
+        // automatically restart listening if voice is enabled
+        setTimeout(() => {
+          if (voiceEnabled && !isListening && isSpeechAvailable) {
+            console.log('🎤 Avatar response complete, restarting microphone for next input');
+            startListening();
+          }
+        }, 1000); // Small delay to ensure speech synthesis has started
+        
       } else {
         console.warn('⚠️ No response content received from API.');
       }
@@ -687,17 +725,9 @@ const AvatarCallPage = () => {
       console.error('❌ Error processing text:', error);
       setError('Failed to process your message. Please try again.');
     }
-  }, [isProcessing, emotion, gestureContext, currentUser, conversationHistory, voiceEnabled, speakText, setError, setIsProcessing, setConversationHistory, setEmotion, setLastMessage]);
+  }, [isProcessing, emotion, gestureContext, currentUser, conversationHistory, voiceEnabled, speakText, setError, setIsProcessing, setConversationHistory, setEmotion, setLastMessage, resetTranscript, isListening, isSpeechAvailable, startListening]);
 
-  // Handle when voice playback ends
-  const handleVoiceEnd = useCallback(() => {
-    console.log('Voice playback ended');
-    setIsSpeaking(false);
-    // Reset lip-sync animation
-    if (volumeLipSyncRef.current) {
-      volumeLipSyncRef.current.reset();
-    }
-  }, []);
+  // Removed handleVoiceEnd - now handled directly in speakText onEnd callback
   
 
   
@@ -1086,61 +1116,7 @@ const AvatarCallPage = () => {
     }
   }, [voiceEnabled, setupVolumeAnalysis, stopLipSync, startRecognition, recognizedText, processUserMessage, speakText, setError, setIsProcessing, lastProcessedText, currentRequestId, emotion, setConversationHistory, setEmotion]);
 
-  // Create the processFinalTranscript function with useCallback to prevent recreation on every render
-  const processFinalTranscript = useCallback(debounce((transcript) => {
-    // Skip if we're still processing
-    if (isProcessing) {
-      console.log('⏳ Currently processing another request, skipping...');
-      return;
-    }
-    
-    // Skip empty or whitespace only transcripts
-    const trimmedTranscript = transcript.trim();
-    if (!trimmedTranscript) {
-      console.log('⚠️ Empty transcript received, skipping...');
-      return;
-    }
-    
-    // Check cooldown period (1 second)
-    const now = Date.now();
-    if (now - lastRequestTime.current < 1000) {
-      console.log('⏳ Request too frequent, skipping...');
-      return;
-    }
-    
-    // Only check for duplicates if the last processed text was very recent (within 2 seconds)
-    const isDuplicate = lastProcessedText.current === trimmedTranscript && 
-                       (now - lastRequestTime.current < 2000);
-    
-    if (isDuplicate) {
-      console.log('🔄 Duplicate message detected, skipping...');
-      return;
-    }
-    
-    console.log('📨 Processing final transcript:', trimmedTranscript);
-    lastRequestTime.current = now;
-    lastProcessedText.current = trimmedTranscript;
-    
-    // Process the user message with the recognized text
-    processUserMessage(
-      trimmedTranscript,
-      speakText,
-      setError,
-      setIsProcessing,
-      lastProcessedText,
-      currentRequestId,
-      emotion,
-      setConversationHistory,
-      setEmotion,
-      voiceService.speak.bind(voiceService)
-    );
-
-    // Automatically turn off the microphone after sending the message
-    if (isListening) {
-      console.log('🎤 Transcript sent, automatically turning off microphone.');
-      stopListening();
-    }
-  }, 500), [isListening, isProcessing, speakText, setError, setIsProcessing, emotion, setConversationHistory, setEmotion, currentRequestId, stopListening]);
+  // Removed processFinalTranscript - now using simplified handleProcessText flow
 
   // Speech recognition is handled by the useSpeechRecognition hook
   // The hook manages initialization, event handling, and cleanup
@@ -1158,74 +1134,7 @@ const AvatarCallPage = () => {
     }
   }, []);
 
-  // Revised function to fix the deadlock
-  const handleFinalTranscript = useCallback(async (text) => {
-    const trimmedText = text?.trim();
-    if (!trimmedText || isProcessing) return; // Use the state variable 'isProcessing'
-
-    console.log('🎤 Processing speech input:', trimmedText);
-
-    // Prevent duplicate processing of the exact same text
-    if (lastProcessedText.current === trimmedText) {
-      console.log('Skipping duplicate transcript');
-      return;
-    }
-    
-    lastProcessedText.current = trimmedText;
-    setIsProcessing(true); // Set processing to TRUE here
-
-    try {
-      // Add user message to chat immediately for better UX
-      const userMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: trimmedText,
-        timestamp: new Date().toISOString(),
-      };
-      setConversationHistory(prev => [...prev, userMessage]);
-
-      // 1. Get the response from the API
-      const response = await processUserMessage(
-        trimmedText,
-        setError,
-        setIsProcessing, // This is for internal state, but we control the main one
-        lastProcessedText,
-        currentRequestId,
-        emotion,
-        setConversationHistory,
-        setEmotion
-      );
-
-      // 2. If we got a valid response with content, speak it and show captions
-      if (response?.content) {
-        console.log('✅ API response received, preparing to speak.');
-        // Add assistant response to history
-        setConversationHistory(prev => [...prev, response]);
-        // Set captions to show the response text after a 2-second delay
-        setTimeout(() => {
-          setCurrentCaption(response.content);
-          setShowCaptions(true);
-        }, 2000);
-        await speakText(response.content); // This will now work correctly
-      } else {
-        console.warn('⚠️ No valid content in API response to speak.');
-      }
-
-    } catch (error) {
-      console.error('❌ Error in handleFinalTranscript:', error);
-      setError('Failed to process your message. Please try again.');
-    } finally {
-      setIsProcessing(false); // Set processing to FALSE here
-      resetTranscript(); // Clear the transcript for the next input
-    }
-  }, [isProcessing, speakText, setError, emotion, setConversationHistory, setEmotion, currentRequestId, resetTranscript]);
-  
-  // Process new final transcripts
-  useEffect(() => {
-    if (finalTranscript?.trim() && finalTranscript !== lastProcessedText.current) {
-      handleFinalTranscript(finalTranscript);
-    }
-  }, [finalTranscript, handleFinalTranscript]);
+  // Remove duplicate transcript handling - now handled in the main useEffect above
   
   // Toggle voice recognition using the hook
   const toggleListening = useCallback(async () => {
@@ -1329,7 +1238,7 @@ const AvatarCallPage = () => {
     lastMessage: lastMessage?.content || '',
     voiceEnabled: voiceEnabled && systemVolume > 0,
     selectedVoice: selectedVoice,
-    onVoiceEnd: handleVoiceEnd,
+    onVoiceEnd: null,
     avatarVolume: systemVolume, // Pass volume to avatar
     isTalking: isSpeaking, // CRITICAL: Pass talking state to trigger animation
     volumeLipSyncRef: {
@@ -1343,7 +1252,7 @@ const AvatarCallPage = () => {
     currentWord: currentWord,
     isVisemeActive: isVisemeActive,
     detectedEmotion: emotion
-  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, handleVoiceEnd, isSpeaking, currentLipSyncVolume, isLipSyncing, emotion, visemeMultiplier, currentWord, isVisemeActive]);
+  }), [lastMessage, voiceEnabled, systemVolume, selectedVoice, isSpeaking, currentLipSyncVolume, isLipSyncing, emotion, visemeMultiplier, currentWord, isVisemeActive]);
   
   // Handle ending the call
   const endCall = useCallback(() => {
