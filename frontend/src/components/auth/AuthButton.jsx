@@ -10,23 +10,23 @@ const AuthButton = ({
   className = '',
   ...props
 }) => {
-  const baseStyles = 'w-full py-3 px-6 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2';
+  const baseStyles = 'w-full py-3.5 px-6 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center space-x-2 shadow-sm hover:shadow-md';
   
   const variants = {
     primary: {
-      base: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2',
-      disabled: 'bg-indigo-400 cursor-not-allowed',
+      base: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+      disabled: 'bg-blue-400 cursor-not-allowed',
     },
     secondary: {
-      base: 'bg-gray-800 text-white hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2',
-      disabled: 'bg-gray-400 cursor-not-allowed',
+      base: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 border border-gray-200',
+      disabled: 'bg-gray-100 cursor-not-allowed opacity-50',
     },
     outline: {
-      base: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2',
+      base: 'border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
       disabled: 'opacity-50 cursor-not-allowed',
     },
     ghost: {
-      base: 'text-indigo-600 hover:bg-indigo-50',
+      base: 'text-blue-600 hover:bg-blue-50',
       disabled: 'opacity-50 cursor-not-allowed',
     },
   };
@@ -41,7 +41,6 @@ const AuthButton = ({
       disabled={disabled || isLoading}
       className={buttonStyles}
       whileTap={{ scale: disabled || isLoading ? 1 : 0.98 }}
-      whileHover={disabled || isLoading ? {} : { scale: 1.02 }}
       {...props}
     >
       {isLoading ? (

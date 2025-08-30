@@ -26,10 +26,10 @@ const SignupPage = () => {
   const navigate = useNavigate();
 
   const handleGoogleSignup = async () => {
-    setIsLoading(true);
     setError('');
     
     try {
+      setIsLoading(true);
       await signInWithGoogle();
       navigate('/');
     } catch (err) {
@@ -156,7 +156,7 @@ const SignupPage = () => {
         </motion.div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <AuthInput
           type="text"
           label="Full Name"
@@ -256,17 +256,17 @@ const SignupPage = () => {
               required
               checked={agreedToTerms}
               onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded"
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded"
             />
           </div>
           <div className="ml-3 text-sm">
             <label htmlFor="terms" className="font-medium text-gray-700 dark:text-gray-300">
               I agree to the{' '}
-              <a href="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+              <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Terms of Service
               </a>{' '}
               and{' '}
-              <a href="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+              <a href="/privacy" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Privacy Policy
               </a>
             </label>
@@ -301,7 +301,7 @@ const SignupPage = () => {
         type="button"
         variant="outline"
         onClick={handleGoogleSignup}
-        className="group w-full mt-6 flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 shadow-sm hover:shadow-md active:shadow-sm transform hover:-translate-y-0.5 active:translate-y-0"
+        className="group w-full mt-6 flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 shadow-sm hover:shadow-md active:shadow-sm"
         disabled={isLoading}
       >
         <span className="relative flex items-center justify-center">
@@ -313,7 +313,7 @@ const SignupPage = () => {
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
         </span>
-        <span className="font-medium text-gray-700 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors duration-200">
+        <span className="font-medium text-gray-700 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
           Continue with Google
         </span>
       </AuthButton>
@@ -322,7 +322,7 @@ const SignupPage = () => {
         Already have an account?{' '}
         <Link 
           to="/login" 
-          className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
+          className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
         >
           Sign in
         </Link>

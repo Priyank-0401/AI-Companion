@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* FOUNDATIONAL SCALING SETUP */
+html {
+  font-size: 100%; /* 16px base - DO NOT CHANGE */
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+/* Make images and media responsive */
+img, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
 @layer base {
   :root {
     --color-bg-primary: #ffffff;
@@ -25,26 +41,26 @@
   @apply transition-colors duration-200;
 }
 
-/* Keyframe animations */
+/* Keyframe animations - converted to rem units */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(0.2rem); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(10px); opacity: 0; }
+  from { transform: translateX(0.5rem); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes slideInLeft {
-  from { transform: translateX(-10px); opacity: 0; }
+  from { transform: translateX(-0.5rem); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0px); }
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-0.25rem); }
+  100% { transform: translateY(0); }
 }
 
 /* Animation classes */
@@ -57,10 +73,10 @@
   animation: float 3s ease-in-out infinite;
 }
 
-/* Message transitions */
+/* Message transitions - converted to rem units */
 .message-enter {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(0.5rem);
 }
 
 .message-enter-active {
@@ -76,7 +92,7 @@
 
 .message-exit-active {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.5rem);
   transition: opacity 200ms ease-in, transform 200ms ease-in;
 }
 
@@ -104,17 +120,17 @@
     transform: translateY(0);
   }
   40% { 
-    transform: translateY(-6px);
+    transform: translateY(-0.3rem);
   }
 }
 
 .typing-indicator span {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 0.3rem;
+  height: 0.3rem;
   border-radius: 50%;
   background-color: #9ca3af;
-  margin: 0 2px;
+  margin: 0 0.1rem;
   animation: bounce 1.4s infinite ease-in-out both;
 }
 
@@ -145,16 +161,16 @@
 /* Blob animation */
 @keyframes blob {
   0% {
-    transform: translate(0px, 0px) scale(1);
+    transform: translate(0, 0) scale(1);
   }
   33% {
-    transform: translate(30px, -20px) scale(1.1);
+    transform: translate(1.5rem, -1rem) scale(1.1);
   }
   66% {
-    transform: translate(-20px, 20px) scale(0.9);
+    transform: translate(-1rem, 1rem) scale(0.9);
   }
   100% {
-    transform: translate(0px, 0px) scale(1);
+    transform: translate(0, 0) scale(1);
   }
 }
 

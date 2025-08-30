@@ -33,17 +33,17 @@ const AuthInput = ({
       )}
       
       <div 
-        className={`relative rounded-lg transition-all duration-200 ${
+        className={`relative rounded-xl transition-all duration-200 ${
           isFocused 
-            ? 'ring-2 ring-indigo-500/50' 
+            ? 'ring-2 ring-blue-500/50' 
             : isDark 
-              ? 'ring-1 ring-gray-700' 
-              : 'ring-1 ring-gray-300'
-        } ${isDark ? 'bg-gray-700/50' : 'bg-white'}`}
+              ? 'ring-1 ring-gray-600' 
+              : 'ring-1 ring-gray-200'
+        } ${isDark ? 'bg-gray-800/60' : 'bg-gray-50'}`}
       >
         {Icon && (
           <div className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-            isFocused ? 'text-indigo-500' : isDark ? 'text-gray-400' : 'text-gray-500'
+            isFocused ? 'text-blue-500' : isDark ? 'text-gray-400' : 'text-gray-500'
           }`}>
             <Icon className="w-5 h-5" />
           </div>
@@ -58,11 +58,11 @@ const AuthInput = ({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
-          className={`w-full px-4 py-3 ${Icon ? 'pl-10' : 'pl-4'} pr-${showPasswordToggle ? '10' : '4'} 
-            rounded-lg border-0 focus:ring-0 text-sm ${
+          className={`w-full px-4 py-3.5 ${Icon ? 'pl-10' : 'pl-4'} pr-${showPasswordToggle ? '10' : '4'} 
+            rounded-xl border-0 focus:ring-0 text-sm font-medium ${
               isDark 
-                ? 'bg-transparent text-white placeholder-gray-500' 
-                : 'text-gray-900 placeholder-gray-400'
+                ? 'bg-transparent text-white placeholder-gray-400' 
+                : 'bg-transparent text-gray-900 placeholder-gray-500'
             }`}
           {...props}
         />
@@ -71,7 +71,7 @@ const AuthInput = ({
           <button
             type="button"
             onClick={onTogglePassword}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500 focus:outline-none"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 focus:outline-none"
             tabIndex="-1"
           >
             {type === 'password' ? (

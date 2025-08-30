@@ -422,8 +422,17 @@ class LLMService {
       return messages;
     }
     
-    // Build enhanced system prompt with emotion context
+    // Build enhanced system prompt with emotion and language context
     let enhancedSystemPrompt = SERIVA_CONFIG.systemPrompt;
+    
+    // Add language context if provided
+    if (context && context.language) {
+      const languageContext = context.language === 'hi-IN' 
+        ? `\n\nIMPORTANT: The user has selected Hindi as their language. You MUST respond in Hindi using Devanagari script. Be culturally appropriate and maintain your warm, empathetic personality in Hindi.`
+        : `\n\nLanguage preference: The user has selected ${context.language}. Please respond in this language while maintaining your supportive personality.`;
+      enhancedSystemPrompt += languageContext;
+      logger.debug(`[LLM] Enhanced system prompt with language: ${context.language}`);
+    }
     
     // Add emotion context if provided
     if (context && context.emotion) {

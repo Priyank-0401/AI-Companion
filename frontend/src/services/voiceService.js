@@ -55,17 +55,32 @@ export const AZURE_NEURAL_VOICES = [
     gender: 'Female',
     styles: ['default', 'cheerful', 'friendly'],
     characteristics: 'Youthful, energetic, upbeat'
+  },
+  {
+    name: 'hi-IN-SwaraNeural',
+    displayName: 'Swara (Hindi - Warm & Clear)',
+    language: 'hi-IN',
+    gender: 'Female',
+    styles: ['default', 'cheerful', 'friendly', 'calm', 'empathetic'],
+    characteristics: 'Natural Hindi voice with clear Devanagari pronunciation'
   }
 ];
 
 class VoiceService {
   constructor() {
+    this.audioElement = null;
+    this.currentUtterance = null;
+    this.isInitialized = false;
+    this.selectedVoice = null;
+    this.selectedLanguage = 'en-US';
+    this.onSpeakStart = null;
+    this.onSpeakEnd = null;
+    this.onSpeakError = null;
     this.availableVoices = AZURE_NEURAL_VOICES;
     this.selectedVoice = AZURE_NEURAL_VOICES[0];
     this._isSpeaking = false;
     this.currentAudio = null;
     this.audioCache = new Map();
-    this.isInitialized = false;
     this.initializationPromise = null;
     this.voiceSettings = {
       rate: '0.9',
@@ -157,11 +172,18 @@ class VoiceService {
     const voice = options.voice || this.selectedVoice;
     const voiceName = voice.name || 'en-US-JennyNeural';
     const style = this.mapTTSStyle(options.style || this.voiceSettings.style);
-    const rate = options.rate || this.voiceSettings.rate;
+    
+    // Use faster rate for Hindi voices
+    let rate = options.rate || this.voiceSettings.rate;
+    if (voice.language === 'hi-IN') {
+      rate = '1.2'; // Faster rate for Hindi
+    }
+    
     const pitch = options.pitch || this.voiceSettings.pitch;    
 
     // Create SSML with style support
-    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
+    const xmlLang = (options.lang || voice.language || 'en-US');
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${xmlLang}">
         <voice name="${voiceName}">
           <mstts:express-as style="${style}" styledegree="1.0">
             <prosody rate="${rate}" pitch="${pitch}">
@@ -342,14 +364,23 @@ class VoiceService {
       
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Find a good female voice from system
+      // Find a good female voice from system matching desired language
       const voices = window.speechSynthesis.getVoices();
-      const femaleVoice = voices.find(v => 
-        v.lang.startsWith('en') && 
-        (v.name.toLowerCase().includes('female') || 
-         v.name.toLowerCase().includes('samantha') ||
-         v.name.toLowerCase().includes('zoe'))
-      ) || voices.find(v => v.lang.startsWith('en'));
+      const desiredLang = (options.lang || this.selectedVoice?.language || 'en-US');
+      const desiredLangBase = desiredLang.split('-')[0];
+      let femaleVoice = voices.find(v => 
+        (v.lang === desiredLang || v.lang.toLowerCase() === desiredLang.toLowerCase() || v.lang.toLowerCase().startsWith(desiredLangBase.toLowerCase())) &&
+        (
+          v.name.toLowerCase().includes('female') ||
+          v.name.toLowerCase().includes('samantha') ||
+          v.name.toLowerCase().includes('zoe') ||
+          v.name.toLowerCase().includes('swara')
+        )
+      );
+      if (!femaleVoice) {
+        femaleVoice = voices.find(v => v.lang.toLowerCase() === desiredLang.toLowerCase() || v.lang.toLowerCase().startsWith(desiredLangBase.toLowerCase()))
+          || voices.find(v => v.lang.startsWith('en'));
+      }
       
       if (femaleVoice) {
         utterance.voice = femaleVoice;
@@ -556,11 +587,22 @@ class VoiceService {
   }
 
   setVoice(voice) {
-    if (voice && this.availableVoices.includes(voice)) {
+    if (voice && AZURE_NEURAL_VOICES.find(v => v.name === voice.name)) {
       this.selectedVoice = voice;
-      return true;
+      console.log('🎵 Voice set to:', voice.displayName);
     }
-    return false;
+  }
+
+  setLanguage(languageCode) {
+    this.selectedLanguage = languageCode;
+    console.log('🌐 VoiceService language set to:', languageCode);
+    
+    // Auto-select appropriate voice for the language
+    const languageVoices = AZURE_NEURAL_VOICES.filter(voice => voice.language === languageCode);
+    if (languageVoices.length > 0 && (!this.selectedVoice || this.selectedVoice.language !== languageCode)) {
+      this.selectedVoice = languageVoices[0];
+      console.log('🎵 Auto-selected voice for language:', this.selectedVoice.displayName);
+    }
   }
 
   setVoiceByName(voiceName) {

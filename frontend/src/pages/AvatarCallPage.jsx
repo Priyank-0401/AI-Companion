@@ -32,6 +32,7 @@ import {
   VideoOff,
   Maximize2,
   Minimize2,
+  Globe,
 } from 'lucide-react';
 
 import voiceService from '../services/voiceService';
@@ -50,7 +51,7 @@ const debounce = (func, wait) => {
 };
 
 // Process user message and get response from the backend
-const processUserMessage = async (message, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', gestureContext = null, setMessages, setEmotion, conversationHistory = []) => {
+const processUserMessage = async (message, setError, setIsProcessing, lastProcessedText, currentRequestId, currentEmotion = 'neutral', gestureContext = null, setMessages, setEmotion, conversationHistory = [], selectedLanguage = 'en-US') => {
   if (!message || !message.trim()) {
     console.warn('⚠️ Empty message provided to processUserMessage');
     return null;
@@ -95,13 +96,15 @@ const processUserMessage = async (message, setError, setIsProcessing, lastProces
       provider: 'groq',
       temperature: 0.7,
       maxTokens: 2000,
+      language: selectedLanguage,
       context: { 
         emotion: currentEmotion,
         gestureContext: gestureContext,
         timestamp: new Date().toISOString(),
         requestId,
         isAvatarCall: true,
-        hasHistory: conversationHistory.length > 0
+        hasHistory: conversationHistory.length > 0,
+        language: selectedLanguage
       }
     };
     
@@ -289,6 +292,13 @@ const AvatarCallPage = () => {
   const debounceTimer = useRef(null);
   const REQUEST_COOLDOWN = 2000; // 2 seconds cooldown between requests
 
+  // Language State (must be declared before useSpeechRecognition)
+  const [selectedLanguage, setSelectedLanguage] = useState(() => {
+    // Load from localStorage or default to English
+    return localStorage.getItem('seriva-language') || 'en-US';
+  });
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+
   // Speech recognition hook
   const {
     isListening,
@@ -302,7 +312,7 @@ const AvatarCallPage = () => {
     resetTranscript
   } = useSpeechRecognition({
     continuous: true,
-    lang: 'en-US',
+    lang: selectedLanguage,
     confidenceThreshold: 0.8
   });
 
@@ -351,6 +361,12 @@ const AvatarCallPage = () => {
   // Gesture Detection State
   const [gestureContext, setGestureContext] = useState(null);
   const [isGestureDetectionActive, setIsGestureDetectionActive] = useState(false);
+  
+  // Language options
+  const languageOptions = [
+    { code: 'en-US', name: 'English', flag: '🇺🇸' },
+    { code: 'hi-IN', name: 'हिंदी', flag: '🇮🇳' }
+  ];
   
   // NEW: Viseme Lip Sync Hook
   const {
@@ -477,7 +493,6 @@ const AvatarCallPage = () => {
     if (isCameraEnabled && isGestureInitialized && isGestureDetectionActive) {
       startGestureDetectionSafely();
     } else if (isGestureInitialized) {
-      console.log('🛑 Stopping gesture detection');
       stopGestureDetection();
     }
     
@@ -617,9 +632,17 @@ const AvatarCallPage = () => {
 
     console.log('🔊 Starting to speak text with style:', { text: text.substring(0, 50) + '...', ttsStyle });
     
-    // Ensure the voice service is initialized with the selected voice
-    if (selectedVoice) {
-      voiceService.setVoice(selectedVoice);
+    // Ensure the voice service is initialized with the correct voice for the current language
+    const currentLanguageVoices = availableVoices.filter(voice => voice.language === selectedLanguage);
+    const correctVoice = currentLanguageVoices.length > 0 ? currentLanguageVoices[0] : selectedVoice;
+    
+    if (correctVoice) {
+      console.log('🎵 Setting voice for speech:', correctVoice.displayName, 'for language:', selectedLanguage);
+      voiceService.setVoice(correctVoice);
+      // Update state if it's different
+      if (selectedVoice?.name !== correctVoice.name) {
+        setSelectedVoice(correctVoice);
+      }
     }
 
     try {
@@ -684,7 +707,9 @@ const AvatarCallPage = () => {
         gestureContext,
         setConversationHistory,
         setEmotion,
-        conversationHistory
+        currentUser,
+        conversationHistory,
+        selectedLanguage
       );
 
       if (response && response.content) {
@@ -937,7 +962,40 @@ const AvatarCallPage = () => {
     }
     
     console.log('🎵 Selected Azure Neural voice:', voice.displayName, '(' + voice.name + ')');
-  }, [voiceEnabled]);
+  }, [selectedVoice, voiceEnabled]);
+  
+  // Language selection handler
+  const selectLanguage = useCallback((languageCode) => {
+    console.log('🌐 Switching language to:', languageCode);
+    setSelectedLanguage(languageCode);
+    setShowLanguageSelector(false);
+    
+    // Persist language preference
+    localStorage.setItem('seriva-language', languageCode);
+    
+    // Update voice service language and auto-select appropriate voice
+    if (voiceService) {
+      voiceService.setLanguage(languageCode);
+      
+      // Auto-select the appropriate voice for the language
+      const languageVoices = availableVoices.filter(voice => voice.language === languageCode);
+      if (languageVoices.length > 0) {
+        const newVoice = languageVoices[0];
+        setSelectedVoice(newVoice);
+        voiceService.setVoice(newVoice);
+        console.log('🎵 Auto-selected voice for language:', newVoice.displayName);
+      }
+    }
+    
+    // Update speech recognition language if active
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.lang = languageCode;
+      console.log('🎤 Updated speech recognition language to:', languageCode);
+    }
+    
+    console.log('✅ Language switched to:', languageCode);
+  }, [isListening, availableVoices]);
+
   // Start recognition function with retry logic
   const startRecognition = useCallback(async () => {
     console.log('🚀 Starting speech recognition...');
@@ -1096,10 +1154,12 @@ const AvatarCallPage = () => {
           lastProcessedText,
           currentRequestId,
           emotion,
+          gestureContext,
           setConversationHistory,
           setEmotion,
           currentUser,
-          conversationHistory
+          conversationHistory,
+          selectedLanguage
         );
       }
       
@@ -1332,13 +1392,16 @@ const AvatarCallPage = () => {
       if (showVoiceSelector && !event.target.closest('.voice-selector-container')) {
         setShowVoiceSelector(false);
       }
+      if (showLanguageSelector && !event.target.closest('.voice-selector-container')) {
+        setShowLanguageSelector(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showVoiceSelector]);
+  }, [showVoiceSelector, showLanguageSelector]);
 
   // Handle delayed speaking state for smoother animations
   useEffect(() => {
@@ -1687,7 +1750,19 @@ const AvatarCallPage = () => {
       </AnimatePresence>
 
       {/* Bottom Controls */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-40">
+      <motion.div 
+        className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-40"
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ 
+          opacity: isGreeting ? 0 : 1, 
+          y: isGreeting ? 100 : 0 
+        }}
+        transition={{ 
+          duration: 0.8, 
+          ease: "easeOut",
+          delay: isGreeting ? 0 : 0.3 // Small delay when fading in
+        }}
+      >
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-center space-x-4">
             {/* Voice Input Button */}
@@ -1865,6 +1940,46 @@ const AvatarCallPage = () => {
               </div>
             </div>
 
+            {/* Language Toggle Button */}
+            <div className="relative group voice-selector-container">
+              <button 
+                onClick={() => setShowLanguageSelector(!showLanguageSelector)}
+                className="w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white"
+                title="Change Language"
+              >
+                <Globe className="w-6 h-6" />
+              </button>
+              
+              {/* Language Selector Dropdown */}
+              {showLanguageSelector && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-3 mb-3">
+                  <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl shadow-xl border border-white/20 dark:border-gray-700/30 py-2 min-w-[160px]">
+                    {languageOptions.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => selectLanguage(lang.code)}
+                        className={`w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 flex items-center space-x-3 ${
+                          selectedLanguage === lang.code 
+                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <span className="text-lg">{lang.flag}</span>
+                        <span className="font-medium">{lang.name}</span>
+                        {selectedLanguage === lang.code && (
+                          <Check className="w-4 h-4 ml-auto text-blue-600 dark:text-blue-400" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
+                Language
+              </div>
+            </div>
+
             {/* Captions Toggle Button */}
             <div className="relative group">
               <button 
@@ -1898,7 +2013,7 @@ const AvatarCallPage = () => {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

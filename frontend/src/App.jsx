@@ -9,6 +9,7 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/common/ScrollToTop';
+import ScrollToTopButton from './components/common/ScrollToTopButton';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -46,8 +47,8 @@ function AppContent() {
     const isChatRoute = location.pathname.startsWith('/chat');
     const isInformationalPage = ['/about', '/privacy', '/terms', '/cookies', '/feedback'].some(path => location.pathname.startsWith(path));
     
-    // Allow scrolling on home, dashboard, chat, and informational pages
-    if (isHomePage || isDashboardPage || isChatRoute || isInformationalPage) {
+    // Allow scrolling on home, dashboard, chat, auth, and informational pages
+    if (isHomePage || isDashboardPage || isChatRoute || isAuthPage || isInformationalPage) {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     } else {
@@ -60,7 +61,7 @@ function AppContent() {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     };
-  }, [location.pathname, isHomePage, isDashboardPage, isSettingsPage]);
+  }, [location.pathname, isHomePage, isDashboardPage, isSettingsPage, isAuthPage]);
 
   // Redirect authenticated users away from auth pages
   if (isAuthPage && user) {
@@ -71,6 +72,7 @@ function AppContent() {
     <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
       <Toaster position="top-right" />
       <ScrollToTop />
+      <ScrollToTopButton />
       {!hideNavbar && <Navbar />}
       <motion.main
         initial={{ opacity: 0 }}
