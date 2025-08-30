@@ -77,7 +77,6 @@ const LoginPage = () => {
     
     try {
       console.log('Initiating Google sign in...');
-      setIsLoading(true);
       const user = await signInWithGoogle();
       console.log('Google sign in successful, user:', user);
       
@@ -87,12 +86,16 @@ const LoginPage = () => {
       
       // The useEffect will handle the redirect when the user state updates
     } catch (err) {
-      const errorMessage = err.message || 'An error occurred. Please try again.';
-      console.error('Google sign in error:', errorMessage, err);
-      setError(errorMessage);
-      setIsLoading(false);
+      // Handle popup cancellation specifically
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        console.log('Google sign in popup was cancelled by user');
+        // Don't show error for user cancellation
+      } else {
+        const errorMessage = err.message || 'An error occurred. Please try again.';
+        console.error('Google sign in error:', errorMessage, err);
+        setError(errorMessage);
+      }
     }
-
   };
 
   return (

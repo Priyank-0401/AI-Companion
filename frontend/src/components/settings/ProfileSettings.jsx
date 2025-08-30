@@ -14,9 +14,12 @@ import {
   MapPin,
   Smartphone,
 } from 'lucide-react';
-import { updateUserProfile, ensureUserProfile } from '../../auth/services/authService';
+import { updateUserProfile, ensureUserProfile, deleteUserAccount } from '../../auth/services/authService';
+import { useNavigate } from 'react-router-dom';
 
 const ProfileSettings = ({ user, colors }) => {
+  const navigate = useNavigate();
+  
   // A helper function to build input classes
   const inputStyle = `w-full px-3 py-2 bg-${colors.background} border border-${colors.border} rounded-lg focus:ring-2 focus:ring-${colors.primary} focus:border-${colors.primary} transition-all duration-200`;
 
@@ -36,35 +39,23 @@ const ProfileSettings = ({ user, colors }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load user data from localStorage and auth context
+  // Load user data from props (which now comes from Firestore)
   useEffect(() => {
-    const storedUserData = localStorage.getItem('user');
-    let initialData = {
-      displayName: '',
-      email: '',
-      photoURL: '',
-      uid: '',
-      age: '',
-      gender: '',
-      location: '',
-    };
-
-    if (storedUserData) {
-      const data = JSON.parse(storedUserData);
-      initialData = { ...initialData, ...data };
-    }
-
     if (user) {
-      initialData = {
-        ...initialData,
-        displayName: user.displayName || initialData.displayName,
-        email: user.email || initialData.email,
-        photoURL: user.photoURL || initialData.photoURL,
-        uid: user.uid || initialData.uid,
-      };
+      setFormData({
+        displayName: user.displayName || '',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        uid: user.uid || '',
+        age: user.age || '',
+        gender: user.gender || '',
+        location: user.location || '',
+        // Include any additional fields from Firestore
+        ...user
+      });
     }
-    setFormData(initialData);
   }, [user]);
 
   const handleInputChange = (e) => {
@@ -120,6 +111,23 @@ const ProfileSettings = ({ user, colors }) => {
       setError(err.message || 'Failed to save profile. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    setError('');
+
+    try {
+      await deleteUserAccount();
+      // Navigate to home page after successful deletion
+      navigate('/');
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      setError(err.message || 'Failed to delete account. Please try again.');
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -195,18 +203,14 @@ const ProfileSettings = ({ user, colors }) => {
                   <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Gender</label>
                   <select name="gender" value={formData.gender} onChange={handleInputChange} className={inputStyle}>
                     <option value="">Select...</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
                 <div className="md:col-span-2">
                   <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Location</label>
                   <input type="text" name="location" value={formData.location} onChange={handleInputChange} className={inputStyle} />
-                </div>
-                <div className="md:col-span-2">
-                  <label className={`block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1`}>Profile Picture URL</label>
-                  <input type="text" name="photoURL" value={formData.photoURL} onChange={handleInputChange} className={inputStyle} />
                 </div>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
@@ -216,8 +220,8 @@ const ProfileSettings = ({ user, colors }) => {
             </form>
           ) : (
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className={`w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md border-2 border-white dark:border-gray-700`} style={{ backgroundColor: getAvatarColor(colors.background === 'gray-900') }}>
-                {getUserPhoto() ? <img src={getUserPhoto()} alt={getUserName()} className="w-full h-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-white shadow-md font-bold text-2xl" style={{ backgroundColor: getAvatarColor() }}>{getUserInitials(getUserName())}</div>}
+              <div className={`w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center shadow-md border-2 border-white dark:border-gray-700 text-white font-bold text-2xl`} style={{ backgroundColor: getAvatarColor() }}>
+                {getUserInitials(getUserName())}
               </div>
               <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="flex items-start gap-3">
@@ -316,9 +320,10 @@ const ProfileSettings = ({ user, colors }) => {
                 Cancel
               </button>
               <button 
-                // Add deletion logic to onClick here
-                className="px-6 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
-                Delete Account
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="px-6 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {isDeleting ? 'Deleting...' : 'Delete Account'}
               </button>
             </div>
           </div>

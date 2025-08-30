@@ -65,15 +65,18 @@ export const AuthProvider = ({ children }) => {
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      setLoading(true);
+      // Do NOT toggle global loading for popup auth to avoid page-wide spinner
       const user = await googleSignIn();
       const userData = await getAuthUser(user);
       return userData;
     } catch (error) {
+      // Swallow cancellation errors silently
+      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+        // No-op: user closed/cancelled the popup
+        return Promise.reject(error);
+      }
       console.error('Google sign in error:', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   }, []);
 

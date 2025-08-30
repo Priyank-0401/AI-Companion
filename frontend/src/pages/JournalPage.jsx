@@ -337,6 +337,21 @@ const JournalPage = () => {
     setEditingEntry(null);
   };
 
+  // Show loading state while entries are being fetched
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen ${colors.bg} flex items-center justify-center`}>
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-indigo-200 dark:bg-indigo-800 rounded-full mb-4 animate-spin">
+            <FileText className="w-6 h-6 text-indigo-600 dark:text-indigo-400 m-3" />
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">Loading your journal entries...</p>
+          <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">This may take a moment</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200`}>
       {/* Notification */}

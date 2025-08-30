@@ -92,9 +92,9 @@ const Navbar = () => {
         }`}>
           {/* Logo */}
           <div className="flex-shrink-0">
-              <Link to="/" className="group flex items-center transition-all duration-200 hover:scale-105">
+              <Link to="/" className="group flex items-center transition-all duration-200">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-indigo-600/20 dark:bg-indigo-400/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-indigo-600/20 dark:bg-indigo-400/20 rounded-xl blur-lg opacity-0 transition-opacity duration-300"></div>
                   <img src="/logo.svg" alt="Seriva Logo" className="relative h-10 w-10 transition-transform duration-200" />
                 </div>
                 <span className="ml-3 text-2xl font-bold text-indigo-600 dark:text-indigo-400 transition-colors duration-200">
@@ -137,10 +137,10 @@ const Navbar = () => {
             <button
               ref={themeButtonRef}
               onClick={() => toggleTheme(themeButtonRef.current)}
-              className="relative p-2.5 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 group"
+              className="relative p-2.5 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200 group"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 dark:from-blue-400/20 dark:to-purple-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 dark:from-blue-400/20 dark:to-purple-400/20 rounded-xl opacity-0 transition-opacity duration-200"></div>
               {theme === 'dark' ? (
                 <Sun className="relative w-5 h-5 transition-transform duration-200 group-hover:rotate-12" />
               ) : (
@@ -162,10 +162,10 @@ const Navbar = () => {
                             console.error('Error signing out:', error);
                           }
                         }}
-                        className="group px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-xl transition-all duration-200 flex items-center space-x-2 hover:shadow-md hover:scale-105 border border-red-200/50 dark:border-red-800/50"
+                        className="group px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-xl transition-all duration-200 flex items-center space-x-2 hover:shadow-md border border-red-200/50 dark:border-red-800/50"
                         disabled={loading}
                       >
-                        <LogOut className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                        <LogOut className="w-4 h-4 transition-transform duration-200" />
                         <span>Sign Out</span>
                       </button>
                   </div>
@@ -173,13 +173,13 @@ const Navbar = () => {
                   <div className="flex items-center space-x-2">
                     <Link
                       to="/login"
-                      className="group px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:scale-105 border border-gray-200/50 dark:border-gray-700/50"
+                      className="group px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50"
                     >
                       Log in
                     </Link>
                     <Link
                       to="/signup"
-                      className="group relative px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-xl transition-all duration-200 flex items-center shadow-lg hover:shadow-xl hover:scale-105 overflow-hidden"
+                      className="group relative px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-xl transition-all duration-200 flex items-center shadow-lg hover:shadow-xl overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-400 opacity-0 group-hover:opacity-20 transition-opacity duration-200"></div>
                       <span className="relative">Get Started</span>
@@ -196,7 +196,7 @@ const Navbar = () => {
             <button
               ref={mobileThemeButtonRef}
               onClick={() => toggleTheme(mobileThemeButtonRef.current)}
-              className="relative p-2.5 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 group"
+              className="relative p-2.5 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all duration-200 group"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 dark:from-blue-400/20 dark:to-purple-400/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
@@ -281,14 +281,14 @@ const Navbar = () => {
                     <Link
                       to="/login"
                       onClick={() => setIsOpen(false)}
-                      className="group block w-full text-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all duration-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:scale-105 border border-gray-200/50 dark:border-gray-700/50"
+                      className="group block w-full text-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all duration-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50"
                     >
                       Log in
                     </Link>
                     <Link
                       to="/signup"
                       onClick={() => setIsOpen(false)}
-                      className="group relative block w-full text-center px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 overflow-hidden"
+                      className="group relative block w-full text-center px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-400 opacity-0 group-hover:opacity-20 transition-opacity duration-200"></div>
                       <span className="relative">Get Started</span>

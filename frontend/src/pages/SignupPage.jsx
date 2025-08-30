@@ -33,8 +33,14 @@ const SignupPage = () => {
       await signInWithGoogle();
       navigate('/');
     } catch (err) {
-      setError('An error occurred. Please try again.');
-      console.error('Google sign up error:', err);
+      // Handle popup cancellation specifically
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        console.log('Google sign up popup was cancelled by user');
+        // Don't show error for user cancellation
+      } else {
+        setError('An error occurred. Please try again.');
+        console.error('Google sign up error:', err);
+      }
     } finally {
       setIsLoading(false);
     }

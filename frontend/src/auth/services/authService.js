@@ -8,9 +8,10 @@ import {
   sendPasswordResetEmail,
   updateEmail as updateFirebaseEmail,
   updatePassword as updateFirebasePassword,
-  sendEmailVerification
+  sendEmailVerification,
+  deleteUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { apiClient } from '../../services/api';
 
@@ -342,6 +343,51 @@ export const updateUserProfile = async (updates) => {
     return await getAuthUser(auth.currentUser);
   } catch (error) {
     console.error('Update profile error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete the current user's account and all associated data
+ * @returns {Promise<void>}
+ */
+export const deleteUserAccount = async () => {
+  if (!auth.currentUser) throw new Error('No authenticated user');
+  
+  try {
+    const userId = auth.currentUser.uid;
+    
+    // Delete user document from Firestore
+    const userRef = getUserDoc(userId);
+    await deleteDoc(userRef);
+    
+    // Delete additional user data collections if they exist
+    // Note: You may need to add more collections based on your app structure
+    try {
+      // Delete journal entries
+      const journalRef = doc(db, 'journal_entries', userId);
+      await deleteDoc(journalRef);
+    } catch (error) {
+      console.log('No journal entries to delete or error deleting:', error.message);
+    }
+    
+    try {
+      // Delete avatar conversations
+      const conversationRef = doc(db, 'avatar_conversations', userId);
+      await deleteDoc(conversationRef);
+    } catch (error) {
+      console.log('No avatar conversations to delete or error deleting:', error.message);
+    }
+    
+    // Clear local storage
+    clearAuthData();
+    
+    // Delete the Firebase Auth user (this must be done last)
+    await deleteUser(auth.currentUser);
+    
+    console.log('User account and all associated data deleted successfully');
+  } catch (error) {
+    console.error('Delete account error:', error);
     throw error;
   }
 };

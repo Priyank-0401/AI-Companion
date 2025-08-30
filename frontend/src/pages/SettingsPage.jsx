@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import useAuth from '../auth/hooks/useAuth';
 import { useTheme } from '../contexts/useTheme';
+import { getAuthUser } from '../auth/services/authService';
 import ProfileSettings from '../components/settings/ProfileSettings';
 
 // Theme colors
@@ -34,24 +35,76 @@ const themeColors = {
 };
 
 const SettingsPage = () => {
-  const { currentUser, loading, initialized } = useAuth();
-  const authUser = localStorage.getItem('authUser');
-  const user = authUser ? JSON.parse(authUser) : currentUser;
-  
-  const userProfile = {
-    ...user,
-    photoURL: user?.photoURL || user?.photoUrl || '',
-    displayName: user?.displayName || user?.name || 'User',
-    email: user?.email || 'user@example.com'
-  };
+  const { user: currentUser, loading: authLoading, initialized } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const { theme } = useTheme();
   const colors = themeColors[theme] || themeColors.light;
 
-  if (!initialized || loading) {
+  // Fetch complete user profile from Firestore
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!initialized || authLoading) return;
+      
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get complete user data from Firestore
+        const completeUserData = await getAuthUser(currentUser);
+        
+        setUserProfile({
+          ...completeUserData,
+          photoURL: completeUserData?.photoURL || completeUserData?.photoUrl || '',
+          displayName: completeUserData?.displayName || completeUserData?.name || 'User',
+          email: completeUserData?.email || 'user@example.com'
+        });
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+        setError('Failed to load user profile');
+        // Fallback to basic user data
+        setUserProfile({
+          ...currentUser,
+          photoURL: currentUser?.photoURL || currentUser?.photoUrl || '',
+          displayName: currentUser?.displayName || currentUser?.name || 'User',
+          email: currentUser?.email || 'user@example.com'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [currentUser, initialized, authLoading]);
+
+  if (!initialized || authLoading || loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        <p className="ml-3 text-gray-600 dark:text-gray-400">Loading your profile...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-center">
+          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
