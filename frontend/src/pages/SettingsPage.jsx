@@ -86,7 +86,7 @@ const SettingsPage = () => {
 
   if (!initialized || authLoading || loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center min-h-[calc(100vh-5rem)] w-full">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
         <p className="ml-3 text-gray-600 dark:text-gray-400">Loading your profile...</p>
       </div>
@@ -95,7 +95,7 @@ const SettingsPage = () => {
 
   if (error) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center min-h-[calc(100vh-5rem)] w-full">
         <div className="text-center">
           <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
           <button 
@@ -110,8 +110,8 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className={`bg-${colors.background} text-${colors.text} min-h-screen`}>
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-20">
+    <div className={`bg-${colors.background} text-${colors.text}`}>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <ProfileSettings user={userProfile} colors={colors} />
       </main>
     </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import chatApi, { api } from '../services/api';
 import Avatar from '../components/AvatarOptimized'; // Import the optimized Avatar component
@@ -274,6 +275,7 @@ const processUserMessage = async (message, setError, setIsProcessing, lastProces
 };
 
 const AvatarCallPage = () => {
+  const navigate = useNavigate();
   // Authentication context
   const { currentUser, loading: authLoading, initialized: authInitialized } = useAuth();
   
@@ -501,13 +503,6 @@ const AvatarCallPage = () => {
     };
   }, [isCameraEnabled, isGestureInitialized, isGestureDetectionActive, isGestureProcessing, startGestureDetection, stopGestureDetection]);
   
-  // Automatically enable gesture detection when camera is turned on
-  useEffect(() => {
-    if (isCameraEnabled && isGestureInitialized && !isGestureDetectionActive) {
-      console.log('🔄 Auto-enabling gesture detection with camera');
-      setIsGestureDetectionActive(true);
-    }
-  }, [isCameraEnabled, isGestureInitialized, isGestureDetectionActive]);
 
   // Load conversation history when user is available
   useEffect(() => {
@@ -1355,7 +1350,10 @@ const AvatarCallPage = () => {
     setRecognizedText('');
     setError(null);
     setIsCallActive(false);
-  }, []);
+
+    // Redirect to home page after cleanup
+    navigate('/');
+  }, [navigate, stopListening]);
 
   // Stop avatar speaking when voice is disabled
   useEffect(() => {
@@ -1567,21 +1565,6 @@ const AvatarCallPage = () => {
           onError={(e) => console.error('Emotion detection video error:', e)}
         />
         
-        {/* Preview video element - visible to user */}
-        <video
-          ref={previewVideoRef}
-          className="fixed left-4 top-24 z-50 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 transition-all duration-300"
-          style={{
-            width: isPreviewExpanded ? '500px' : '320px',
-            height: isPreviewExpanded ? '375px' : '240px',
-            transform: 'scaleX(-1)', // Mirror the preview
-            display: isCameraEnabled ? 'block' : 'none',
-            objectFit: 'cover'
-          }}
-          autoPlay
-          playsInline
-          muted
-        />
         
         <motion.div 
           className="absolute inset-0"
@@ -1617,10 +1600,10 @@ const AvatarCallPage = () => {
       <AnimatePresence>
         {isCameraEnabled && (
           <motion.div 
-            className={`fixed left-4 top-24 z-50 bg-black/80 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 backdrop-blur-sm transition-all duration-300 ${
+            className={`fixed left-3 top-20 md:right-4 md:top-24 z-50 bg-black/80 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 backdrop-blur-sm transition-all duration-300 ${
               isPreviewExpanded 
-                ? 'w-[500px] h-[375px]' 
-                : 'w-[320px] h-[240px]'
+                ? 'w-[clamp(180px,60vw,500px)] h-[clamp(135px,45vw,375px)]' 
+                : 'w-[clamp(140px,40vw,320px)] h-[clamp(105px,30vw,240px)]'
             }`}
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1695,30 +1678,30 @@ const AvatarCallPage = () => {
 
       {/* Captions Area - Bottom Right Corner */}
       <AnimatePresence>
-        {showCaptions && currentCaption && (
+        {!isGreeting && showCaptions && currentCaption && (
           <motion.div 
-            className="fixed bottom-24 right-6 z-30 max-w-sm"
+            className="fixed bottom-[clamp(60px,14vw,88px)] right-2 sm:right-6 z-30 w-[min(75vw,18rem)] sm:w-auto max-w-sm"
             initial={{ opacity: 0, x: 20, y: 20 }}
             animate={{ opacity: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, x: 20, y: 20 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
           >
-            <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-4 relative overflow-hidden">
+            <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-1 sm:p-2 relative overflow-hidden font-[Inter]">
               {/* Gradient accent */}
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
               
               <div className="flex items-start space-x-3">
                 {/* Avatar Icon */}
-                <div className="flex-shrink-0 mt-1">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-white font-semibold text-xs">S</span>
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-white font-semibold text-[8px] sm:text-[10px]">S</span>
                   </div>
                 </div>
                 
                 {/* Caption Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Seriva</h4>
+                <div className="flex-1 min-w-0 max-h-[22vh] overflow-y-auto pr-1 sm:max-h-none">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <h4 className="text-[8px] sm:text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Seriva</h4>
                     <button 
                       onClick={() => setShowCaptions(false)}
                       className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
@@ -1727,7 +1710,7 @@ const AvatarCallPage = () => {
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                  <p className="text-gray-800 dark:text-gray-200 leading-relaxed text-sm">
+                  <p className="text-gray-800 dark:text-gray-200 leading-tight text-[9px] sm:text-[11px] mb-2">
                     {currentCaption}
                   </p>
                 </div>
@@ -1735,13 +1718,13 @@ const AvatarCallPage = () => {
               
               {/* Typing indicator when processing */}
               {isProcessing && (
-                <div className="flex items-center space-x-2 mt-3 pl-11">
+                <div className="flex items-center space-x-2 mt-1.5 pl-7 sm:pl-9">
                   <div className="flex space-x-1">
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Thinking...</span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400">Thinking...</span>
                 </div>
               )}
             </div>
@@ -1751,7 +1734,7 @@ const AvatarCallPage = () => {
 
       {/* Bottom Controls */}
       <motion.div 
-        className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-40"
+        className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-20 min-h-[clamp(40px,8vw,72px)]"
         initial={{ opacity: 0, y: 100 }}
         animate={{ 
           opacity: isGreeting ? 0 : 1, 
@@ -1763,13 +1746,13 @@ const AvatarCallPage = () => {
           delay: isGreeting ? 0 : 0.3 // Small delay when fading in
         }}
       >
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-center space-x-4">
+        <div className="container mx-auto px-3 py-0 md:px-4 md:py-1">
+          <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 md:gap-3">
             {/* Voice Input Button */}
             <div className="relative group">
               <button 
                 onClick={toggleListening}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform ${
+                className={`w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center transition-all duration-300 transform ${
                   isGreeting
                     ? 'bg-red-500/70 cursor-not-allowed text-white/70' // Red and disabled during greeting
                     : isListening 
@@ -1782,11 +1765,11 @@ const AvatarCallPage = () => {
                 disabled={isProcessing || isGreeting}
               >
                 {isListening ? (
-                  <Mic className="w-6 h-6 text-white" />
+                  <Mic className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)] text-white" />
                 ) : isProcessing ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <Loader2 className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)] animate-spin" />
                 ) : (
-                  <MicOff className={`w-6 h-6 ${isGreeting ? 'text-white/70' : 'text-gray-900 dark:text-white'}`} />
+                  <MicOff className={`w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)] ${isGreeting ? 'text-white/70' : 'text-gray-900 dark:text-white'}`} />
                 )}
               </button>
               {isListening && !isGreeting && (
@@ -1802,7 +1785,7 @@ const AvatarCallPage = () => {
               <button 
                 onClick={handleToggleCamera}
                 disabled={isGreeting}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center transition-all duration-300 ${
                   isGreeting
                     ? 'bg-gray-500/70 cursor-not-allowed text-white/70'
                     : isCameraEnabled 
@@ -1817,7 +1800,7 @@ const AvatarCallPage = () => {
                       : 'Turn on camera'
                 }
               >
-                {isCameraEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                {isCameraEnabled ? <Video className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" /> : <VideoOff className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" />}
               </button>
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 {isGreeting ? 'Greeting...' : isCameraEnabled ? 'Turn off' : 'Turn on'}
@@ -1829,7 +1812,7 @@ const AvatarCallPage = () => {
               <button 
                 onClick={() => setIsGestureDetectionActive(!isGestureDetectionActive)}
                 disabled={!isCameraEnabled || !isGestureInitialized || isGreeting}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center transition-all duration-300 ${
                   isGreeting
                     ? 'bg-gray-500/70 cursor-not-allowed text-white/70'
                     : !isCameraEnabled || !isGestureInitialized
@@ -1851,11 +1834,11 @@ const AvatarCallPage = () => {
                 }
               >
                 {isGestureDetectionActive ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7a1 1 0 01-1-1V5a1 1 0 011-1h4zM9 3v1h6V3H9zm-2 5v10h10V8H7z" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7a1 1 0 01-1-1V5a1 1 0 011-1h4zM9 3v1h6V3H9zm-2 5v10h10V8H7z" />
                   </svg>
                 )}
@@ -1871,7 +1854,7 @@ const AvatarCallPage = () => {
                 onClick={() => setIsMuted(!isMuted)}
                 onMouseEnter={showVolumeSliderOnHover}
                 onMouseLeave={hideVolumeSliderAfterDelay}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center transition-all duration-300 ${
                   isMuted 
                     ? 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600' 
                     : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md'
@@ -1944,10 +1927,10 @@ const AvatarCallPage = () => {
             <div className="relative group voice-selector-container">
               <button 
                 onClick={() => setShowLanguageSelector(!showLanguageSelector)}
-                className="w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white"
+                className="w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center transition-all duration-300 bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white"
                 title="Change Language"
               >
-                <Globe className="w-6 h-6" />
+                <Globe className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" />
               </button>
               
               {/* Language Selector Dropdown */}
@@ -1984,14 +1967,14 @@ const AvatarCallPage = () => {
             <div className="relative group">
               <button 
                 onClick={() => setShowCaptions(!showCaptions)}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center transition-all duration-300 ${
                   showCaptions 
                     ? 'bg-blue-500 hover:bg-blue-600 text-white' 
                     : 'bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 backdrop-blur-md shadow-md text-gray-900 dark:text-white'
                 }`}
                 title={showCaptions ? 'Hide captions' : 'Show captions'}
               >
-                <MessageSquare className="w-6 h-6" />
+                <MessageSquare className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" />
               </button>
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 {showCaptions ? 'Hide captions' : 'Show captions'}
@@ -2002,10 +1985,10 @@ const AvatarCallPage = () => {
             <div className="relative group">
               <button 
                 onClick={endCall}
-                className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30 hover:scale-105 transition-all duration-300"
+                className="w-[clamp(32px,8vw,44px)] h-[clamp(32px,8vw,44px)] rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30 hover:scale-105 transition-all duration-300"
                 title="End Call"
               >
-                <PhoneOff className="w-6 h-6" />
+                <PhoneOff className="w-[clamp(12px,2.5vw,18px)] h-[clamp(12px,2.5vw,18px)]" />
               </button>
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs text-gray-700 dark:text-white/70 whitespace-nowrap">
                 End Call

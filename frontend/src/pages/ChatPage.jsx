@@ -137,6 +137,7 @@ const ChatPage = () => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [isNewChat, setIsNewChat] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -247,6 +248,12 @@ const ChatPage = () => {
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Sync sidebar visibility with viewport size
+  useEffect(() => {
+    // On desktop, sidebar should be open; on mobile, closed by default
+    setIsSidebarOpen(!isMobile);
+  }, [isMobile]);
 
   // State to track last fetch time and error state
   const [lastFetchTime, setLastFetchTime] = useState(0);
@@ -823,6 +830,11 @@ const ChatPage = () => {
       // Mark that we're not in a new chat
       debugLog('Setting isNewChat to false');
       setIsNewChat(false);
+
+      // Close sidebar on mobile after selecting a conversation
+      if (isMobile) {
+        setIsSidebarOpen(false);
+      }
       
       // Prefetch the conversation data
       debugLog('Prefetching conversation data', { conversationId });
@@ -1222,9 +1234,10 @@ const ChatPage = () => {
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Sidebar */}
-        <div className="fixed inset-y-0 left-0 z-20 w-72 flex flex-col border-r border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 md:relative">
+        {/* Sidebar - Desktop (always visible) */}
+        <div className="hidden md:flex md:relative md:z-0 w-72 flex-col border-r border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <ChatSidebar
+            isOpen={true}
             conversations={conversations}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -1237,6 +1250,43 @@ const ChatPage = () => {
           />
         </div>
 
+        {/* Sidebar - Mobile (slide-in) */}
+        <AnimatePresence>
+          {isMobile && isSidebarOpen && (
+            <>
+              <motion.div
+                key="overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/40 z-10 md:hidden"
+                onClick={() => setIsSidebarOpen(false)}
+              />
+              <motion.div
+                key="sidebar"
+                initial={{ x: -300 }}
+                animate={{ x: 0 }}
+                exit={{ x: -300 }}
+                transition={{ type: 'tween', duration: 0.2 }}
+                className="fixed inset-y-0 left-0 z-20 w-72 flex flex-col border-r border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 md:hidden shadow-xl"
+              >
+                <ChatSidebar
+                  isOpen={true}
+                  conversations={conversations}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onNewChat={handleNewChat}
+                  onSelectConversation={handleSelectConversation}
+                  onDeleteConversation={promptDelete}
+                  selectedConversation={activeConversation}
+                  conversationStyle={conversationStyle}
+                  onStyleChange={handleStyleChange}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
 
 
         {/* Main Content */}
@@ -1247,6 +1297,18 @@ const ChatPage = () => {
                 {/* Mobile header */}
                 <div className="md:hidden p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between">
                   <div className="flex items-center flex-1 min-w-0">
+                    {/* Menu button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsSidebarOpen(true)}
+                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                      aria-label="Open sidebar"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                    </motion.button>
 
                     <div className="ml-4 flex-1 min-w-0">
                       <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
@@ -1290,7 +1352,21 @@ const ChatPage = () => {
 
               </>
             ) : (
-              <div className="hidden md:flex flex-1 flex-col items-center justify-center p-6 bg-white dark:bg-gray-900">
+              <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-900 relative">
+                {/* Floating hamburger button for mobile */}
+                <div className="absolute top-4 left-4 md:hidden z-10">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                    aria-label="Open sidebar"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </motion.button>
+                </div>
                 <EmptyChat 
                   onStartConversation={handleStartConversationFromPrompt} 
                   onPopulateInput={handlePopulateInput}

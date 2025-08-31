@@ -40,15 +40,16 @@ function AppContent() {
   const isHomePage = location.pathname === '/';
   const hideNavbar = false;
   const isDashboardPage = location.pathname === '/dashboard';
-  const isSettingsPage = location.pathname === '/settings';
+  const isSettingsRoute = location.pathname.startsWith('/settings');
+  const isJournalRoute = location.pathname.startsWith('/journal');
   
   // Prevent body scrolling on specific pages - must be called unconditionally
   useEffect(() => {
     const isChatRoute = location.pathname.startsWith('/chat');
     const isInformationalPage = ['/about', '/privacy', '/terms', '/cookies', '/feedback'].some(path => location.pathname.startsWith(path));
     
-    // Allow scrolling on home, dashboard, chat, auth, and informational pages
-    if (isHomePage || isDashboardPage || isChatRoute || isAuthPage || isInformationalPage) {
+    // Allow scrolling on home, dashboard, chat, auth, informational, journal, and settings pages
+    if (isHomePage || isDashboardPage || isChatRoute || isAuthPage || isInformationalPage || isJournalRoute || isSettingsRoute) {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     } else {
@@ -61,7 +62,7 @@ function AppContent() {
       document.body.style.overflow = 'auto';
       document.body.style.height = 'auto';
     };
-  }, [location.pathname, isHomePage, isDashboardPage, isSettingsPage, isAuthPage]);
+  }, [location.pathname, isHomePage, isDashboardPage, isSettingsRoute, isJournalRoute, isAuthPage]);
 
   // Redirect authenticated users away from auth pages
   if (isAuthPage && user) {

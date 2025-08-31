@@ -106,7 +106,7 @@ const JournalPage = () => {
   // Theme colors
   const themeColors = {
     light: {
-      bg: 'bg-gray-50',
+      bg: 'bg-white',
       cardBg: 'bg-white',
       text: 'text-gray-900',
       textSecondary: 'text-gray-600',
@@ -340,7 +340,7 @@ const JournalPage = () => {
   // Show loading state while entries are being fetched
   if (isLoading) {
     return (
-      <div className={`min-h-screen ${colors.bg} flex items-center justify-center`}>
+      <div className={`min-h-[calc(100vh-5rem)] w-full ${colors.bg} flex items-center justify-center`}>
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-12 w-12 bg-indigo-200 dark:bg-indigo-800 rounded-full mb-4 animate-spin">
             <FileText className="w-6 h-6 text-indigo-600 dark:text-indigo-400 m-3" />
@@ -353,7 +353,7 @@ const JournalPage = () => {
   }
 
   return (
-    <div className={`min-h-screen ${colors.bg} ${colors.text} transition-colors duration-200`}>
+    <div className={`${colors.bg} ${colors.text} transition-colors duration-200`}>
       {/* Notification */}
       {notification && (
         <Notification 
