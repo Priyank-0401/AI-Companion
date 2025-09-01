@@ -8,11 +8,11 @@ const TermsOfServicePage = () => {
     transition: { duration: 0.6 }
   };
 
-  const lastUpdated = "January 21, 2025";
+  const lastUpdated = "August 31, 2025";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
-      <div className="container mx-auto px-4 py-16 max-w-4xl">
+      <div className="container mx-auto px-4 py-16 max-w-7xl">
         {/* Header */}
         <motion.div 
           className="text-center mb-12"

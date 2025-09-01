@@ -168,21 +168,30 @@ class VoiceService {
       throw new Error('Text cannot be empty');
     }
 
-    // Get voice and style settings
-    const voice = options.voice || this.selectedVoice;
+    // Get target language and choose a consistent voice for it
+    const desiredLang = (options.lang || this.selectedLanguage || this.selectedVoice?.language || 'en-US');
+    let voice = options.voice || this.selectedVoice;
+    if (!voice || voice.language !== desiredLang) {
+      const defaultVoice = this.getDefaultVoiceForLanguage(desiredLang);
+      if (defaultVoice) {
+        voice = defaultVoice;
+        // keep internal state consistent
+        this.selectedVoice = defaultVoice;
+        this.selectedLanguage = desiredLang;
+        console.log(`🎯 Enforcing voice-language consistency -> ${defaultVoice.displayName} for ${desiredLang}`);
+      }
+    }
     const voiceName = voice.name || 'en-US-JennyNeural';
     const style = this.mapTTSStyle(options.style || this.voiceSettings.style);
     
-    // Use faster rate for Hindi voices
+    // Use faster rate for Hindi voices only
     let rate = options.rate || this.voiceSettings.rate;
-    if (voice.language === 'hi-IN') {
-      rate = '1.2'; // Faster rate for Hindi
-    }
+    rate = (voice.language === 'hi-IN') ? '1.1' : rate;
     
     const pitch = options.pitch || this.voiceSettings.pitch;    
 
     // Create SSML with style support
-    const xmlLang = (options.lang || voice.language || 'en-US');
+    const xmlLang = desiredLang || voice.language || 'en-US';
     const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${xmlLang}">
         <voice name="${voiceName}">
           <mstts:express-as style="${style}" styledegree="1.0">
@@ -598,10 +607,12 @@ class VoiceService {
     console.log('🌐 VoiceService language set to:', languageCode);
     
     // Auto-select appropriate voice for the language
-    const languageVoices = AZURE_NEURAL_VOICES.filter(voice => voice.language === languageCode);
-    if (languageVoices.length > 0 && (!this.selectedVoice || this.selectedVoice.language !== languageCode)) {
-      this.selectedVoice = languageVoices[0];
-      console.log('🎵 Auto-selected voice for language:', this.selectedVoice.displayName);
+    if (!this.selectedVoice || this.selectedVoice.language !== languageCode) {
+      const defaultVoice = this.getDefaultVoiceForLanguage(languageCode);
+      if (defaultVoice) {
+        this.selectedVoice = defaultVoice;
+        console.log('🎵 Auto-selected voice for language:', this.selectedVoice.displayName);
+      }
     }
   }
 
@@ -620,6 +631,22 @@ class VoiceService {
 
   adjustSettings(settings) {
     this.voiceSettings = { ...this.voiceSettings, ...settings };
+  }
+
+  // Prefer a specific default voice per language (Jenny for English, Swara for Hindi)
+  getDefaultVoiceForLanguage(languageCode) {
+    if (!languageCode) return this.availableVoices[0];
+    if (languageCode === 'en-US') {
+      return AZURE_NEURAL_VOICES.find(v => v.name === 'en-US-JennyNeural')
+        || AZURE_NEURAL_VOICES.find(v => v.language === 'en-US')
+        || this.availableVoices[0];
+    }
+    if (languageCode === 'hi-IN') {
+      return AZURE_NEURAL_VOICES.find(v => v.name === 'hi-IN-SwaraNeural')
+        || AZURE_NEURAL_VOICES.find(v => v.language === 'hi-IN')
+        || this.availableVoices[0];
+    }
+    return AZURE_NEURAL_VOICES.find(v => v.language === languageCode) || this.availableVoices[0];
   }
 
   // Get voice recommendations based on context

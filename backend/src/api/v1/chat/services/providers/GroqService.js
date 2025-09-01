@@ -9,11 +9,11 @@ export default class GroqService extends BaseProvider {
     
     // Pricing per 1M tokens (input/output)
     this.tokenUsage.pricing = {
-      'llama3-8b-8192': {
+      'llama-3.1-8b-instant': {
         input: 0.10,
         output: 0.10
       },
-      'llama3-70b-8192': {
+      'llama-3.1-70b-versatile': {
         input: 0.80,
         output: 0.80
       },
@@ -34,7 +34,7 @@ export default class GroqService extends BaseProvider {
     // Ensure options is always an object
     const safeOptions = typeof options === 'object' && options !== null ? options : {};
     const startTime = Date.now();
-    const model = safeOptions.model || 'llama3-8b-8192';
+    const model = safeOptions.model || 'llama-3.1-8b-instant';
     const requestId = Math.random().toString(36).substring(2, 8);
     
     try {
@@ -220,7 +220,7 @@ export default class GroqService extends BaseProvider {
    * @returns {AsyncGenerator} Stream of response chunks
    */
   async *streamChatCompletion(messages, options = {}) {
-    const model = options.model || 'llama3-8b-8192';
+    const model = options.model || 'llama-3.1-8b-instant';
     const url = `${this.baseUrl}/chat/completions`;
     
     try {
@@ -427,19 +427,19 @@ export default class GroqService extends BaseProvider {
    */
   async listModels() {
     return {
-      'llama3-8b-8192': {
-        displayName: 'LLaMA 3 8B',
+      'llama-3.1-8b-instant': {
+        displayName: 'LLaMA 3.1 8B Instant',
         maxTokens: 8192,
         supportsStreaming: true,
-        description: '8 billion parameter model with 8K context window',
-        pricing: this.tokenUsage.pricing['llama3-8b-8192']
+        description: '8B parameter model (Groq) with fast responses and 8K context',
+        pricing: this.tokenUsage.pricing['llama-3.1-8b-instant']
       },
-      'llama3-70b-8192': {
-        displayName: 'LLaMA 3 70B',
+      'llama-3.1-70b-versatile': {
+        displayName: 'LLaMA 3.1 70B Versatile',
         maxTokens: 8192,
         supportsStreaming: true,
-        description: '70 billion parameter model with 8K context window',
-        pricing: this.tokenUsage.pricing['llama3-70b-8192']
+        description: '70B parameter model (Groq) with strong reasoning and 8K context',
+        pricing: this.tokenUsage.pricing['llama-3.1-70b-versatile']
       },
       'mixtral-8x7b-32768': {
         displayName: 'Mixtral 8x7B',

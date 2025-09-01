@@ -8,7 +8,7 @@ const CookiePolicyPage = () => {
     transition: { duration: 0.6 }
   };
 
-  const lastUpdated = "January 21, 2025";
+  const lastUpdated = "August 21, 2025";
 
   const cookieTypes = [
     {
@@ -51,7 +51,7 @@ const CookiePolicyPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900 pt-20">
-      <div className="container mx-auto px-4 py-16 max-w-4xl">
+      <div className="container mx-auto px-4 py-16 max-w-7xl">
         {/* Header */}
         <motion.div 
           className="text-center mb-12"
@@ -426,7 +426,7 @@ const CookiePolicyPage = () => {
             </p>
             <div className="space-y-2">
               <p className="text-gray-600 dark:text-gray-300">
-                <strong>Email:</strong> privacy@seriva.ai
+                <strong>Email:</strong> priyankpahwa41@gmail.com
               </p>
               <p className="text-gray-600 dark:text-gray-300">
                 <strong>Cookie Preferences:</strong> Manage in your account settings
